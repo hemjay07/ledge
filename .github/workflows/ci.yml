@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        if: hashFiles('site/package.json') != ''
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: install pipeline test deps
+        run: pip install -r pipeline/requirements.txt
+
+      - name: pytest
+        run: pytest pipeline/tests -q
+
+      - name: recompute (byte-for-byte gate)
+        run: python pipeline/recompute.py --check
+
+      - name: copy lint
+        run: bash scripts/lint-copy.sh
+
+      - name: install site deps
+        if: hashFiles('site/package.json') != ''
+        run: npm ci --prefix site
+
+      - name: vitest
+        if: hashFiles('site/package.json') != ''
+        run: npm run test --prefix site
+
+      - name: next build (static export)
+        if: hashFiles('site/package.json') != ''
+        run: npm run build --prefix site

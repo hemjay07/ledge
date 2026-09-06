@@ -1,0 +1,298 @@
+"""Pure stats functions. No I/O, no network, no clock reads except the
+explicit crawled_at argument to build_number. Binding rules: ARCHITECTURE.md
+section 6. This is the only place a METHOD.md definition lives in code.
+"""
+from __future__ import annotations
+
+from collections import Counter
+from datetime import datetime, timezone
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Optional, TypedDict
+
+Launch = TypedDict(
+    "Launch",
+    {
+        "token": str,
+        "deployer": str,
+        "pairToken": str,
+        "pairClass": str,
+        "creatorTaxBps": Optional[int],
+        "block": int,
+        "ts": int,
+    },
+)
+Graduation = TypedDict("Graduation", {"token": str, "block": int, "ts": int})
+
+MIN_N = 30
+FAST_CUTOFF = 300  # seconds
+DEFAULT_STALE_AFTER_SECONDS = 7200
+
+FACTORY_ADDRESS = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
+CHAIN_ID = 4663
+SCHEMA_VERSION = 1
+DEFINITIONS_VERSION = "2026-09-06"
+
+PAIR_BUCKETS = ["eth", "stable", "stock", "other"]
+TAX_BUCKETS = ["0%", "1%", "2-3%", "4-5%", "6-10%"]
+HOUR_BUCKETS = [f"{h:02d}" for h in range(24)]
+DAY_BUCKETS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+_PERCENTILES = (10, 25, 50, 75, 90, 95)
+
+
+def window(launches: list, graduations: list, since: Optional[int], until: int) -> dict:
+    """Select launches with ts in [since, until] and the graduations that
+    match a launch inside that selection. A graduation whose token has no
+    launch anywhere in `launches` is an orphan; a graduation whose token
+    launched outside this window is neither matched nor an orphan.
+    """
+    selected = [l for l in launches if (since is None or l["ts"] >= since) and l["ts"] <= until]
+    tokens_in_window = {l["token"] for l in selected}
+    tokens_anywhere = {l["token"] for l in launches}
+
+    grads_by_token: dict[str, dict] = {}
+    orphans = 0
+    for g in graduations:
+        token = g["token"]
+        if token in tokens_in_window:
+            grads_by_token[token] = g
+        elif token not in tokens_anywhere:
+            orphans += 1
+
+    return {
+        "launches": selected,
+        "grads_by_token": grads_by_token,
+        "since": since,
+        "until": until,
+        "orphans": orphans,
+    }
+
+
+def rate(w: dict) -> dict:
+    n = len(w["launches"])
+    graduations = len(w["grads_by_token"])
+    if n < MIN_N:
+        return {"launches": n, "graduations": graduations, "rate": None, "insufficient": True}
+    return {"launches": n, "graduations": graduations, "rate": round(graduations / n, 6), "insufficient": False}
+
+
+def _ttg_deltas(w: dict) -> list[int]:
+    launch_ts = {l["token"]: l["ts"] for l in w["launches"]}
+    return [g["ts"] - launch_ts[token] for token, g in w["grads_by_token"].items()]
+
+
+def rate_excluding_fast(w: dict, cutoff: int = FAST_CUTOFF) -> dict:
+    n = len(w["launches"])
+    slow = sum(1 for delta in _ttg_deltas(w) if delta >= cutoff)
+    if n < MIN_N:
+        return {"launches": n, "graduations": slow, "rate": None, "oneIn": None, "insufficient": True}
+    result_rate = round(slow / n, 6)
+    one_in = None
+    if slow > 0:
+        one_in = int(Decimal(1 / result_rate).quantize(0, rounding=ROUND_HALF_UP))
+    return {"launches": n, "graduations": slow, "rate": result_rate, "oneIn": one_in, "insufficient": False}
+
+
+def ttg_percentiles(w: dict) -> dict:
+    deltas = sorted(_ttg_deltas(w))
+    n = len(deltas)
+    if n < MIN_N:
+        result = {f"p{p}": None for p in _PERCENTILES}
+        result["max"] = None
+        result["n"] = n
+        result["insufficient"] = True
+        return result
+
+    def nearest_rank(p: int) -> int:
+        import math
+
+        idx = math.ceil(p / 100 * n) - 1
+        idx = max(0, min(n - 1, idx))
+        return deltas[idx]
+
+    result = {f"p{p}": nearest_rank(p) for p in _PERCENTILES}
+    result["max"] = deltas[-1]
+    result["n"] = n
+    result["insufficient"] = False
+    return result
+
+
+def fast_shares(w: dict) -> dict:
+    deltas = _ttg_deltas(w)
+    n = len(deltas)
+    if n == 0:
+        return {"under300Share": 0.0, "under60Share": 0.0, "n": 0}
+    under300 = sum(1 for d in deltas if d < 300)
+    under60 = sum(1 for d in deltas if d < 60)
+    return {
+        "under300Share": round(under300 / n, 6),
+        "under60Share": round(under60 / n, 6),
+        "n": n,
+    }
+
+
+def _tax_bucket(bps: Optional[int]) -> Optional[str]:
+    if bps is None:
+        return None
+    if bps == 0:
+        return "0%"
+    if 1 <= bps <= 100:
+        return "1%"
+    if 101 <= bps <= 300:
+        return "2-3%"
+    if 301 <= bps <= 500:
+        return "4-5%"
+    if 501 <= bps <= 1000:
+        return "6-10%"
+    return None  # out of documented range -- excluded like a missing value
+
+
+def _bucket_key(launch: dict, key: str) -> Optional[str]:
+    if key == "pairClass":
+        return launch["pairClass"]
+    if key == "taxBucket":
+        return _tax_bucket(launch["creatorTaxBps"])
+    if key == "hourUtc":
+        return f"{datetime.fromtimestamp(launch['ts'], timezone.utc).hour:02d}"
+    if key == "dayUtc":
+        return DAY_BUCKETS[datetime.fromtimestamp(launch["ts"], timezone.utc).weekday()]
+    raise ValueError(f"unknown cohort key: {key}")
+
+
+def _bucket_list(key: str) -> list[str]:
+    return {
+        "pairClass": PAIR_BUCKETS,
+        "taxBucket": TAX_BUCKETS,
+        "hourUtc": HOUR_BUCKETS,
+        "dayUtc": DAY_BUCKETS,
+    }[key]
+
+
+def cohort(w: dict, key: str) -> list[dict]:
+    buckets = _bucket_list(key)
+    launches_by_bucket: dict[str, list[dict]] = {b: [] for b in buckets}
+    for l in w["launches"]:
+        bucket = _bucket_key(l, key)
+        if bucket is not None:
+            launches_by_bucket[bucket].append(l)
+
+    rows = []
+    for bucket in buckets:
+        members = launches_by_bucket[bucket]
+        n = len(members)
+        graduations = sum(1 for l in members if l["token"] in w["grads_by_token"])
+        if n < MIN_N:
+            rows.append({"bucket": bucket, "launches": n, "graduations": graduations, "rate": None, "insufficient": True})
+        else:
+            rows.append(
+                {
+                    "bucket": bucket,
+                    "launches": n,
+                    "graduations": graduations,
+                    "rate": round(graduations / n, 6),
+                    "insufficient": False,
+                }
+            )
+    return rows
+
+
+def cohort_excluded(w: dict, key: str) -> int:
+    return sum(1 for l in w["launches"] if _bucket_key(l, key) is None)
+
+
+def deployers(w: dict) -> dict:
+    counts = Counter(l["deployer"] for l in w["launches"])
+    distinct = len(counts)
+    total_launches = len(w["launches"])
+    two_plus = sum(1 for c in counts.values() if c >= 2)
+    from_10plus_launches = sum(c for c in counts.values() if c >= 10)
+
+    histogram_buckets = [
+        ("1", lambda c: c == 1),
+        ("2-4", lambda c: 2 <= c <= 4),
+        ("5-9", lambda c: 5 <= c <= 9),
+        ("10-49", lambda c: 10 <= c <= 49),
+        ("50+", lambda c: c >= 50),
+    ]
+    histogram = [
+        {"bucket": label, "deployers": sum(1 for c in counts.values() if pred(c))}
+        for label, pred in histogram_buckets
+    ]
+
+    return {
+        "distinct": distinct,
+        "launched2plusShare": round(two_plus / distinct, 6) if distinct else 0.0,
+        "from10plusShare": round(from_10plus_launches / total_launches, 6) if total_launches else 0.0,
+        "histogram": histogram,
+    }
+
+
+def _parse_iso(value: str) -> int:
+    return int(datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp())
+
+
+def _window_block(launches: list, graduations: list, since: Optional[int], until: int, lower_bound: bool) -> dict:
+    w = window(launches, graduations, since, until)
+    plain = rate(w)
+    excluding_fast = rate_excluding_fast(w)
+
+    cohorts = {
+        "pair": cohort(w, "pairClass"),
+        "tax": cohort(w, "taxBucket"),
+        "hour": cohort(w, "hourUtc"),
+        "day": cohort(w, "dayUtc"),
+    }
+    cohorts_excluded = {
+        "pair": cohort_excluded(w, "pairClass"),
+        "tax": cohort_excluded(w, "taxBucket"),
+        "hour": cohort_excluded(w, "hourUtc"),
+        "day": cohort_excluded(w, "dayUtc"),
+    }
+
+    return {
+        "since": since,
+        "until": until,
+        "lowerBound": lower_bound,
+        "launches": plain["launches"],
+        "graduations": plain["graduations"],
+        "rate": plain["rate"],
+        "insufficient": plain["insufficient"],
+        "orphans": w["orphans"],
+        "excludingFast": {
+            "cutoffSeconds": FAST_CUTOFF,
+            "graduations": excluding_fast["graduations"],
+            "rate": excluding_fast["rate"],
+            "oneIn": excluding_fast["oneIn"],
+            "insufficient": excluding_fast["insufficient"],
+        },
+        "fastShares": fast_shares(w),
+        "ttg": ttg_percentiles(w),
+        "cohorts": cohorts,
+        "cohortsExcluded": cohorts_excluded,
+        "deployers": deployers(w),
+    }
+
+
+def build_number(launches: list, graduations: list, state: dict, crawled_at: str) -> dict:
+    until = _parse_iso(crawled_at)
+    since_24h = until - 86400
+
+    last_run_at = state.get("lastRunAt")
+    last_success_at = state.get("lastSuccessAt")
+    stale = False
+    if last_run_at and last_success_at:
+        stale = (_parse_iso(last_run_at) - _parse_iso(last_success_at)) > DEFAULT_STALE_AFTER_SECONDS
+
+    return {
+        "schemaVersion": SCHEMA_VERSION,
+        "definitionsVersion": DEFINITIONS_VERSION,
+        "crawledAt": crawled_at,
+        "staleAfterSeconds": DEFAULT_STALE_AFTER_SECONDS,
+        "stale": stale,
+        "headBlock": state.get("lastIndexedBlock"),
+        "firstIndexedBlock": state.get("firstIndexedBlock"),
+        "factory": FACTORY_ADDRESS,
+        "chainId": CHAIN_ID,
+        "h24": _window_block(launches, graduations, since_24h, until, lower_bound=True),
+        "allTime": _window_block(launches, graduations, None, until, lower_bound=False),
+    }
