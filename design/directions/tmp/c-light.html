@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LEDGE — The Pons Number</title>
+<meta name="description" content="The Pons Number: 1.85% of 3,347 Pons launches in the last 24 hours graduated. Measured hourly from the factory contract.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ---------------------------------------------------------------
+   LEDGE — direction C, "The Broadside"
+   Two-tone public notice. Colour is reserved for the stale state.
+   --------------------------------------------------------------- */
+
+/* three-state tokens: light default, system dark, explicit dark */
+:root{
+  --ground:      #EFEAE0;   /* bone */
+  --ground-slip: #E5DFD1;   /* pasted-slip ground, one step down */
+  --ink:         #16130F;   /* press ink */
+  --ink-muted:   #57503F;   /* 6.4:1 on bone */
+  --rule:        #16130F;
+  --rule-hair:   #BDB5A3;
+  --stale:       #B3321C;   /* correction slip, 5.1:1 on bone */
+  --stale-ink:   #FFFFFF;
+  --bar:         #16130F;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:      #121110;
+    --ground-slip: #1C1A17;
+    --ink:         #E8E3D8;
+    --ink-muted:   #A39B8A;   /* 6.7:1 on ink ground */
+    --rule:        #E8E3D8;
+    --rule-hair:   #423E38;
+    --stale:       #F2704A;   /* 6.4:1 on ink ground */
+    --stale-ink:   #121110;
+    --bar:         #E8E3D8;
+    }
+}
+:root[data-theme="dark"]{
+  --ground:      #121110;
+  --ground-slip: #1C1A17;
+  --ink:         #E8E3D8;
+  --ink-muted:   #A39B8A;
+  --rule:        #E8E3D8;
+  --rule-hair:   #423E38;
+  --stale:       #F2704A;
+  --stale-ink:   #121110;
+  --bar:         #E8E3D8;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"Work Sans","Helvetica Neue",Arial,sans-serif;
+  font-size:16px;
+  line-height:1.45;
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
+  -webkit-font-smoothing:antialiased;
+}
+.sheet{max-width:56rem;margin:0 auto;padding:0 1.25rem 4rem}
+@media (min-width:64rem){ .sheet{padding:0 2.5rem 6rem} }
+
+h1,h2,h3{font-weight:600;margin:0}
+p{margin:0}
+a{color:inherit;text-decoration:none;border-bottom:1px solid var(--rule-hair)}
+a:hover{border-bottom-color:var(--ink)}
+a:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:1px}
+
+/* ---- printed rules ---- */
+.rule-heavy{height:7px;background:var(--rule)}
+.rule-mid{height:3px;background:var(--rule)}
+.rule-hair{height:1px;background:var(--rule-hair)}
+
+/* ---- running head / colophon ---- */
+.head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
+  padding:.5rem 0 .55rem;
+  font-size:.6875rem;letter-spacing:.14em;text-transform:uppercase;font-weight:600;
+}
+.head .mark{font-family:"Anton",Impact,sans-serif;font-weight:400;font-size:1.05rem;letter-spacing:.1em;line-height:1}
+.head .win{color:var(--ink-muted);white-space:nowrap}
+
+/* ---- stale slip ---- */
+.slip{background:var(--stale);color:var(--stale-ink);padding:.7rem 1.25rem}
+.slip .sheet-in{max-width:56rem;margin:0 auto;font-size:.8125rem;font-weight:600;letter-spacing:.01em}
+@media (min-width:64rem){ .slip{padding-left:2.5rem;padding-right:2.5rem} }
+.slip[hidden]{display:none}
+
+/* ---- the fold ---- */
+.fold{padding:clamp(2rem,9vw,4.5rem) 0 0}
+.fold .kicker{
+  font-size:.6875rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-muted);font-weight:600;margin-bottom:.4rem;
+}
+.figure-block{margin-left:6%}
+@media (min-width:48rem){ .figure-block{margin-left:14%} }
+.figure{
+  font-family:"Anton",Impact,"Arial Narrow",sans-serif;
+  font-weight:400;
+  font-size:clamp(7rem,34vw,17rem);
+  line-height:.82;
+  letter-spacing:-.015em;
+  display:block;
+  font-variant-numeric:tabular-nums;
+}
+.caption{
+  margin-top:clamp(1rem,3.5vw,1.75rem);
+  font-size:clamp(.9375rem,3.4vw,1.0625rem);
+  max-width:34ch;
+  text-wrap:balance;
+}
+.caption .den{color:var(--ink-muted)}
+.age{white-space:nowrap}
+.age.is-stale{color:var(--stale);font-weight:600}
+
+.second{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem .9rem;
+  padding:1rem 0 1.1rem;
+}
+.second .n2{
+  font-family:"Anton",Impact,"Arial Narrow",sans-serif;font-weight:400;
+  font-size:clamp(2.25rem,11vw,3.75rem);line-height:.9;letter-spacing:-.01em;
+}
+.second .n2-note{font-size:.875rem;color:var(--ink-muted);max-width:32ch}
+.second .n2-note b{color:var(--ink);font-weight:600}
+
+.colophon{
+  display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
+  padding:.55rem 0 .6rem;
+  font-size:.6875rem;letter-spacing:.14em;text-transform:uppercase;font-weight:600;
+}
+.colophon .url{font-family:"Anton",Impact,sans-serif;font-weight:400;font-size:1rem;letter-spacing:.09em}
+.colophon .stamp{color:var(--ink-muted);text-align:right}
+
+/* ---- body sections ---- */
+section{padding-top:clamp(2.25rem,6vw,3.25rem)}
+.sec-head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
+  font-size:.6875rem;letter-spacing:.16em;text-transform:uppercase;font-weight:600;
+  padding-bottom:.4rem;
+}
+.sec-head .n{color:var(--ink-muted);white-space:nowrap;font-weight:500}
+.lede{font-size:1.0625rem;max-width:46ch;padding-top:.85rem}
+.note{font-size:.8125rem;color:var(--ink-muted);max-width:56ch;padding-top:.55rem}
+
+/* ---- distribution: a thick printed rule with printed tick marks ---- */
+.dist{padding-top:1.6rem}
+.dist-frame{position:relative;height:118px}
+.dist-bar{position:absolute;left:0;right:0;top:64px;height:26px;background:var(--bar)}
+.tick{position:absolute;top:0;height:64px;width:2px;background:var(--ink);transform:translateX(-1px)}
+.tick[data-tier="a"]{top:34px;height:30px}
+.tick-l{
+  position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);
+  font-size:.625rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+  white-space:nowrap;text-align:center;line-height:1.25;
+}
+.tick-l .v{display:block;letter-spacing:.02em;text-transform:none;font-size:.75rem}
+.tick[data-align="r"] .tick-l{left:auto;right:0;transform:none;text-align:right}
+.axis{position:absolute;top:90px;left:0;right:0;height:28px}
+.axis span{position:absolute;top:0;font-size:.625rem;color:var(--ink-muted);letter-spacing:.06em;transform:translateX(-50%);padding-top:6px}
+.axis span::before{content:"";position:absolute;top:0;left:50%;width:1px;height:5px;background:var(--rule-hair)}
+.axis span:first-child{transform:none}
+.axis span:first-child::before{left:0}
+
+/* ---- tables ---- */
+.scroller{overflow-x:auto;margin-top:.9rem;-webkit-overflow-scrolling:touch}
+.scroller:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+table{border-collapse:collapse;width:100%;min-width:26rem;font-size:.9375rem}
+caption{text-align:left;font-size:.8125rem;color:var(--ink-muted);padding-bottom:.5rem}
+th,td{padding:.5rem 0;text-align:right;vertical-align:baseline;border-bottom:1px solid var(--rule-hair)}
+thead th{
+  font-size:.625rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-muted);
+  font-weight:600;border-bottom:2px solid var(--rule);padding-bottom:.35rem;
+}
+th[scope="row"],thead th:first-child,td:first-child{text-align:left}
+th[scope="row"]{font-weight:500;white-space:nowrap;padding-right:1rem}
+td.val{font-weight:600;white-space:nowrap;padding-left:1rem}
+td.den{color:var(--ink-muted);white-space:nowrap;padding-left:1rem;font-size:.875rem}
+td.thin{color:var(--ink-muted);font-weight:500}
+tbody tr:last-child th,tbody tr:last-child td{border-bottom:2px solid var(--rule)}
+
+/* ---- all-time ---- */
+.alltime{display:flex;flex-wrap:wrap;gap:1.6rem 3rem;padding-top:1rem}
+.at-item .at-v{font-family:"Anton",Impact,sans-serif;font-weight:400;font-size:2.25rem;line-height:1}
+.at-item .at-k{font-size:.8125rem;color:var(--ink-muted);max-width:24ch;padding-top:.3rem}
+
+/* ---- footer ---- */
+footer{padding-top:clamp(2.5rem,7vw,4rem)}
+.foot-text{font-size:.8125rem;color:var(--ink-muted);padding-top:.75rem;line-height:1.7;overflow-wrap:anywhere}
+.foot-text a{color:var(--ink)}
+.addr{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8125rem}
+
+/* ---- one restrained reveal ---- */
+@media (prefers-reduced-motion:no-preference){
+  .reveal{animation:rise 420ms cubic-bezier(.2,.6,.2,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+}
+.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+</style>
+</head>
+<body>
+
+<div class="slip" id="slip" hidden>
+  <div class="sheet-in" role="status">
+    <span id="slip-text">This number is 3 h old. Last successful measurement 15:58 UTC, 6 September 2026.</span>
+  </div>
+</div>
+
+<div class="sheet">
+
+  <!-- ============ THE FOLD: the sheet a phone screenshot captures whole ============ -->
+  <div class="rule-heavy"></div>
+  <div class="head">
+    <span class="mark">LEDGE</span>
+    <span class="win">Trailing 24 hours</span>
+  </div>
+  <div class="rule-hair"></div>
+
+  <div class="fold reveal">
+    <h1 class="kicker">The Pons Number</h1>
+    <div class="figure-block">
+      <span class="figure" aria-hidden="true">1.85%</span>
+      <span class="visually-hidden">1.85 per cent: 62 of 3,347 Pons launches in the last 24 hours graduated.</span>
+    </div>
+    <p class="caption">
+      of <b>3,347</b> launches in the last 24&nbsp;hours graduated
+      <span class="den">· 62 graduations · updated <span class="age" id="age">12 min</span> ago</span>
+    </p>
+  </div>
+
+  <div class="rule-hair" style="margin-top:1.5rem"></div>
+  <div class="second">
+    <span class="n2" aria-hidden="true">0.36%</span>
+    <p class="n2-note">
+      <span class="visually-hidden">0.36 per cent, </span>excluding launches that graduated inside 5&nbsp;minutes
+      · <b>1 in 279</b> · 12 of 3,347
+    </p>
+  </div>
+  <div class="rule-mid"></div>
+  <div class="colophon">
+    <span class="url">LEDGE.TOOLS</span>
+    <span class="stamp">Measured 6 Sep 2026 · 15:58 UTC</span>
+  </div>
+  <div class="rule-heavy"></div>
+  <!-- ============ end of fold ============ -->
+
+  <p class="note" style="padding-top:1rem">
+    The 24-hour figure is a lower bound: a launch near the end of the window may still graduate.
+    81% of graduations completed inside 5 minutes; 58% inside 60 seconds (n&nbsp;=&nbsp;62 graduations).
+  </p>
+
+  <!-- ============ TIME TO GRADUATION ============ -->
+  <section aria-labelledby="h-dist">
+    <div class="rule-mid"></div>
+    <div class="sec-head" style="padding-top:.45rem">
+      <h2 id="h-dist">Time to graduation</h2>
+      <span class="n">n = 62 graduations · 24 h</span>
+    </div>
+    <p class="lede">9 in 10 graduations happened within 8&nbsp;min. Median 41&nbsp;s.</p>
+
+    <div class="dist">
+      <div class="dist-frame" role="img" aria-label="Time-to-graduation distribution over 62 graduations on a log axis: 10th percentile 8 seconds, 25th 18 seconds, median 41 seconds, 75th 4 minutes, 90th 8 minutes, 95th 18 minutes, longest 42 minutes.">
+        <div class="dist-bar"></div>
+
+        <div class="tick" data-tier="b" style="left:47.4%">
+          <span class="tick-l">p50<span class="v">41 s</span></span>
+        </div>
+        <div class="tick" data-tier="a" style="left:69.9%">
+          <span class="tick-l">p75<span class="v">4 min</span></span>
+        </div>
+        <div class="tick" data-tier="b" style="left:78.6%">
+          <span class="tick-l">p90<span class="v">8 min</span></span>
+        </div>
+        <div class="tick" data-tier="a" data-align="r" style="left:89.5%">
+          <span class="tick-l">p95<span class="v">18 min</span></span>
+        </div>
+
+        <div class="axis" aria-hidden="true">
+          <span style="left:0%">1 s</span>
+          <span style="left:29.4%">10 s</span>
+          <span style="left:52.3%">1 min</span>
+          <span style="left:81.7%">10 min</span>
+        </div>
+      </div>
+    </div>
+    <p class="note">
+      Log axis, 1&nbsp;s to the longest observed graduation, 42&nbsp;min.
+      p10 8&nbsp;s · p25 18&nbsp;s · p50 41&nbsp;s · p75 4&nbsp;min · p90 8&nbsp;min · p95 18&nbsp;min · max 42&nbsp;min.
+      The bar ends at the longest graduation observed in this window, not at a boundary.
+    </p>
+  </section>
+
+  <!-- ============ COHORTS ============ -->
+  <section aria-labelledby="h-pair">
+    <div class="rule-mid"></div>
+    <div class="sec-head" style="padding-top:.45rem">
+      <h2 id="h-pair">By pair token</h2>
+      <span class="n">24 h · 3,347 launches</span>
+    </div>
+    <div class="scroller" tabindex="0" role="region" aria-labelledby="h-pair">
+      <table>
+        <thead>
+          <tr><th scope="col">Pair</th><th scope="col">Rate</th><th scope="col">Graduations / launches (n)</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">ETH</th><td class="val">0.89%</td><td class="den">13 / 1,457</td></tr>
+          <tr><th scope="row">Stablecoin</th><td class="val">2.8%</td><td class="den">25 / 892</td></tr>
+          <tr><th scope="row">Tokenized stock</th><td class="val">2.5%</td><td class="den">24 / 972</td></tr>
+          <tr><th scope="row">Other</th><td class="val thin">not enough data (n=26)</td><td class="den">0 / 26</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">No launches were excluded from this cohort.</p>
+  </section>
+
+  <section aria-labelledby="h-tax">
+    <div class="rule-mid"></div>
+    <div class="sec-head" style="padding-top:.45rem">
+      <h2 id="h-tax">By creator tax</h2>
+      <span class="n">24 h · 3,347 launches</span>
+    </div>
+    <div class="scroller" tabindex="0" role="region" aria-labelledby="h-tax">
+      <table>
+        <thead>
+          <tr><th scope="col">Creator tax</th><th scope="col">Rate</th><th scope="col">Graduations / launches (n)</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">0%</th><td class="val">2.50%</td><td class="den">49 / 1,962</td></tr>
+          <tr><th scope="row">1%</th><td class="val">0.6%</td><td class="den">4 / 617</td></tr>
+          <tr><th scope="row">2–3%</th><td class="val">1.6%</td><td class="den">8 / 510</td></tr>
+          <tr><th scope="row">4–5%</th><td class="val">0.0%</td><td class="den">0 / 127</td></tr>
+          <tr><th scope="row">6–10%</th><td class="val">0.8%</td><td class="den">1 / 131</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Rates are printed to the precision the sample supports: two decimals at n&nbsp;≥&nbsp;1,000, one below.</p>
+  </section>
+
+  <section aria-labelledby="h-hour">
+    <div class="rule-mid"></div>
+    <div class="sec-head" style="padding-top:.45rem">
+      <h2 id="h-hour">By hour (UTC)</h2>
+      <span class="n">24 h · 3 hours observed</span>
+    </div>
+    <div class="scroller" tabindex="0" role="region" aria-labelledby="h-hour">
+      <table>
+        <thead>
+          <tr><th scope="col">Hour</th><th scope="col">Rate</th><th scope="col">Graduations / launches (n)</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">13:00</th><td class="val">0.7%</td><td class="den">1 / 144</td></tr>
+          <tr><th scope="row">14:00</th><td class="val">2.02%</td><td class="den">32 / 1,581</td></tr>
+          <tr><th scope="row">15:00</th><td class="val">1.79%</td><td class="den">29 / 1,622</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">
+      The remaining 21 hourly buckets hold n&nbsp;=&nbsp;0: indexing began at 15:58&nbsp;UTC today,
+      so only 13:00–15:00 have been observed. Day-of-week buckets are withheld for the same reason —
+      six of seven days hold n&nbsp;=&nbsp;0.
+    </p>
+  </section>
+
+  <section aria-labelledby="h-dep">
+    <div class="rule-mid"></div>
+    <div class="sec-head" style="padding-top:.45rem">
+      <h2 id="h-dep">Deployers</h2>
+      <span class="n">24 h · 2,223 distinct</span>
+    </div>
+    <p class="lede">
+      2,223 distinct deployers produced 3,347 launches. 11.8% of them launched two or more.
+      20.0% of all launches came from deployers with ten or more.
+    </p>
+    <div class="scroller" tabindex="0" role="region" aria-labelledby="h-dep">
+      <table>
+        <caption>Launches per deployer, 24 h · n = 2,223 deployers</caption>
+        <thead>
+          <tr><th scope="col">Launches</th><th scope="col">Deployers</th><th scope="col">Share of 2,223</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">1</th><td class="val">1,960</td><td class="den">88.2%</td></tr>
+          <tr><th scope="row">2–4</th><td class="val">205</td><td class="den">9.2%</td></tr>
+          <tr><th scope="row">5–9</th><td class="val">31</td><td class="den">1.4%</td></tr>
+          <tr><th scope="row">10–49</th><td class="val">25</td><td class="den">1.1%</td></tr>
+          <tr><th scope="row">50+</th><td class="val">2</td><td class="den">0.1%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Aggregate distribution only. No deployer address appears on this page.</p>
+  </section>
+
+  <!-- ============ ALL-TIME ============ -->
+  <section aria-labelledby="h-all">
+    <div class="rule-mid"></div>
+    <div class="sec-head" style="padding-top:.45rem">
+      <h2 id="h-all">All-time</h2>
+      <span class="n">since 15:58 UTC today</span>
+    </div>
+    <div class="alltime">
+      <div class="at-item">
+        <div class="at-v">1.85%</div>
+        <p class="at-k">62 of 3,347 launches graduated</p>
+      </div>
+      <div class="at-item">
+        <div class="at-v">0.36%</div>
+        <p class="at-k">excluding launches that graduated inside 5 minutes · 1 in 279 · 12 of 3,347</p>
+      </div>
+    </div>
+    <p class="note">
+      All-time is identical to the 24-hour window: LEDGE has indexed only since block 56,028,514,
+      15:58&nbsp;UTC today. 7 graduations had no recorded launch and are excluded from every rate.
+    </p>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer>
+    <div class="rule-heavy"></div>
+    <div class="head" style="padding-top:.55rem">
+      <span class="mark">LEDGE.TOOLS</span>
+      <span class="win">Chain 4663 · Definitions 2026-09-06</span>
+    </div>
+    <div class="rule-hair"></div>
+    <p class="foot-text">
+      Measured from PonsV2LaunchFactory <span class="addr">0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e</span>
+      · Data and code: <a href="https://github.com/hemjay07/ledge">github.com/hemjay07/ledge</a>
+      · <a href="/method">Method</a>
+      · <a href="/number.json">number.json</a>
+    </p>
+  </footer>
+</div>
+
+<script>
+/* Only script on the page:
+   1) renders "updated N ago" from a hardcoded crawledAt
+   2) ?stale=1 shows the correction slip for demo purposes
+   DEMO_NOW freezes "now" so this static direction renders its fresh state;
+   the real page uses Date.now(). Append ?live=1 to use the real clock. */
+(function () {
+  var CRAWLED_AT = "2026-09-06T15:58:32Z";
+  var DEMO_NOW   = "2026-09-06T16:10:32Z";
+  var STALE_AFTER_S = 7200;
+
+  var q = new URLSearchParams(location.search);
+  var now = q.has("live") ? Date.now() : Date.parse(DEMO_NOW);
+  var secs = Math.max(0, Math.round((now - Date.parse(CRAWLED_AT)) / 1000));
+
+  function ago(s) {
+    if (s < 90) return s + " s";
+    if (s < 5400) return Math.round(s / 60) + " min";
+    if (s < 172800) return Math.round(s / 3600) + " h";
+    return Math.round(s / 86400) + " d";
+  }
+
+  var isStale = secs >= STALE_AFTER_S || q.get("stale") === "1";
+  var ageEl = document.getElementById("age");
+  ageEl.textContent = ago(secs);
+  if (isStale) ageEl.classList.add("is-stale");
+
+  if (isStale) {
+    document.getElementById("slip-text").textContent =
+      "This number is " + ago(secs) + " old. Last successful measurement 15:58 UTC, 6 September 2026.";
+    document.getElementById("slip").hidden = false;
+  }
+})();
+</script>
+</body>
+</html>

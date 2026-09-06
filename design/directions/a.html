@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LEDGE — The Pons Number</title>
+<meta name="description" content="The Pons Number. Graduation rates measured from every Pons launch.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------
+   LEDGE — direction A, "The Ledger"
+   A printed accounting register: ruled lines, a numbered entry column,
+   tabular figures. Light = warm paper, near-black ink.
+   Dark = the same sheet as a photographic negative: cool ground,
+   bone ink, the rules dimmed rather than inverted.
+   Colour appears once, and only for the stale state (red ink stamp).
+   ------------------------------------------------------------------ */
+
+/* three-state tokens ------------------------------------------------ */
+:root {
+  --paper:        #F6F3EA;  /* warm cream sheet          */
+  --paper-alt:    #EFEBDF;  /* alternating ruled band    */
+  --ink:          #16140E;  /* near-black, warm          */
+  --ink-2:        #45413A;  /* secondary running text    */
+  --ink-3:        #6B6558;  /* labels, denominators      */
+  --rule:         #CDC6B3;  /* hairline rule             */
+  --rule-mid:     #A9A18C;  /* section rule              */
+  --rule-strong:  #16140E;  /* total rules               */
+  --stamp:        #A8231C;  /* the one colour: stale     */
+  --stamp-field:  #F0E2DE;
+  --shadow:       0 0 0 1px var(--rule);
+  --sheet-max:    47rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:        #0E0E12;
+    --paper-alt:    #14141A;
+    --ink:          #E9E5D9;
+    --ink-2:        #B4AEA0;
+    --ink-3:        #8B857A;
+    --rule:         #2C2C34;
+    --rule-mid:     #43434E;
+    --rule-strong:  #E9E5D9;
+    --stamp:        #E4564B;
+    --stamp-field:  #241514;
+    --shadow:       0 0 0 1px var(--rule);
+  }
+}
+:root[data-theme="dark"] {
+  --paper:        #0E0E12;
+  --paper-alt:    #14141A;
+  --ink:          #E9E5D9;
+  --ink-2:        #B4AEA0;
+  --ink-3:        #8B857A;
+  --rule:         #2C2C34;
+  --rule-mid:     #43434E;
+  --rule-strong:  #E9E5D9;
+  --stamp:        #E4564B;
+  --stamp-field:  #241514;
+  --shadow:       0 0 0 1px var(--rule);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Newsreader", Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono, .fig {
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---- the sheet ---------------------------------------------------- */
+.sheet {
+  max-width: var(--sheet-max);
+  margin: 0 auto;
+  padding: 0 1rem 4rem;
+}
+@media (min-width: 40rem) {
+  .sheet { padding: 0 2rem 6rem; }
+}
+
+/* the ledger's ruled margin: a single vertical rule down the register */
+.entry {
+  position: relative;
+  padding: 1.5rem 0 1.5rem 2.75rem;
+  border-top: 1px solid var(--rule);
+}
+.entry::before {
+  content: attr(data-folio);
+  position: absolute;
+  left: 0;
+  top: 1.55rem;
+  width: 1.75rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  text-align: right;
+}
+.entry::after {
+  content: "";
+  position: absolute;
+  left: 2.1rem;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule);
+}
+@media (min-width: 40rem) {
+  .entry { padding-left: 3.5rem; }
+  .entry::before { width: 2.25rem; }
+  .entry::after { left: 2.75rem; }
+}
+
+/* ---- masthead ----------------------------------------------------- */
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  padding: 1.75rem 0 0.75rem;
+  border-bottom: 2px solid var(--rule-strong);
+}
+.wordmark {
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+.masthead .folio {
+  margin: 0;
+  margin-left: auto;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+.subject {
+  margin: 0.5rem 0 0;
+  font-size: 0.9375rem;
+  font-style: italic;
+  color: var(--ink-2);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.75rem;
+}
+
+/* ---- stale stamp -------------------------------------------------- */
+.stale {
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.875rem;
+  background: var(--stamp-field);
+  border: 1px solid var(--stamp);
+  border-left-width: 4px;
+  color: var(--stamp);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.stale[hidden] { display: none; }
+.stale b { font-weight: 600; }
+
+/* ---- the total ---------------------------------------------------- */
+.label {
+  margin: 0 0 0.25rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+h2.label { font-weight: 600; color: var(--ink-2); }
+
+.total {
+  border-top: 1px solid var(--rule-strong);
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+}
+.total-figure {
+  display: block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: clamp(3.75rem, 20vw, 7rem);
+  font-weight: 500;
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  margin: 0.25rem 0 0.5rem;
+}
+/* double rule beneath the total, as a ledger total is drawn */
+.total-rules {
+  border-top: 1px solid var(--rule-strong);
+  padding-top: 3px;
+}
+.total-rules::after {
+  content: "";
+  display: block;
+  height: 1px;
+  background: var(--rule-strong);
+}
+.total-gloss {
+  margin: 0.75rem 0 0;
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  color: var(--ink);
+  max-width: 34rem;
+}
+
+/* the second figure, entered beneath as a contra-line */
+.contra {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.875rem;
+  border-top: 1px solid var(--rule);
+  padding-top: 0.75rem;
+}
+.contra-figure {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: clamp(1.875rem, 9vw, 2.75rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.contra-oneIn {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 1rem;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.contra-gloss {
+  flex-basis: 100%;
+  margin: 0.375rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+
+.footing {
+  margin: 1.25rem 0 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.footing .age { color: var(--ink); }
+.footing.is-stale .age { color: var(--stamp); font-weight: 600; }
+
+.note {
+  margin: 0.75rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+  max-width: 34rem;
+}
+.note--fine {
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+/* ---- distribution bar --------------------------------------------- */
+.dist {
+  margin-top: 1rem;
+  min-width: 17rem;
+}
+.dist-track {
+  position: relative;
+  height: 1.5rem;
+  border: 1px solid var(--rule-mid);
+  border-right: 0;
+  background: var(--paper-alt);
+}
+.dist-fill {
+  position: absolute;
+  inset: 0 21.3% 0 0;
+  background: var(--ink);
+  opacity: 0.14;
+}
+.tick {
+  position: absolute;
+  top: -0.375rem;
+  bottom: -0.375rem;
+  width: 1px;
+  background: var(--ink);
+}
+.tick--minor { top: 0.375rem; bottom: 0.375rem; background: var(--rule-mid); }
+.dist-labels {
+  position: relative;
+  height: 3.1rem;
+  margin-top: 0.375rem;
+}
+.dist-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  color: var(--ink-2);
+  white-space: nowrap;
+  text-align: center;
+}
+.dist-labels span b {
+  display: block;
+  font-weight: 500;
+  color: var(--ink);
+  font-size: 0.75rem;
+}
+.dist-labels .tier2 { top: 1.65rem; }
+.dist-scale {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--rule);
+  padding-top: 0.375rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  color: var(--ink-3);
+}
+
+/* ---- register tables ---------------------------------------------- */
+.scroller {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 0.75rem;
+}
+.scroller:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+table {
+  width: 100%;
+  min-width: 20rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+caption {
+  caption-side: top;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  padding-bottom: 0.5rem;
+}
+th, td {
+  padding: 0.4375rem 0.625rem 0.4375rem 0;
+  text-align: right;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+th:first-child, td:first-child {
+  text-align: left;
+  padding-left: 0.375rem;
+  white-space: normal;
+}
+th:last-child, td:last-child { padding-right: 0.375rem; }
+thead th {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--rule-mid);
+  padding-bottom: 0.3125rem;
+}
+tbody tr:nth-child(even) { background: var(--paper-alt); }
+tbody th { font-weight: 500; }
+td.fig { font-size: 0.9375rem; }
+td.n { color: var(--ink-2); }
+td.thin { color: var(--ink-3); font-style: italic; font-size: 0.8125rem; }
+tfoot td, tfoot th {
+  border-bottom: 0;
+  border-top: 1px solid var(--rule-strong);
+  padding-top: 0.4375rem;
+  font-weight: 500;
+}
+
+/* ---- all-time ----------------------------------------------------- */
+.alltime {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem 2.5rem;
+  margin-top: 0.75rem;
+}
+.alltime div { min-width: 8rem; }
+.alltime .fig { font-size: 1.5rem; display: block; line-height: 1.1; }
+.alltime .cap { font-size: 0.8125rem; color: var(--ink-2); display: block; margin-top: 0.25rem; }
+
+/* ---- footer ------------------------------------------------------- */
+.colophon {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--rule-strong);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.9;
+  color: var(--ink-2);
+  word-break: break-word;
+}
+.colophon a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.colophon a:hover { text-decoration-style: dotted; }
+a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.addr { color: var(--ink); }
+
+.vh {
+  position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---- the single reveal: the sheet settles once, on load ----------- */
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { animation: settle 420ms ease-out both; }
+  @keyframes settle {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+</style>
+</head>
+<body>
+
+<main class="sheet">
+
+  <header class="masthead">
+    <h1 class="wordmark">Ledge</h1>
+    <p class="folio">Robinhood Chain · id 4663 · sheet 01</p>
+  </header>
+  <p class="subject">The Pons Number — graduations recorded against launches, as measured from the factory.</p>
+
+  <div class="stale mono" id="stale-banner" hidden role="status">
+    <b>This number is <span id="stale-age">2 h 40 min</span> old.</b><br>
+    Last successful measurement 15:58 UTC, 6 September 2026.
+  </div>
+
+  <!-- 01 · THE TOTAL -->
+  <section class="entry" data-folio="01" aria-labelledby="h-number">
+    <p class="label" id="h-number">The Pons Number · trailing 24 hours</p>
+    <div class="total">
+      <span class="total-figure" aria-hidden="true">1.85%</span>
+      <p class="vh">1.85 percent: 62 graduations of 3,347 launches in the last 24 hours.</p>
+      <div class="total-rules"></div>
+    </div>
+    <p class="total-gloss">62 of 3,347 Pons launches in the last 24 hours graduated.</p>
+
+    <div class="contra">
+      <span class="contra-figure" aria-hidden="true">0.36%</span>
+      <span class="contra-oneIn" aria-hidden="true">1 in 279</span>
+      <p class="vh">0.36 percent, or 1 in 279: 12 graduations of 3,347 launches, excluding launches that graduated inside 5 minutes.</p>
+      <p class="contra-gloss">excluding launches that graduated inside 5 minutes · 12 of 3,347</p>
+    </div>
+
+    <p class="footing" id="footing">
+      of 3,347 launches in the last 24 hours · updated <span class="age" id="age">41 min</span> ago
+    </p>
+    <p class="note note--fine">A launch near the end of the window may still graduate, so the 24-hour figure is a lower bound for the most recent hours.</p>
+  </section>
+
+  <!-- 02 · FAST GRADUATIONS -->
+  <section class="entry" data-folio="02" aria-labelledby="h-fast">
+    <h2 class="label" id="h-fast">Fast graduations</h2>
+    <p class="note">81% of graduations completed inside 5 minutes; 58% inside 60 seconds. <span class="mono" style="color:var(--ink-3)">n = 62</span></p>
+  </section>
+
+  <!-- 03 · TIME TO GRADUATION -->
+  <section class="entry" data-folio="03" aria-labelledby="h-ttg">
+    <h2 class="label" id="h-ttg">Time to graduation · trailing 24 hours</h2>
+    <p class="note">9 in 10 graduations happened within 8 min. Median 41 s.</p>
+
+    <div class="scroller" tabindex="0" role="group" aria-label="Time-to-graduation distribution, 62 graduations">
+      <div class="dist">
+        <div class="dist-track">
+          <div class="dist-fill"></div>
+          <span class="tick tick--minor" style="left:26.5%"></span>
+          <span class="tick tick--minor" style="left:36.9%"></span>
+          <span class="tick" style="left:47.4%"></span>
+          <span class="tick" style="left:69.9%"></span>
+          <span class="tick" style="left:78.7%"></span>
+          <span class="tick" style="left:89.5%"></span>
+        </div>
+        <div class="dist-labels" aria-hidden="true">
+          <span style="left:47.4%"><b>41 s</b>p50</span>
+          <span class="tier2" style="left:69.9%"><b>4 min</b>p75</span>
+          <span style="left:78.7%"><b>8 min</b>p90</span>
+          <span class="tier2" style="left:89.5%"><b>18 min</b>p95</span>
+        </div>
+        <p class="dist-scale"><span>1 s</span><span>log scale</span><span>42 min · longest</span></p>
+      </div>
+    </div>
+    <p class="vh">Percentiles of time to graduation over 62 graduations: p50 41 seconds, p75 4 minutes, p90 8 minutes, p95 18 minutes, longest 42 minutes.</p>
+  </section>
+
+  <!-- 04 · PAIR -->
+  <section class="entry" data-folio="04" aria-labelledby="h-pair">
+    <h2 class="label" id="h-pair">By pair token · trailing 24 hours</h2>
+    <div class="scroller" tabindex="0" role="group" aria-label="Graduation rate by pair token">
+      <table>
+        <caption>Graduations of launches, by the token the pool is paired against.</caption>
+        <thead>
+          <tr><th scope="col">Pair token</th><th scope="col">Launches (n)</th><th scope="col">Graduations</th><th scope="col">Rate</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">ETH</th><td class="fig n">1,457</td><td class="fig n">13</td><td class="fig">0.89%</td></tr>
+          <tr><th scope="row">Stablecoin</th><td class="fig n">892</td><td class="fig n">25</td><td class="fig">2.80%</td></tr>
+          <tr><th scope="row">Tokenized stock</th><td class="fig n">972</td><td class="fig n">24</td><td class="fig">2.47%</td></tr>
+          <tr><th scope="row">Other</th><td class="fig n">26</td><td class="fig n">0</td><td class="thin">not enough data (n=26)</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><th scope="row">All</th><td class="fig">3,347</td><td class="fig">62</td><td class="fig">1.85%</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- 05 · TAX -->
+  <section class="entry" data-folio="05" aria-labelledby="h-tax">
+    <h2 class="label" id="h-tax">By creator tax · trailing 24 hours</h2>
+    <div class="scroller" tabindex="0" role="group" aria-label="Graduation rate by creator tax">
+      <table>
+        <caption>Creator tax read from the factory at launch.</caption>
+        <thead>
+          <tr><th scope="col">Creator tax</th><th scope="col">Launches (n)</th><th scope="col">Graduations</th><th scope="col">Rate</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">0%</th><td class="fig n">1,962</td><td class="fig n">49</td><td class="fig">2.50%</td></tr>
+          <tr><th scope="row">1%</th><td class="fig n">617</td><td class="fig n">4</td><td class="fig">0.65%</td></tr>
+          <tr><th scope="row">2–3%</th><td class="fig n">510</td><td class="fig n">8</td><td class="fig">1.57%</td></tr>
+          <tr><th scope="row">4–5%</th><td class="fig n">127</td><td class="fig n">0</td><td class="fig">0.00%</td></tr>
+          <tr><th scope="row">6–10%</th><td class="fig n">131</td><td class="fig n">1</td><td class="fig">0.76%</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><th scope="row">All</th><td class="fig">3,347</td><td class="fig">62</td><td class="fig">1.85%</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- 06 · HOUR -->
+  <section class="entry" data-folio="06" aria-labelledby="h-hour">
+    <h2 class="label" id="h-hour">By hour (UTC) · trailing 24 hours</h2>
+    <div class="scroller" tabindex="0" role="group" aria-label="Graduation rate by hour, UTC">
+      <table>
+        <caption>Hours with no launches in the window are not listed.</caption>
+        <thead>
+          <tr><th scope="col">Hour (UTC)</th><th scope="col">Launches (n)</th><th scope="col">Graduations</th><th scope="col">Rate</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">13:00</th><td class="fig n">144</td><td class="fig n">1</td><td class="fig">0.69%</td></tr>
+          <tr><th scope="row">14:00</th><td class="fig n">1,581</td><td class="fig n">32</td><td class="fig">2.02%</td></tr>
+          <tr><th scope="row">15:00</th><td class="fig n">1,622</td><td class="fig n">29</td><td class="fig">1.79%</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><th scope="row">All</th><td class="fig">3,347</td><td class="fig">62</td><td class="fig">1.85%</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- 07 · DEPLOYERS -->
+  <section class="entry" data-folio="07" aria-labelledby="h-dep">
+    <h2 class="label" id="h-dep">Deployers · trailing 24 hours</h2>
+    <p class="note">2,223 distinct deployers launched 3,347 tokens. 11.83% launched two or more; 19.96% of launches came from deployers with ten or more.</p>
+    <div class="scroller" tabindex="0" role="group" aria-label="Distribution of launches per deployer">
+      <table>
+        <caption>Launches per deployer, as counts of deployers. No addresses.</caption>
+        <thead>
+          <tr><th scope="col">Launches per deployer</th><th scope="col">Deployers (n)</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">1</th><td class="fig n">1,960</td></tr>
+          <tr><th scope="row">2–4</th><td class="fig n">205</td></tr>
+          <tr><th scope="row">5–9</th><td class="fig n">31</td></tr>
+          <tr><th scope="row">10–49</th><td class="fig n">25</td></tr>
+          <tr><th scope="row">50+</th><td class="fig n">2</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><th scope="row">All</th><td class="fig">2,223</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- 08 · ALL-TIME -->
+  <section class="entry" data-folio="08" aria-labelledby="h-all">
+    <h2 class="label" id="h-all">All-time · since 15:58 UTC today</h2>
+    <div class="alltime">
+      <div>
+        <span class="fig">1.85%</span>
+        <span class="cap">62 graduations of 3,347 launches</span>
+      </div>
+      <div>
+        <span class="fig">0.36%</span>
+        <span class="cap">excluding launches that graduated inside 5 minutes · 1 in 279 · 12 of 3,347</span>
+      </div>
+    </div>
+    <p class="note note--fine">Identical to the 24-hour figures: LEDGE has indexed one window so far, from block 56,028,514. 7 graduations had no launch in the record and are excluded from every rate.</p>
+  </section>
+
+  <footer class="colophon">
+    Measured from PonsV2LaunchFactory <span class="addr">0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e</span><br>
+    Data and code: <a href="https://github.com/hemjay07/ledge">github.com/hemjay07/ledge</a> · <a href="/method">Method</a> · <a href="/number.json">number.json</a>
+  </footer>
+
+</main>
+
+<script>
+(function () {
+  var crawledAt = "2026-09-06T15:58:32Z";
+  var STALE_AFTER = 7200; // seconds
+  var age = Math.max(0, (Date.now() - Date.parse(crawledAt)) / 1000);
+
+  function fmt(s) {
+    var m = Math.round(s / 60);
+    if (m < 1) return "less than a minute";
+    if (m < 60) return m + " min";
+    var h = Math.floor(m / 60), r = m % 60;
+    if (h < 48) return r ? h + " h " + r + " min" : h + " h";
+    return Math.floor(h / 24) + " days";
+  }
+
+  document.getElementById("age").textContent = fmt(age);
+
+  var demo = /(^|[?&])stale=1(&|$)/.test(location.search);
+  if (demo || age >= STALE_AFTER) {
+    var banner = document.getElementById("stale-banner");
+    document.getElementById("stale-age").textContent = demo && age < STALE_AFTER ? "2 h 40 min" : fmt(age);
+    banner.hidden = false;
+    document.getElementById("footing").classList.add("is-stale");
+  }
+})();
+</script>
+
+</body>
+</html>
