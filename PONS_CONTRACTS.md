@@ -6,7 +6,7 @@ contract `PonsV2LauncherToken` (verified, solc 0.8.35) via Blockscout /api/v2/sm
 | Role | Address |
 |---|---|
 | Launch factory (`launchFactory_`) | 0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e |
-| Bonding curve (`curve_`, shared)  | 0xF6e86610771ee7838cABE2f9c376265CA25EF04c |
+| Bonding curve (CHIT's own; NOT shared — every launch deploys its own PonsV2BondingCurve, address in TokenLaunched topic 2) | 0xF6e86610771ee7838cABE2f9c376265CA25EF04c |
 | Example deployer                   | 0x96Cb8EB2E349e64bA47b1015890A2fe7584c369B |
 
 Token getters (no-arg, return address): curve(), deployer(), launchFactory(), getTokenInfo()
@@ -63,3 +63,6 @@ Observed: new launch 0x7d1e707f… set creatorTaxBps=500 (5%). Tax varies per la
 - Tax sample (36 grads + 300 random dead, reweighted): see tax-cohorts-2026-09-06.json. ALL cells n<30 grads → suggestive only.
   0% tax is the MOST COMMON choice (~43% of launches). Phase: dead=0, graduated=2 (clean). Buyback: 0/36 graduated used it.
 Artifacts: first-number-2026-09-06.json · tax-sample-2026-09-06.json · tax-cohorts-2026-09-06.json. 20-h backfill running → crawl1.log/json.
+
+## Correction 2026-09-06 (RESEARCH-PHASE2-3.md)
+Curves are per-launch, identical bytecode with per-launch immutables. Live fill = realQuoteReserve() (0x4f1f58fd) / graduationThreshold() (0x8b0bc501) on the token's own curve; call graduated() (0xe7c2b772) first — a graduated curve is drained to zero. Threshold is per pair token (4.2e18 ETH, 8,090e6 USDG, others). Curve events (CurveBuy 0xec36bf57…, CurveSell 0x8113d738…) must be filtered by topic0 only, never by address. RPC is CORS-open. ABI: pipeline/PonsV2Curve.blockscout.json.

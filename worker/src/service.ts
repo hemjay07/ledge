@@ -7,6 +7,7 @@ import { RpcClient, RpcUnavailable } from "./rpc";
 import { buildTokenBody, readIndex, readLaunchedToken } from "./lookup";
 import { curveFill } from "./curve";
 import { loadNumber, loadPairTokens } from "./numberFile";
+import { resolveDecimals } from "./decimals";
 import { lookupText } from "./text";
 import type { TokenResponse } from "./schema";
 
@@ -48,6 +49,14 @@ export async function lookupToken(
     fill = null; // an unreadable fill is reported as unavailable, never as zero
   }
 
+  const pairToken = launch?.pair_token ?? onChain.pairToken;
+  let pairDecimals: number | null = null;
+  try {
+    pairDecimals = await resolveDecimals(env, rpc, pairToken, pairTokens);
+  } catch {
+    pairDecimals = null; // unknown units are said aloud, never assumed
+  }
+
   const body = buildTokenBody({
     address,
     nowSeconds,
@@ -58,6 +67,7 @@ export async function lookupToken(
     numberFile,
     pairTokens,
     fill,
+    pairDecimals,
     siteOrigin: env.SITE_ORIGIN,
   });
 

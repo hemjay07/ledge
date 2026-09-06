@@ -85,6 +85,81 @@ export function formatAge(seconds: number): string {
   return `${Math.round(s / 86400)} d`;
 }
 
+/* ---- token amounts ------------------------------------------------------ */
+
+/** A quantity in a token's smallest unit, printed in that token's own units.
+
+    This is a unit conversion on one observed quantity -- 4200000000000000000
+    and 4.2 ETH are the same fact written two ways -- not a rate and not a
+    share. The integer arithmetic is exact: the wei never pass through a float,
+    only the digits that are printed do.
+
+    `maxPlaces` is a display cap, not a claim about precision. A value that
+    would round away to "0" is given more places until a significant digit
+    appears, because "0 ETH" for a token that holds something would be false;
+    it stops at the token's own decimals, where the value really is exhausted. */
+export function formatUnits(
+  raw: string | bigint,
+  decimals: number,
+  maxPlaces = 4,
+): string | null {
+  let value: bigint;
+  try {
+    value = typeof raw === "bigint" ? raw : BigInt(raw);
+  } catch {
+    return null;
+  }
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) return null;
+
+  const negative = value < 0n;
+  if (negative) value = -value;
+
+  const scale = 10n ** BigInt(decimals);
+  const whole = value / scale;
+  const fraction = (value % scale).toString().padStart(decimals, "0");
+
+  let places = Math.min(maxPlaces, decimals);
+  while (places < decimals && whole === 0n && /^0*$/.test(fraction.slice(0, places))) {
+    places += 1;
+  }
+
+  const shown = fraction.slice(0, places).replace(/0+$/, "");
+  const sign = negative ? "-" : "";
+  return shown === "" ? `${sign}${whole}` : `${sign}${whole}.${shown}`;
+}
+
+/** A Class B ratio -- one measurement against one constant -- as a percentage.
+
+    It deliberately does NOT go through rateText. rateText carries the
+    insufficiency gate, and that gate is about SAMPLES: it asks whether n
+    supports a rate. A curve fill has no n, because it has no population; it is
+    one quantity over one threshold, both observed and both printed beside it.
+    Passing a fabricated n to rateText to get past its gate would be routing
+    around the gate, which is the thing the gate exists to prevent.
+
+    A share that would round away to "0.0%" while the curve actually holds
+    something is printed as "<0.1%", because a curve holding something must not
+    read as a curve holding nothing. `holdsSomething` is the caller's reading of
+    the quantity itself, not of the already-rounded share -- by the time a share
+    reaches six places the distinction has been lost. */
+export function formatShareOfOne(share: number, holdsSomething = true): string {
+  const percent = share * 100;
+  if (holdsSomething && percent < 0.05) return "<0.1%";
+  return `${percent.toFixed(1)}%`;
+}
+
+/** "4.2 ETH", or "4.2" when the ticker is not known. */
+export function formatAmount(
+  raw: string | bigint,
+  decimals: number,
+  symbol: string | null,
+  maxPlaces = 4,
+): string | null {
+  const amount = formatUnits(raw, decimals, maxPlaces);
+  if (amount === null) return null;
+  return symbol === null ? amount : `${amount} ${symbol}`;
+}
+
 /** Which whole minute of its life a token is in. "minute 14" on the card. */
 export function minuteOf(elapsedSeconds: number): number {
   return Math.floor(Math.max(0, elapsedSeconds) / 60);

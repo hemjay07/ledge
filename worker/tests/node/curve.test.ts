@@ -10,7 +10,24 @@ import {
   curveFill,
 } from "../../src/curve";
 import { RpcClient, MAX_BATCH } from "../../src/rpc";
-import { WORKER_ROOT, makeBody } from "./helpers";
+import { WORKER_ROOT, makeBody, ON_CHAIN, LAUNCH, fixtureNumber } from "./helpers";
+
+/** The frozen file with every pairTax cell pushed under the gate. */
+function fixtureNumberInsufficient() {
+  const file = fixtureNumber();
+  for (const w of [file.h24, file.allTime]) {
+    w.ttg = { ...w.ttg, n: 12, insufficient: true };
+    w.cohorts.pairTax = w.cohorts.pairTax!.map((r) => ({
+      ...r,
+      launches: 12,
+      graduations: 0,
+      rate: null,
+      insufficient: true,
+      excludingFast: { ...r.excludingFast, graduations: 0, rate: null, oneIn: null, insufficient: true },
+    }));
+  }
+  return file;
+}
 import { lookupText } from "../../src/text";
 import { collectText, cardTree } from "../../src/card";
 import { tokenResponseSchema } from "../../src/schema";
@@ -172,6 +189,11 @@ describe("how a fill reaches a reader", () => {
     note: null,
   };
 
+  /* USDG carries six decimals, so 8090000000 is 8,090 USDG. The map supplies
+     the ticker; decimals.ts supplies the exponent. */
+  const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
+  const USDG_MAP = { [USDG]: { class: "stable", symbol: "USDG" } };
+
   it("keeps every card line inside the plate", () => {
     // IBM Plex Mono advances at 0.6 em; the plate is 1200 wide with 64 padding
     for (const t of cardTree(makeBody({ fill }), null).texts) {
@@ -179,16 +201,81 @@ describe("how a fill reaches a reader", () => {
     }
   });
 
-  it("prints both figures, never the percentage alone", () => {
+  it("prints both quantities in the pair token's own units", () => {
+    const text = lookupText(makeBody({ fill }), null);
+    // 2245000707691451167 wei is 2.245 ETH, and 4200000000000000000 is 4.2 ETH
+    expect(text).toContain("Curve fill: 2.245 ETH of 4.2 ETH.");
+    expect(text).not.toContain("2245000707691451167");
+    expect(text).not.toContain("smallest unit");
+  });
+
+  /* The share travels as a field, not as a sentence. This line sits three
+     lines below a cohort line that may read "not enough data (n=12)", and a
+     percentage printed under a suppressed one invites the misreading the
+     suppression exists to prevent. */
+  it("keeps the share out of the sentence and in the field", () => {
     const body = makeBody({ fill });
-    const text = lookupText(body, null);
+    const line = lookupText(body, null)
+      .split("\n")
+      .find((l) => l.startsWith("Curve fill"))!;
+    expect(line).toBe("Curve fill: 2.245 ETH of 4.2 ETH.");
+    expect(line).not.toMatch(/%/);
+    expect(body.state.curveFilledShare).toBe(0.534524);
+  });
+
+  it("prints no percentage in an entry whose cohort is under-sampled", () => {
+    const file = fixtureNumberInsufficient();
+    const text = lookupText(makeBody({ fill, numberFile: file }), null);
+    expect(text).toContain("not enough data (n=12)");
+    expect(text).not.toMatch(/\d+\.\d+\s*%/);
+  });
+
+  it("uses the pair token's decimals, not ETH's", () => {
+    const g = CURVES["graduated"]!;
+    const text = lookupText(
+      makeBody({
+        pairDecimals: 6,
+        pairTokens: USDG_MAP,
+        onChain: { ...ON_CHAIN, pairToken: USDG },
+        launch: { ...LAUNCH, pair_token: USDG, pair_class: "stable" },
+        fill: {
+          filledWei: g.expected.filledWei,
+          thresholdWei: g.expected.thresholdWei,
+          share: 1,
+          note: null,
+        },
+      }),
+      null,
+    );
+    // 8090000000 at six decimals is 8,090 USDG, not 8.09e-9 ETH
+    expect(text).toContain("Curve fill: 8090 USDG of 8090 USDG.");
+  });
+
+  it("prints the raw integer and says the units are unknown rather than assuming 18", () => {
+    const text = lookupText(makeBody({ fill, pairDecimals: null }), null);
     expect(text).toContain(`Curve fill: ${c.expected.filledWei} of ${c.expected.thresholdWei}`);
-    expect(text).not.toMatch(/Curve fill: 53\.45%/);
+    expect(text).toContain("its decimals are not known");
+  });
+
+  it("does not round a curve that holds something down to nothing", () => {
+    const text = lookupText(
+      makeBody({
+        pairDecimals: 6,
+        fill: { filledWei: "1", thresholdWei: "8090000000", share: 0, note: null },
+      }),
+      null,
+    );
+    // one unit of an 8,090-unit threshold: the quantity is shown exactly, and
+    // the share says "<0.1%" rather than the "0.0%" six places would give
+    expect(text).toContain("Curve fill: 0.000001 ETH of 8090 ETH.");
+    expect(text).not.toContain("Curve fill: 0 ETH");
   });
 
   it("carries the graduated note onto the page and the card", () => {
     const g = CURVES["graduated"]!;
     const body = makeBody({
+      pairDecimals: 6,
+      pairTokens: USDG_MAP,
       fill: {
         filledWei: g.expected.filledWei,
         thresholdWei: g.expected.thresholdWei,
@@ -200,7 +287,9 @@ describe("how a fill reaches a reader", () => {
     // the card carries the short form, which must still say when it filled
     const card = collectText(cardTree(body, null));
     expect(card).toContain("filled to the threshold at graduation");
-    expect(card).toContain(g.expected.thresholdWei);
+    // in USDG's own units, not as a raw integer and not at ETH's exponent
+    expect(card).toContain("8090");
+    expect(card).not.toContain("8090000000");
   });
 
   it("still says 'fill not available' when the curve could not be read", () => {

@@ -111,6 +111,21 @@ describe("the lookup text", () => {
     expect(t).toContain("not placed on the table of graduation times");
   });
 
+  /* A placement can be absent for two unrelated reasons, and the sentence has
+     to name the right one. Saying "the launch time is not indexed" about a
+     token whose launch time IS indexed is a small lie a reader can catch. */
+  it("blames the missing launch time when that is what is missing", () => {
+    const t = lookupText(makeBody({ launch: null }), MAX);
+    expect(t).toContain("The launch time is not indexed, so this launch is not placed");
+    expect(t).not.toContain("not loadable");
+  });
+
+  it("blames the unloadable table when the launch time is known", () => {
+    const t = lookupText(makeBody({ numberFile: null }), null);
+    expect(t).toContain("The published table of graduation times is not loadable");
+    expect(t).not.toContain("The launch time is not indexed");
+  });
+
   it("says plainly when no cohort has been published", () => {
     const t = lookupText(makeBody({ numberFile: null }), null);
     expect(t).toContain("No cohort has been published for this configuration.");

@@ -19,7 +19,14 @@
    much: the positions below are the layout, and resvg-wasm (which DOES accept
    a build-time module) rasterises it. */
 
-import { formatCount, formatStamp, isInsufficient, rateText, shortAddress } from "./format";
+import {
+  formatAmount,
+  formatCount,
+  formatStamp,
+  isInsufficient,
+  rateText,
+  shortAddress,
+} from "./format";
 import { FILL_GRADUATED, FILL_GRADUATED_CARD } from "./curve";
 import { headline } from "./text";
 import { pairLabel, taxLabel } from "./buckets";
@@ -106,14 +113,29 @@ function wrap(line: string, maxChars: number): string[] {
   return out;
 }
 
-function fillLine(state: Omit<TokenResponse, "text">["state"]): string {
+/* The card mirrors text.ts's fill sentence in the pair token's own units, with
+   the graduated note in its short form and the trailing full stop dropped --
+   a card line is a label, not a sentence. */
+function fillLine(
+  state: Omit<TokenResponse, "text">["state"],
+  config: Omit<TokenResponse, "text">["config"],
+): string {
   if (state.curveFilledShare === null) {
     return `Curve fill: ${state.fillNote ?? "not available"}`;
   }
+  const decimals = config.pairDecimals;
+  const threshold =
+    decimals === null ? null : formatAmount(state.graduationThresholdWei ?? "0", decimals, config.pairSymbol);
+
   if (state.fillNote === FILL_GRADUATED) {
-    return `Curve fill: ${FILL_GRADUATED_CARD}, ${state.graduationThresholdWei}`;
+    return `Curve fill: ${FILL_GRADUATED_CARD}, ${threshold ?? state.graduationThresholdWei}`;
   }
-  return `Curve fill: ${state.curveFilledWei} of ${state.graduationThresholdWei}`;
+  const filled =
+    decimals === null ? null : formatAmount(state.curveFilledWei ?? "0", decimals, config.pairSymbol);
+  if (filled === null || threshold === null) {
+    return `Curve fill: ${state.curveFilledWei} of ${state.graduationThresholdWei} (units not known)`;
+  }
+  return `Curve fill: ${filled} of ${threshold}`;
 }
 
 /** The card, as positioned text. Exported so a test can read every string the
@@ -141,6 +163,7 @@ export function cardTree(
   /* The fill line shares its row with the address, so it may only have the
      plate minus that column and a gutter. */
   const fillColumn = plate - widthOf(address, 24) - 40;
+  const fill = fillLine(body.state, body.config);
 
   const texts: CardText[] = [
     {
@@ -182,10 +205,10 @@ export function cardTree(
     /* The card gets the short form of the graduated note: the long one runs
        off a 1200px line, and a truncated sentence would be worse than a
        shorter true one. */
-    text: fillLine(body.state),
+    text: fill,
     x: PAD,
     y: 512,
-    size: fit(fillLine(body.state), 24, fillColumn),
+    size: fit(fill, 24, fillColumn),
     weight: 400,
     fill: INK_3,
     anchor: "start",

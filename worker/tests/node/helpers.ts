@@ -51,6 +51,7 @@ export function makeBody(overrides: Partial<BuildInput> = {}): Omit<TokenRespons
     numberFile: fixtureNumber(),
     pairTokens: null,
     fill: null,
+    pairDecimals: 18,
     siteOrigin: "https://ledge.tools",
     ...overrides,
   });

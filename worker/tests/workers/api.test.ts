@@ -8,6 +8,7 @@ import {
   SELECTOR_REAL_QUOTE_RESERVE,
 } from "../../src/curve";
 import curveFixtures from "../fixtures/curves.json";
+import { SELECTOR_DECIMALS, kvDecimalsKey } from "../../src/decimals";
 import { reset, seedCursor } from "./setup";
 import numberFixture from "../fixtures/number.json";
 
@@ -116,6 +117,9 @@ describe("GET /api/token/{address}", () => {
     expect(body.state.phaseLabel).toBe("on the bonding curve");
     expect(body.state.elapsedSeconds).toBeGreaterThanOrEqual(810);
     // R1: the fill, read from this launch's OWN curve
+    expect(body.config.pairSymbol).toBe("ETH");
+    expect(body.config.pairDecimals).toBe(18);
+    expect(body.text).toContain("Curve fill: 2.245 ETH of 4.2 ETH.");
     expect(body.state.curveFilledShare).toBe(LIVE_CURVE.expected.share);
     expect(body.state.curveFilledWei).toBe(LIVE_CURVE.expected.filledWei);
     expect(body.state.graduationThresholdWei).toBe(LIVE_CURVE.expected.thresholdWei);
@@ -357,4 +361,64 @@ describe("the Telegram abuse limits", () => {
     const columns = await env.LEDGE_DB.prepare("SELECT * FROM tg_usage LIMIT 1").first<any>();
     expect(Object.keys(columns).sort()).toEqual(["chat_id", "count", "hour_key"]);
   }, 30_000);
+});
+
+describe("the units a fill is denominated in", () => {
+  const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
+
+  /** A USDG-paired launch, whose curve holds the graduated fixture's figures. */
+  function stubUsdgChain(options: { decimals: number | null }) {
+    const graduatedCurve = curveFixtures.graduated;
+    stubChain((payload) =>
+      payload.map((request: any) => {
+        if (request.method !== "eth_call") return { id: request.id, result: null };
+        const to = String(request.params[0].to).toLowerCase();
+        const data: string = request.params[0].data;
+        if (data.startsWith(SELECTOR_GET_LAUNCHED_TOKEN)) {
+          const words = Array.from({ length: 15 }, () => bareWord(0n));
+          words[1] = bareWord(BigInt(graduatedCurve.curve));
+          words[4] = bareWord(BigInt(USDG));
+          words[5] = bareWord(BigInt(graduatedCurve.graduationThreshold));
+          words[8] = bareWord(0n);
+          words[10] = bareWord(0n);
+          words[14] = bareWord(1n);
+          return { id: request.id, result: "0x" + words.join("") };
+        }
+        if (data === SELECTOR_DECIMALS && to === USDG) {
+          return { id: request.id, result: options.decimals === null ? null : word(BigInt(options.decimals)) };
+        }
+        if (data === SELECTOR_GRADUATED) return { id: request.id, result: word(0n) };
+        if (data === SELECTOR_REAL_QUOTE_RESERVE) return { id: request.id, result: word(4_045_000_000n) };
+        if (data === SELECTOR_GRADUATION_THRESHOLD) {
+          return { id: request.id, result: word(BigInt(graduatedCurve.graduationThreshold)) };
+        }
+        return { id: request.id, result: null };
+      }),
+    );
+  }
+
+  it("reads decimals() once and caches the answer in KV", async () => {
+    await env.LEDGE_KV.delete(kvDecimalsKey(USDG));
+    stubUsdgChain({ decimals: 6 });
+    const body = (await (await get(`/api/token/${ADDRESS}`)).json()) as any;
+    const partial = body.partial ?? body;
+    expect(partial.config.pairDecimals).toBe(6);
+    expect(partial.config.pairSymbol).toBe("USDG");
+    // 4045000000 of 8090000000 at six decimals is 4,045 USDG of 8,090
+    expect(partial.text).toContain("Curve fill: 4045 USDG of 8090 USDG.");
+    expect(partial.text).not.toContain("4045000000 of");
+    expect(await env.LEDGE_KV.get(kvDecimalsKey(USDG), "text")).toBe("6");
+  });
+
+  it("prints the raw integer and says so rather than assuming 18", async () => {
+    await env.LEDGE_KV.delete(kvDecimalsKey(USDG));
+    stubUsdgChain({ decimals: null });
+    const body = (await (await get(`/api/token/${ADDRESS}`)).json()) as any;
+    const partial = body.partial ?? body;
+    expect(partial.config.pairDecimals).toBeNull();
+    expect(partial.text).toContain("4045000000 of 8090000000");
+    expect(partial.text).toContain("its decimals are not known");
+    // an assumed 18 would have rendered this as 0.000000004 of something
+    expect(partial.text).not.toContain("0.000000004");
+  });
 });

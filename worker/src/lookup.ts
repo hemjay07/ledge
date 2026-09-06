@@ -29,6 +29,7 @@ import {
   type LaunchedToken,
 } from "./pons";
 import { pairClassOf, taxBucketOf, type PairTokenEntry } from "./buckets";
+import { pairSymbolOf } from "./decimals";
 import { curveFill, FILL_UNAVAILABLE } from "./curve";
 import { placeOnLadder, type Placement } from "./ladder";
 import type { NumberFile, NumberWindow, PairTaxRow, WindowName } from "./numberFile";
@@ -149,6 +150,8 @@ export interface BuildInput {
   numberFile: NumberFile | null;
   pairTokens: Record<string, PairTokenEntry> | null;
   fill: Awaited<ReturnType<typeof curveFill>>;
+  /** Decimals for the pair token, resolved by decimals.ts. Null when unknown. */
+  pairDecimals: number | null;
   siteOrigin: string;
 }
 
@@ -198,7 +201,14 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
     venue: "pons",
     observedAt,
     source: "chain",
-    config: { pairToken, pairClass, creatorTaxBps, taxBucket },
+    config: {
+      pairToken,
+      pairClass,
+      pairSymbol: pairSymbolOf(pairToken, input.pairTokens),
+      pairDecimals: input.pairDecimals,
+      creatorTaxBps,
+      taxBucket,
+    },
     state: {
       phase: onChain.phase,
       phaseLabel: phaseLabel(onChain.phase),

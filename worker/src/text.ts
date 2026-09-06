@@ -19,6 +19,7 @@
    ========================================================================= */
 
 import {
+  formatAmount,
   formatCount,
   formatDuration,
   formatOneIn,
@@ -133,28 +134,64 @@ function cohortSentence(
   );
 }
 
-/** The placement, for the running block. Where there is no launch time there
-    is no placement, and the block says that rather than leaving a gap. */
-function placementSentence(placement: TokenResponse["placement"]): string | null {
-  return (
-    placementText(placement) ??
-    "The launch time is not indexed, so this launch is not placed on the table of graduation times."
-  );
+/* A placement can be missing for two unrelated reasons, and saying the wrong
+   one is a small lie that a reader can catch: a token whose launch time IS
+   indexed being told it is not. The cause decides the wording. */
+function placementSentence(body: Omit<TokenResponse, "text">): string | null {
+  const line = placementText(body.placement);
+  if (line !== null) return line;
+  if (!body.state.indexed) {
+    return "The launch time is not indexed, so this launch is not placed on the table of graduation times.";
+  }
+  if (body.cohort === null) {
+    return "The published table of graduation times is not loadable, so this launch is not placed on it.";
+  }
+  return "This launch is not placed on the table of graduation times.";
 }
 
-/* Both figures, always. The fill is a ratio of two observed quantities, and
-   CONSTRAINTS 3 does not let it travel as a lone percentage -- so the wei are
-   the sentence and the share is the bar drawn beside it. A note, when the
-   reading needs one to be honest, follows. */
-function fillSentence(state: TokenResponse["state"]): string {
+/* Both quantities, always, in the pair token's own units.
+
+   "0.0094 ETH of 4.2 ETH" is the same fact as "9413231 of 4200000000000000000"
+   and the only one a reader can act on; the conversion is a unit change on one
+   observed quantity, done in format.ts, not a statistic.
+
+   The share is NOT appended, though it would satisfy CONSTRAINTS 3 on its own
+   terms (x of y, both shown). The reason is placement: this line sits three
+   lines below a cohort line that may read "not enough data (n=12)", and a
+   percentage printed inches beneath a suppressed one invites exactly the
+   misreading the suppression exists to prevent. The share travels as
+   `curveFilledShare`, which is where the bar is drawn from, and the bar has
+   both quantities beside it.
+
+   Where the decimals are unknown the integer is printed unchanged and the
+   sentence says the units are not known. An assumed exponent would move the
+   figure by orders of magnitude, which is worse than an unreadable one. */
+export function fillSentence(
+  state: TokenResponse["state"],
+  config: TokenResponse["config"],
+): string {
   if (state.curveFilledShare === null) {
     return `Curve fill: ${state.fillNote ?? "not available"}.`;
   }
   const note = state.fillNote === null ? "" : ` — ${state.fillNote}`;
-  return (
-    `Curve fill: ${state.curveFilledWei} of ${state.graduationThresholdWei} ` +
-    `in the pair token's smallest unit${note}.`
-  );
+  const decimals = config.pairDecimals;
+
+  if (decimals === null) {
+    return (
+      `Curve fill: ${state.curveFilledWei} of ${state.graduationThresholdWei} ` +
+      `in the pair token's smallest unit; its decimals are not known${note}.`
+    );
+  }
+
+  const filled = formatAmount(state.curveFilledWei ?? "0", decimals, config.pairSymbol);
+  const threshold = formatAmount(state.graduationThresholdWei ?? "0", decimals, config.pairSymbol);
+  if (filled === null || threshold === null) {
+    return (
+      `Curve fill: ${state.curveFilledWei} of ${state.graduationThresholdWei} ` +
+      `in the pair token's smallest unit; its decimals are not known${note}.`
+    );
+  }
+  return `Curve fill: ${filled} of ${threshold}${note}.`;
 }
 
 /** The lookup, as plain text. Rendered by the API, the /t noscript block and
@@ -179,10 +216,10 @@ export function lookupText(
     lines.push("No cohort has been published for this configuration.");
   }
 
-  const placement = placementSentence(body.placement);
+  const placement = placementSentence(body);
   if (placement) lines.push(placement);
 
-  lines.push(fillSentence(body.state));
+  lines.push(fillSentence(body.state, body.config));
 
   if (body.cohort) lines.push(formatStamp(body.cohort.crawledAt));
   if (body.live.stale) {

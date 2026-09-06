@@ -141,6 +141,7 @@ function bodyFor(input: VectorCase["input"]) {
     numberFile: NUMBER,
     pairTokens: PAIR_TOKENS,
     fill: null,
+    pairDecimals: 18,
     siteOrigin: "https://ledge.tools",
   });
 }

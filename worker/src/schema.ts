@@ -116,6 +116,11 @@ const placement = z
 const config = z.object({
   pairToken: z.string(),
   pairClass: z.string(),
+  /* The units the fill quantities are denominated in. Null when they are not
+     known, and the fill is then printed as the raw integer with a word saying
+     so -- never scaled by an assumed exponent. */
+  pairSymbol: z.string().nullable(),
+  pairDecimals: z.number().int().min(0).max(36).nullable(),
   creatorTaxBps: z.number().int().nullable(),
   taxBucket: z.string().nullable(),
 });
