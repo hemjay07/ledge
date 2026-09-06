@@ -390,6 +390,24 @@ a:focus-visible,
   padding-left: 0.03em;
 }
 
+/* The poster in its "1 in N" face (lib/lead.ts, LEAD = "excludingFast"): the
+   count set in the display face at poster size, and the rate it restates
+   beside it at the second size, baseline-aligned so the pair reads as one
+   figure with its restatement rather than as two figures. */
+.one-in {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-2) var(--s-4);
+}
+/* "1 in" is the unit, not the figure. Set below the count it qualifies, and
+   still in the display face, exactly as the percent sign is. */
+.figure .one-in-unit {
+  font-size: 0.52em;
+  letter-spacing: 0.005em;
+  padding-right: 0.08em;
+}
+
 /* the hairline closing the primary figure, previously an inline style */
 .fold-rule {
   margin-top: var(--s-6);
@@ -425,7 +443,9 @@ a:focus-visible,
   gap: var(--s-2) var(--s-4);
   padding: var(--s-4) 0 1.1rem;
 }
-.second .figure-2 {
+/* The second figure, wherever it stands: in the second block under LEAD =
+   "raw", and beside the "1 in N" poster under LEAD = "excludingFast". */
+.figure-2 {
   font-family: var(--font-display);
   font-weight: 400;
   font-size: var(--fs-figure-2);

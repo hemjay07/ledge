@@ -1,5 +1,6 @@
 import type { WindowData } from "./schema";
 import { formatCount, formatStamp, isInsufficient, rateText } from "./format";
+import { LEAD } from "./lead";
 
 /* Every sentence that carries a rate off the page — the accessible text under
    the poster figures, the page description, the Open Graph and Twitter
@@ -33,11 +34,40 @@ export function excludingFastSentence(
   w: WindowData,
   cutoffWords: string,
   withCounts = false,
+  measuredAt?: string,
 ): string {
   const counts = withCounts
     ? `: ${formatCount(w.excludingFast.graduations)} of ${formatCount(w.launches)}`
     : "";
-  return `${rateText(excludingFastFact(w))} excluding launches that graduated inside ${cutoffWords}${counts}.`;
+  const measured = measuredAt ? ` ${formatStamp(measuredAt)}.` : "";
+  return `${rateText(excludingFastFact(w))} excluding launches that graduated inside ${cutoffWords}${counts}.${measured}`;
+}
+
+/* ---- which of the two the fold leads with ------------------------------ */
+
+/** The sentence heard in place of the poster figure, whichever figure LEAD
+    posters. The poster is the copy of the number that is screenshotted, so it
+    is the one that speaks the measurement time. */
+export function posterSentence(
+  w: WindowData,
+  cutoffWords: string,
+  measuredAt?: string,
+): string {
+  return LEAD === "raw"
+    ? ponsNumberSentence(w, measuredAt)
+    : excludingFastSentence(w, cutoffWords, true, measuredAt);
+}
+
+/** The sentence heard in place of the second figure. It is the other one of
+    the pair: both are always rendered, over the same n and the same window. */
+export function secondarySentence(
+  w: WindowData,
+  cutoffWords: string,
+  withCounts = false,
+): string {
+  return LEAD === "raw"
+    ? excludingFastSentence(w, cutoffWords, withCounts)
+    : ponsNumberSentence(w);
 }
 
 /** The description carried by the page metadata, the unfurl and the card's
@@ -51,5 +81,5 @@ export function shareSummary(w: WindowData, cutoffWords: string): string {
     ? `Excluding launches that graduated inside ${cutoffWords}: ${rateText(excludingFastFact(w))}.`
     : `${rateText(excludingFastFact(w))} excluding launches that graduated inside ${cutoffWords}.`;
 
-  return `${headline} ${excluding}`;
+  return LEAD === "raw" ? `${headline} ${excluding}` : `${excluding} ${headline}`;
 }

@@ -21,6 +21,7 @@ import {
   isInsufficient,
   rateText,
 } from "../lib/format-core.mjs";
+import { LEAD } from "../lib/lead-core.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -93,10 +94,32 @@ export function cardTree(data, nowMs = Date.now()) {
      whenever that rate is not printable, and whenever the pipeline wrote no
      N — there is nothing to restate and nothing to count. */
   const oneIn = w.excludingFast.oneIn;
+  const oneInPrintable =
+    !isInsufficient(excluding) && oneIn !== null && oneIn !== undefined;
+
+  /* The card leads with whichever figure the sheet leads with (lib/lead-core.mjs).
+     Under "excludingFast" the poster is the "1 in N" restatement, and the
+     gloss drops it rather than printing it twice. When it cannot be printed
+     the poster falls back to what the raw poster shows in that case —
+     "not enough data (n=…)" — never a bare "1 in". */
+  const leadsRaw = LEAD === "raw";
   const gloss =
-    isInsufficient(excluding) || oneIn === null || oneIn === undefined
+    !leadsRaw || !oneInPrintable
       ? `excluding under ${cutoff}`
       : `excluding under ${cutoff} · ${formatOneIn(oneIn)}`;
+
+  const poster =
+    leadsRaw || !oneInPrintable
+      ? figure(leadsRaw ? headline : excluding, 210, 46)
+      : {
+          type: "div",
+          props: {
+            style: { fontFamily: DISPLAY, fontSize: 150, lineHeight: 0.82, color: INK },
+            children: formatOneIn(oneIn),
+          },
+        };
+
+  const graduations = leadsRaw ? w.graduations : w.excludingFast.graduations;
 
   return {
     type: "div",
@@ -130,7 +153,7 @@ export function cardTree(data, nowMs = Date.now()) {
                 props: {
                   style: { display: "flex", alignItems: "baseline", gap: 48 },
                   children: [
-                    figure(headline, 210, 46),
+                    poster,
                     {
                       type: "div",
                       props: {
@@ -154,27 +177,55 @@ export function cardTree(data, nowMs = Date.now()) {
                 type: "div",
                 props: {
                   style: { fontSize: 30, paddingTop: 34, color: INK },
-                  children: `of ${formatCount(w.launches)} launches in the last 24 hours graduated`,
+                  children: `of ${formatCount(w.launches)} launches in the last 24 hours graduated${
+                    leadsRaw ? "" : `, excluding under ${cutoff}`
+                  }`,
                 },
               },
               {
                 type: "div",
                 props: {
-                  style: { display: "flex", fontSize: 24, paddingTop: 12, color: INK_3 },
+                  style: {
+                    display: "flex",
+                    flexDirection: "column",
+                    fontSize: 24,
+                    paddingTop: 12,
+                    color: INK_3,
+                  },
                   children: [
                     {
                       type: "div",
                       props: {
-                        children: `n = ${formatCount(w.launches)} · ${formatCount(w.graduations)} graduations · updated`,
+                        style: { display: "flex" },
+                        children: [
+                          {
+                            type: "div",
+                            props: {
+                              children: `n = ${formatCount(w.launches)} · ${formatCount(graduations)} graduations · updated`,
+                            },
+                          },
+                          {
+                            type: "div",
+                            props: {
+                              style: { color: isStale ? STALE : INK_3, fontWeight: 600 },
+                              children: ` ${formatAge(ageSeconds)} ago`,
+                            },
+                          },
+                        ],
                       },
                     },
-                    {
-                      type: "div",
-                      props: {
-                        style: { color: isStale ? STALE : INK_3, fontWeight: 600 },
-                        children: ` ${formatAge(ageSeconds)} ago`,
-                      },
-                    },
+                    /* Neither figure leaves the card. When the excluding-fast
+                       figure posters, the raw rate keeps its own line, with
+                       the counts it was computed from. */
+                    leadsRaw
+                      ? null
+                      : {
+                          type: "div",
+                          props: {
+                            style: { paddingTop: 6 },
+                            children: `${rateText(headline)} counting every graduation · ${formatCount(w.graduations)} of ${formatCount(w.launches)}`,
+                          },
+                        },
                   ],
                 },
               },

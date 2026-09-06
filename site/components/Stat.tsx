@@ -99,11 +99,19 @@ export function Stat(props: StatProps): ReactElement {
      size. At full display size Anton's % is nearly as wide as the digits and
      reads as a third group of numerals rather than as a unit. Everywhere else
      the span carries no rule and the sign stays exactly as it was. */
+  /* The same treatment for the "1 in N" face: the words are the unit and the
+     count is the figure, so the words are marked up to be set smaller. The
+     span carries no rule outside the poster figures. */
   const body =
     format === "percent" && text.endsWith("%") ? (
       <>
         {text.slice(0, -1)}
         <span className="pct">%</span>
+      </>
+    ) : format === "oneIn" && text.startsWith("1 in ") ? (
+      <>
+        <span className="one-in-unit">1 in </span>
+        {text.slice("1 in ".length)}
       </>
     ) : (
       text

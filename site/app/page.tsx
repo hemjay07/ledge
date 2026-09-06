@@ -1,8 +1,7 @@
 import type { ReactElement } from "react";
 import Link from "next/link";
-import { Age } from "../components/Age";
 import { ColophonStrip, RunningHead } from "../components/ColophonStrip";
-import { Figure } from "../components/Figure";
+import { Fold } from "../components/Fold";
 import { Footer } from "../components/Footer";
 import { LedgerEntry } from "../components/LedgerEntry";
 import { Register } from "../components/Register";
@@ -25,7 +24,6 @@ import {
 } from "../lib/format";
 import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow, shareCell } from "../lib/rows";
 import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../lib/windows";
-import { excludingFastSentence, ponsNumberSentence } from "../lib/summary";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 
@@ -60,59 +58,19 @@ export default function Home(): ReactElement {
         {/* the fold — everything a phone screenshot must carry */}
         <RunningHead mark="LEDGE" win="Trailing 24 hours · 01" />
 
-        <div className="fold">
-          <h1 className="kicker">The Pons Number</h1>
-          <div className="figure-block">
-            <Figure
-              name="pons-number"
-              value={h24.rate}
-              n={h24.launches}
-              window="24h"
-              updatedAt={crawledAt}
-              insufficient={h24.insufficient}
-              accessibleText={ponsNumberSentence(h24, crawledAt)}
-            />
-          </div>
-          <p className="caption">
-            of <b>{formatCount(h24.launches)}</b> launches in the last 24&nbsp;hours graduated{" "}
-            <span className="den">
-              · <span className="mono">{formatCount(h24.graduations)}</span> graduations ·{" "}
-              <Age crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
-            </span>
-          </p>
-          <p className="dek">
-            Pons is a token launchpad on Robinhood Chain. A launch graduates when its bonding
-            curve fills to 4.2&nbsp;ETH and the token moves to an open market. LEDGE reads every
-            launch from the factory contract and counts, hourly.
-          </p>
-        </div>
-
-        <div className="rule-hair fold-rule" />
-        <div className="second">
-          <Figure
-            name="excluding-fast"
-            variant="secondary"
-            value={exFast.rate}
-            n={h24.launches}
-            window="24h"
-            updatedAt={crawledAt}
-            insufficient={exFast.insufficient}
-            accessibleText={excludingFastSentence(h24, cutoffWords, true)}
-          />
-          <p className="gloss">
-            excluding launches that graduated inside {cutoffWords}
-            {exFast.oneIn === null ? null : (
-              <>
-                {" "}
-                · <b className="mono">{formatOneIn(exFast.oneIn)}</b>
-              </>
-            )}{" "}
-            ·{" "}
-            <span className="mono">
-              {formatCount(exFast.graduations)} of {formatCount(h24.launches)}
-            </span>
-          </p>
-        </div>
+        <Fold
+          w={h24}
+          crawledAt={crawledAt}
+          staleAfterSeconds={staleAfterSeconds}
+          secondaryCounts
+          dek={
+            <p className="dek">
+              Pons is a token launchpad on Robinhood Chain. A launch graduates when its bonding
+              curve fills to 4.2&nbsp;ETH and the token moves to an open market. LEDGE reads every
+              launch from the factory contract and counts, hourly.
+            </p>
+          }
+        />
         <ColophonStrip stamp={formatStamp(crawledAt)} />
         {/* end of fold */}
 

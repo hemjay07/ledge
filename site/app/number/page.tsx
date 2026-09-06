@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
-import { Age } from "../../components/Age";
 import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
-import { Figure } from "../../components/Figure";
+import { Fold } from "../../components/Fold";
 import { Footer } from "../../components/Footer";
 import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { h24, numberFile, SITE_URL } from "../../lib/number";
-import {
-  formatCount,
-  formatDurationLong,
-  formatOneIn,
-  formatStamp,
-} from "../../lib/format";
-import { excludingFastSentence, ponsNumberSentence, shareSummary } from "../../lib/summary";
+import { formatDurationLong, formatStamp } from "../../lib/format";
+import { shareSummary } from "../../lib/summary";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 
@@ -56,54 +50,7 @@ export default function NumberCard(): ReactElement {
         <SheetNav current="card" />
         <RunningHead mark="LEDGE" win="Trailing 24 hours · 01" />
 
-        <div className="fold">
-          <h1 className="kicker">The Pons Number</h1>
-          <div className="figure-block">
-            <Figure
-              name="pons-number"
-              value={h24.rate}
-              n={h24.launches}
-              window="24h"
-              updatedAt={crawledAt}
-              insufficient={h24.insufficient}
-              accessibleText={ponsNumberSentence(h24, crawledAt)}
-            />
-          </div>
-          <p className="caption">
-            of <b>{formatCount(h24.launches)}</b> launches in the last 24&nbsp;hours graduated{" "}
-            <span className="den">
-              · <span className="mono">{formatCount(h24.graduations)}</span> graduations ·{" "}
-              <Age crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
-            </span>
-          </p>
-        </div>
-
-        <div className="rule-hair fold-rule" />
-        <div className="second">
-          <Figure
-            name="excluding-fast"
-            variant="secondary"
-            value={exFast.rate}
-            n={h24.launches}
-            window="24h"
-            updatedAt={crawledAt}
-            insufficient={exFast.insufficient}
-            accessibleText={excludingFastSentence(h24, cutoffWords)}
-          />
-          <p className="gloss">
-            excluding launches that graduated inside {cutoffWords}
-            {exFast.oneIn === null ? null : (
-              <>
-                {" "}
-                · <b className="mono">{formatOneIn(exFast.oneIn)}</b>
-              </>
-            )}{" "}
-            ·{" "}
-            <span className="mono">
-              {formatCount(exFast.graduations)} of {formatCount(h24.launches)}
-            </span>
-          </p>
-        </div>
+        <Fold w={h24} crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
         <ColophonStrip stamp={formatStamp(crawledAt)} />
 
         <div className="card-note">
