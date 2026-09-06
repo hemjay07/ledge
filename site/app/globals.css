@@ -855,3 +855,136 @@ footer {
     font-size: 22px;
   }
 }
+
+/* ---- the lookup: a ruled ledger line, not a control panel ---- */
+/* The field is a line in the register with a rule under it, which is what a
+   quantity written into a ledger looks like. Nothing here is filled, rounded
+   or shadowed: the only decoration a form gets on this sheet is the same rule
+   ladder every other row uses. */
+.lookup {
+  margin-top: var(--s-3);
+}
+.lookup-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.lookup-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  margin-top: var(--s-2);
+  border-bottom: var(--rw-mid) solid var(--rule-mid);
+}
+.lookup-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: var(--s-2) 0;
+  color: var(--ink);
+  font-size: var(--fs-note);
+  letter-spacing: 0;
+}
+.lookup-input:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.lookup-submit {
+  flex: 0 0 auto;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: var(--rw-hair) solid var(--rule-mid);
+  border-radius: 0;
+  padding: 0 0 0.1rem;
+  margin-bottom: var(--s-2);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.lookup-submit:hover {
+  border-bottom-color: var(--ink);
+}
+.lookup-submit:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.lookup-out:empty {
+  display: none;
+}
+.lookup-entry {
+  margin-top: var(--s-4);
+}
+.lookup-headline {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-note);
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.lookup-config {
+  margin: var(--s-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-fine);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.lookup-line-plain {
+  margin-top: var(--s-3);
+  font-size: var(--fs-note);
+  color: var(--ink-2);
+  max-width: 56ch;
+  text-wrap: pretty;
+}
+.lookup-foot {
+  margin-top: var(--s-4);
+  padding-top: var(--s-2);
+  border-top: var(--rw-hair) solid var(--rule-hair);
+  font-family: var(--font-mono);
+  font-size: var(--fs-fine);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.lookup-foot a {
+  color: var(--ink);
+}
+.lookup-stamp {
+  color: var(--ink-3);
+}
+
+/* The waiting state is a hairline that pulses once and then stands as a rule:
+   a ruled line is already the sheet's vocabulary, and one pulse says the
+   request left without implying progress the page cannot measure. */
+.hairline-pulse {
+  height: var(--rw-hair);
+  background: var(--rule-mid);
+  margin-top: var(--s-4);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hairline-pulse {
+    animation: hairline-pulse 1100ms cubic-bezier(0.2, 0.6, 0.2, 1) both;
+  }
+  @keyframes hairline-pulse {
+    0% {
+      opacity: 0.2;
+    }
+    45% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.45;
+    }
+  }
+}

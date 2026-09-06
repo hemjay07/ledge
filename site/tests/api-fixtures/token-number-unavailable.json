@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "error": "number_unavailable",
+  "message": "Cohort figures are not loadable. Live state is shown alone.",
+  "partial": {
+    "schemaVersion": 1,
+    "address": "0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2",
+    "venue": "pons",
+    "observedAt": "2026-09-06T18:14:07Z",
+    "source": "chain",
+    "config": {
+      "pairToken": "0x0000000000000000000000000000000000000000",
+      "pairClass": "eth",
+      "creatorTaxBps": 300,
+      "taxBucket": "2-3%"
+    },
+    "state": {
+      "phase": 0,
+      "phaseLabel": "on the bonding curve",
+      "curveFilledWei": "1743200000000000000",
+      "graduationThresholdWei": "4200000000000000000",
+      "curveFilledShare": 0.415048,
+      "fillNote": null,
+      "launchBlock": 56172001,
+      "launchedAt": "2026-09-06T18:00:36Z",
+      "elapsedSeconds": 811,
+      "graduated": false,
+      "graduatedAt": null,
+      "timeToGraduationSeconds": null,
+      "indexed": true
+    },
+    "cohort": null,
+    "placement": null,
+    "live": {
+      "stale": false,
+      "lastSuccessAt": "2026-09-06T18:13:47Z",
+      "lastIndexedBlock": 56172588
+    },
+    "notice": null,
+    "links": {
+      "method": "https://ledge.tools/method",
+      "numberJson": "https://ledge.tools/number.json"
+    },
+    "text": "0x23fe54b3…f98fe2 · Pons\nETH · 2–3% · on the bonding curve\nminute 13 · on the curve · cohort not published · ETH · 2–3%\nNo cohort has been published for this configuration.\nThe launch time is not indexed, so this launch is not placed on the table of graduation times.\nCurve fill: 1743200000000000000 of 4200000000000000000 in the pair token's smallest unit.\nhttps://ledge.tools/method"
+  }
+}

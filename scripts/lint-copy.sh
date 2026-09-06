@@ -33,7 +33,7 @@ PATTERN+='|know before you ape'
 PATTERN+='|data.driven insights?'
 PATTERN+='|\balpha\b'
 PATTERN+='|\bedge\b'
-PATTERN+='|\bsignals?\b'
+PATTERN+='|\bsignals\b'   # the crypto noun, plural as CONSTRAINTS words it; AbortController.signal is code, not copy
 PATTERN+='|we believe'
 PATTERN+='|our mission'
 PATTERN+="|in today's"
@@ -58,16 +58,23 @@ PATTERN+='|should (buy|sell|avoid|wait)'
 PATTERN+='|you should'
 
 
-# Targets: site source, README, and pipeline copy strings.
+# Targets: site source, README, pipeline copy strings, and the contract source.
+# NatSpec is copy: it is what a reader sees on Blockscout, so contracts/src is
+# checked with the same list and .sol is no longer excluded.
 # site/scripts ships copy too — the share card is generated there — so it is
 # checked. site/tools is dev-only tooling and stays out.
+# worker/src is checked because the lookup API, the /t page, the death card and
+# the Telegram bot all render copy, and the NOT-THIS list has to reach every
+# surface a reader sees, not only the static site.
 TARGETS=()
 [ -d site/app ] && TARGETS+=("site/app")
 [ -d site/components ] && TARGETS+=("site/components")
 [ -d site/lib ] && TARGETS+=("site/lib")
 [ -d site/scripts ] && TARGETS+=("site/scripts")
+[ -d worker/src ] && TARGETS+=("worker/src")
 [ -f README.md ] && TARGETS+=("README.md")
 [ -d pipeline ] && TARGETS+=("pipeline")
+[ -d contracts/src ] && TARGETS+=("contracts/src")
 
 if [ "${#TARGETS[@]}" -eq 0 ]; then
   echo "lint-copy: no targets present yet, nothing to check"
@@ -76,7 +83,7 @@ fi
 
 EXCLUDES=(--exclude=CONSTRAINTS.md --exclude-dir=node_modules --exclude-dir=.venv \
           --exclude-dir=__pycache__ --exclude-dir=.next --exclude-dir=out \
-          --exclude-dir=tests "--exclude=*.json" "--exclude=*.lock" "--exclude=*.sol")
+          --exclude-dir=tests "--exclude=*.json" "--exclude=*.lock")
 
 FAIL=0
 TMP="$(mktemp)"
@@ -114,7 +121,7 @@ EMOJI_RE = re.compile(
 
 EXCLUDE_NAMES = {"CONSTRAINTS.md"}
 EXCLUDE_DIRS = {"node_modules", ".venv", "__pycache__", ".next", "out", "tests", ".git"}
-EXCLUDE_SUFFIXES = (".json", ".lock", ".sol")
+EXCLUDE_SUFFIXES = (".json", ".lock")
 
 def iter_files(target):
     if os.path.isfile(target):

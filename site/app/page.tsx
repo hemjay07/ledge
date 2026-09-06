@@ -4,6 +4,8 @@ import { ColophonStrip, RunningHead } from "../components/ColophonStrip";
 import { Fold } from "../components/Fold";
 import { Footer } from "../components/Footer";
 import { LedgerEntry } from "../components/LedgerEntry";
+import { LiveBoard } from "../components/LiveBoard";
+import { Lookup } from "../components/Lookup";
 import { Register } from "../components/Register";
 import { Scale } from "../components/Scale";
 import { SheetNav } from "../components/SheetNav";
@@ -23,13 +25,16 @@ import {
   histogramLabel,
 } from "../lib/format";
 import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow, shareCell } from "../lib/rows";
-import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../lib/windows";
+import { SAME_MEASUREMENT_NOTE, coverageHours, sameMeasurement } from "../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 
 /* keyed off the data, so the all-time surfaces return by themselves once the
    index reaches back further than a day */
 const allTimeIsSameMeasurement = sameMeasurement(h24, allTime);
+
+/* the record's span, in hours, rather than the block it starts at */
+const coverage = coverageHours(numberFile.firstIndexedAt, crawledAt);
 
 export default function Home(): ReactElement {
   const exFast = h24.excludingFast;
@@ -76,6 +81,33 @@ export default function Home(): ReactElement {
 
         <LedgerEntry
           folio="02"
+          id="h-lookup"
+          heading="One launch"
+          headingNote="· against the published cohorts"
+        >
+          <Lookup />
+        </LedgerEntry>
+
+        <LedgerEntry folio="03" id="h-what" heading="What this is">
+          <p className="lede">
+            LEDGE reads the Pons factory contract every hour, records every launch it finds, and
+            counts how many graduated — in the last 24 hours and over the indexed record, split by
+            pair token and by creator tax. Every figure on this page is printed with the number of
+            launches it was counted from.
+          </p>
+          <p className="note">
+            It will never rank a token, never name a wallet, and never print a rate without its
+            denominator.
+          </p>
+          <p className="note">
+            No public tool publishes the graduation rate of launches by configuration; this does.
+          </p>
+        </LedgerEntry>
+
+        <LiveBoard folio="04" />
+
+        <LedgerEntry
+          folio="05"
           id="h-fast"
           heading="Fast graduations"
           headingNote={`· n = ${formatCount(h24.fastShares.n)} graduations · 24 h`}
@@ -126,7 +158,7 @@ export default function Home(): ReactElement {
         </LedgerEntry>
 
         <LedgerEntry
-          folio="03"
+          folio="06"
           id="h-ttg"
           heading="Time to graduation"
           headingNote={`· n = ${formatCount(h24.ttg.n)} graduations · 24 h`}
@@ -160,7 +192,7 @@ export default function Home(): ReactElement {
         </LedgerEntry>
 
         <Register
-          folio="04"
+          folio="07"
           heading="By pair token"
           headingId="h-pair"
           headingNote={`· 24 h · n = ${formatCount(h24.launches)} launches`}
@@ -173,7 +205,7 @@ export default function Home(): ReactElement {
         />
 
         <Register
-          folio="05"
+          folio="08"
           heading="By creator tax"
           headingId="h-tax"
           headingNote={`· 24 h · n = ${formatCount(h24.launches)} launches`}
@@ -186,7 +218,7 @@ export default function Home(): ReactElement {
         />
 
         <Register
-          folio="06"
+          folio="09"
           heading="By hour (UTC)"
           headingId="h-hour"
           headingNote={`· 24 h · ${observedHours.length} hours observed`}
@@ -205,7 +237,7 @@ export default function Home(): ReactElement {
         />
 
         <LedgerEntry
-          folio="07"
+          folio="10"
           id="h-dep"
           heading="Deployers"
           headingNote={`· 24 h · n = ${formatCount(distinct)} distinct`}
@@ -259,10 +291,14 @@ export default function Home(): ReactElement {
         </LedgerEntry>
 
         <LedgerEntry
-          folio="08"
+          folio="11"
           id="h-all"
           heading="All-time"
-          headingNote={`· since block ${formatCount(numberFile.firstIndexedBlock)}`}
+          headingNote={
+            coverage === null
+              ? `· since block ${formatCount(numberFile.firstIndexedBlock)}`
+              : `· ${formatCount(coverage)} hours of record`
+          }
         >
           {allTimeIsSameMeasurement ? (
             <p className="note">{SAME_MEASUREMENT_NOTE}</p>

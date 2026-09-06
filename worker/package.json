@@ -1,0 +1,31 @@
+{
+  "name": "ledge-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "sync-fonts": "node scripts/sync-fonts.mjs",
+    "pretest": "npm run sync-fonts",
+    "predev": "npm run sync-fonts",
+    "test": "vitest run --config vitest.node.config.ts && vitest run --config vitest.workers.config.ts",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev --local",
+    "db:local": "wrangler d1 execute LEDGE_DB --local --file=schema.sql",
+    "test:node": "vitest run --config vitest.node.config.ts",
+    "test:workers": "vitest run --config vitest.workers.config.ts"
+  },
+  "dependencies": {
+    "@resvg/resvg-wasm": "^2.6.2",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.85.0"
+  }
+}

@@ -100,3 +100,81 @@ describe("a rate that may not be printed is null in the file", () => {
     })).success).toBe(false);
   });
 });
+
+/* The fields the live layer reads. The site does not render them yet, but it
+   is the build that refuses a file that has lost them: nothing downstream —
+   the Worker's lookups, the death card — can be reproduced from a file whose
+   ladder or cross cohort is missing, and a silently absent one would be
+   discovered as a wrong figure rather than as a broken build. */
+describe("the ladder, the cross cohort, and the first indexed time", () => {
+  it("carries an ISO first-indexed timestamp beside the first indexed block", () => {
+    expect(numberFile.firstIndexedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    expect(numberFile.firstIndexedBlock).toBeGreaterThan(0);
+  });
+
+  it("accepts a file that has indexed nothing yet", () => {
+    expect(numberSchema.safeParse(broken((f) => {
+      f.firstIndexedAt = null;
+    })).success).toBe(true);
+  });
+
+  it("refuses a first-indexed timestamp no clock can read", () => {
+    expect(numberSchema.safeParse(broken((f) => {
+      f.firstIndexedAt = "the first block";
+    })).success).toBe(false);
+  });
+
+  it("carries a monotone ladder whose rungs each keep their raw count", () => {
+    for (const w of [numberFile.h24, numberFile.allTime]) {
+      expect(w.ttg.ladder.map((r) => r.atSeconds)).toEqual([
+        30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600,
+      ]);
+      const counts = w.ttg.ladder.map((r) => r.cumulative);
+      expect(counts).toEqual([...counts].sort((a, b) => a - b));
+      expect(counts.at(-1)).toBeLessThanOrEqual(w.ttg.n);
+    }
+  });
+
+  it("refuses a ladder rung that has lost its raw count", () => {
+    expect(numberSchema.safeParse(broken((f) => {
+      delete f.h24.ttg.ladder[0].cumulative;
+    })).success).toBe(false);
+  });
+
+  it("refuses a ladder share on a ttg block that may not be printed", () => {
+    expect(numberSchema.safeParse(broken((f) => {
+      f.h24.ttg.insufficient = true;
+    })).success).toBe(false);
+  });
+
+  it("carries 20 cross-cohort rows, pair-major, each with its own denominator", () => {
+    for (const w of [numberFile.h24, numberFile.allTime]) {
+      expect(w.cohorts.pairTax).toHaveLength(20);
+      expect(w.cohorts.pairTax[0].bucket).toBe("eth/0%");
+      expect(w.cohorts.pairTax.at(-1)!.bucket).toBe("other/6-10%");
+      for (const row of w.cohorts.pairTax) {
+        expect(row.bucket).toBe(`${row.pairClass}/${row.taxBucket}`);
+        expect(typeof row.launches).toBe("number");
+        if (row.insufficient) {
+          expect(row.rate).toBeNull();
+          expect(row.excludingFast.rate).toBeNull();
+        }
+      }
+      const summed = w.cohorts.pairTax.reduce((a, r) => a + r.launches, 0);
+      expect(summed + w.cohortsExcluded.pairTax).toBe(w.launches);
+    }
+  });
+
+  it("refuses a cross-cohort row whose excluding-fast rate outlives its gate", () => {
+    expect(numberSchema.safeParse(broken((f) => {
+      f.h24.cohorts.pairTax[0].insufficient = true;
+      f.h24.cohorts.pairTax[0].rate = null;
+    })).success).toBe(false);
+  });
+
+  it("refuses a file whose cross cohort has lost its excluded count", () => {
+    expect(numberSchema.safeParse(broken((f) => {
+      delete f.h24.cohortsExcluded.pairTax;
+    })).success).toBe(false);
+  });
+});

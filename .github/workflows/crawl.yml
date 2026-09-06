@@ -16,6 +16,8 @@ jobs:
   crawl:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      committed: ${{ steps.commit.outputs.committed }}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,14 +35,55 @@ jobs:
 
 
       - name: commit data
+        id: commit
         run: |
           git config user.name  "ledge-bot"
           git config user.email "ledge-bot@users.noreply.github.com"
           git add data
-          git diff --cached --quiet && { echo "no data change"; exit 0; }
+          if git diff --cached --quiet; then
+            echo "no data change"
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git commit -m "data: crawl $(date -u +%Y-%m-%dT%H:%MZ)"
           for i in 1 2 3; do
-            git pull --rebase --autostash && git push && exit 0
+            if git pull --rebase --autostash && git push; then
+              echo "committed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             sleep 5
           done
           exit 1
+
+  # The on-chain mirror of the reading. Downstream of the commit, allowed to
+  # fail, and holding the only key in the project: a publish that goes wrong
+  # must never block, dirty or delay the dataset.
+  oracle:
+    needs: crawl
+    if: needs.crawl.outputs.committed == 'true' && vars.LEDGE_ORACLE_ADDRESS != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    env:
+      LEDGE_ORACLE_KEY: ${{ secrets.LEDGE_ORACLE_KEY }}
+      LEDGE_ORACLE_ADDRESS: ${{ vars.LEDGE_ORACLE_ADDRESS }}
+      RPC_URL: ${{ vars.RPC_URL }}
+    steps:
+      # the branch tip, not the triggering SHA: the reading to publish is the
+      # one the crawl job just committed.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: publish reading
+        if: env.LEDGE_ORACLE_KEY != ''
+        run: python pipeline/publish_oracle.py
+
+      - name: report a missing key
+        if: env.LEDGE_ORACLE_KEY == ''
+        run: echo "LEDGE_ORACLE_KEY is not set; skipping the on-chain publish"
+

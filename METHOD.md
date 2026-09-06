@@ -22,7 +22,7 @@ This is the source for the public `/method` page. Definitions here are binding o
 - **Window convention**: every window is the half-open interval `[since, until)` on launch timestamps — a launch at exactly `since` is inside, a launch at exactly `until` is the first launch of the next window. Adjacent windows therefore partition the timeline and no launch is counted twice at the seam. `until` is the run's `crawledAt`; all-time is `since = null`.
 - **The Pons Number (24h)**: graduations of launches whose launch timestamp falls in `[crawledAt − 86400, crawledAt)`, divided by launches in that window. A graduation counts for its launch whenever it happens, including after `until`. Because a launch near the end of the window may still graduate, the number is a lower bound for the most recent hours; the page says so.
 - **Excluding fast graduations (24h)**: same denominator; numerator excludes fast graduations. Shown beside the Pons Number, never instead of it. Also displayed as "1 in N" where N = round(1 / rate).
-- **All-time**: same two rates over every launch since the first block LEDGE indexed (block recorded on `/method`).
+- **All-time**: same two rates over every launch since the first block LEDGE indexed. `number.json` records both that block (`firstIndexedBlock`) and the timestamp of the earliest launch in the record (`firstIndexedAt`), so coverage can be stated in hours without converting block numbers to time — a conversion this method forbids everywhere else. Before anything is indexed, `firstIndexedAt` is `null`.
 
 ## Precision
 
@@ -36,11 +36,26 @@ The n < 30 rule applies to **every** published proportion, not only cohort rates
 - **Creator tax**: 0%, 1%, 2–3%, 4–5%, 6–10% (`creatorTaxBps` from `getLaunchedToken`).
 - **Hour of day (UTC)**: 24 buckets by launch timestamp.
 - **Day of week (UTC)**: 7 buckets; renders "not enough data" until every bucket has n ≥ 30.
+- **Pair token x creator tax**: the two cohorts above crossed — 4 pair classes x 5 tax buckets, 20 cells, every cell published with its own n whether or not it can be printed. Most cells are under 30 launches and render "not enough data (n=…)"; that is the honest state of the measurement, not a gap. Each cell also carries the same rate excluding graduations inside 5 minutes, gated on the same n. A launch whose creator tax we could not read, or whose tax falls outside the documented range, has no cell and is counted in the cell grid's excluded total, exactly as it is in the one-dimensional tax cohort.
 - **Deployers (aggregate only)**: distinct deployers in window; share that launched 2+; share of launches from deployers with 10+; distribution of launches-per-deployer as a histogram. No addresses.
 
 ## Time-to-graduation distribution
 
 Percentiles p10 / p25 / p50 / p75 / p90 / p95 / max of time to graduation, over the same window as the rate shown. Rendered as a horizontal bar with those ticks. Copy: "9 in 10 graduations happened within {p90}". No boundary claims ("nothing after X") are made.
+
+### The ladder
+
+Beside the percentiles, the same distribution is published as a step table at eleven fixed second marks:
+
+`30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600`
+
+Each rung carries the raw count of graduations that completed in **strictly less** than that many seconds, and that count as a share of the window's matched graduations. Strictly-less is the same convention as the 5-minute cutoff, so the rung at 300 s is the share that graduated inside 5 minutes and the rung at 60 s is the share inside 60 seconds — the ladder and those two figures cannot disagree.
+
+The counts only rise as the marks rise. The raw count is always published, so any share can be checked against it. Below 30 matched graduations the whole distribution is insufficient and every rung's share is `null` — the counts still say what was observed.
+
+A graduation slower than the last mark belongs to no rung, so the last count can be below n. Nothing is claimed about that tail beyond `max`.
+
+The marks are a definition. They exist so that anything asking "where does this elapsed time sit" reads a row out of the table rather than computing a percentage of its own; every published share comes from `pipeline/stats.py` and nowhere else. Moving a mark is a dated entry below.
 
 ## Freshness
 
@@ -57,6 +72,8 @@ Percentiles p10 / p25 / p50 / p75 / p90 / p95 / max of time to graduation, over 
 - Anyone can run the same script against the same files and get the same numbers.
 
 ## Changelog of definitions
+
+- 2026-09-06 — two new published figures, no existing definition changed. (1) The time-to-graduation ladder: cumulative counts and shares at eleven fixed second marks (30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600), counted strictly below each mark. The marks were chosen to be dense where the observed distribution is dense — 44% of graduations land inside 60 s — and to reach past the slowest graduation recorded in the 20-hour backfill (about 5 hours). Moving a mark is a change to a published figure and needs its own entry here. (2) The pair-token x creator-tax cell grid, 20 cells, published with every cell's n whether or not a rate can be printed. Both are computed by the same stats engine as every other figure and covered by the same byte-for-byte recompute check. The two rates already published (raw and excluding fast) are unchanged, and no number already on the site moved.
 
 - 2026-09-06 — the fold now leads with the excluding-fast figure, shown as "1 in N" with its rate beside it; the raw rate is the second figure. Both rates are always shown together with the same denominator; only the order changed. Reason: the raw rate is indistinguishable from figures published for other launchpads, while the rate excluding graduations inside 5 minutes is the measurement this site exists to publish. No definition changed.
 - 2026-09-06 — window convention stated explicitly as half-open `[since, until)`; previously the text said "within the trailing 24 hours" and the code selected the closed interval `[since, until]`, which counted a launch landing exactly on a window boundary in both adjacent windows. No published figure changed at the sample sizes recorded so far. `number.json` `schemaVersion` raised to 2 in the same change: `fastShares.under300Share`, `fastShares.under60Share`, `deployers.launched2plusShare` and `deployers.from10plusShare` are now `null` with an `insufficient` flag below n = 30 instead of `0.0`, and `stale` now reports only that the generating run knew it was behind (age is computed by the consumer from `crawledAt`).

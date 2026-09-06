@@ -1,0 +1,38 @@
+{
+  "_note": "Three real curves, read live from chain 4663 on 2026-09-06 and recorded in RESEARCH-PHASE2-3.md section A2. The wei values are exactly what eth_call returned. Frozen: these are historical readings, not live data, and they must never be refreshed from the chain — the graduated one in particular is a permanent record of the drain behaviour.",
+  "graduated": {
+    "why": "a graduated token: the curve was drained, so every balance reads 0 and a naive ratio would render 0% for a launch that filled all the way",
+    "token": "0x9b927d143392f6cbd52a490a9cc6595a56dbc70e",
+    "curve": "0x0c7c6bd603ba4262a15b69d9c01d627ff3d25236",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairNote": "USDG, 6 decimals",
+    "graduated": true,
+    "realQuoteReserve": "0",
+    "graduationThreshold": "8090000000",
+    "poolGraduatedPairTokenAmount": "8090000115",
+    "expected": { "filledWei": "8090000000", "thresholdWei": "8090000000", "share": 1 }
+  },
+  "dead": {
+    "why": "launched, never graduated: one wei of quote survived the fees, so the fill is a real 0.0000% and not a missing reading",
+    "token": "0x93506fb3d39dda7472b0d12d4acaa3b4ee92aea1",
+    "curve": "0x36f0eeb62c426cf9daa52e0228f1297f23bda704",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairNote": "USDG, 6 decimals",
+    "graduated": false,
+    "realQuoteReserve": "1",
+    "graduationThreshold": "8090000000",
+    "expected": { "filledWei": "1", "thresholdWei": "8090000000", "share": 0 }
+  },
+  "live": {
+    "why": "mid-curve, ETH-paired: the quote side reads 53.45% while the token side reads 73.92% at the same instant, which is why only one of them is published",
+    "token": "0x1e0616d65ec5790d57cbe05489b9409a8561a01b",
+    "curve": "0xd2414346044d5b597a14f2dd48175cdf0efd642a",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "pairNote": "ETH, 18 decimals",
+    "graduated": false,
+    "realQuoteReserve": "2245000707691451167",
+    "graduationThreshold": "4200000000000000000",
+    "tokenSideShareForContrast": 0.7392,
+    "expected": { "filledWei": "2245000707691451167", "thresholdWei": "4200000000000000000", "share": 0.534524 }
+  }
+}

@@ -36,6 +36,18 @@ jobs:
       - name: recompute (byte-for-byte gate)
         run: python pipeline/recompute.py --check
 
+      # Gate 1 (ARCHITECTURE-PHASE2-4 §9): the live layer must reproduce these
+      # objects and these sentences exactly. Regenerate from the frozen fixture
+      # and diff, so a change to a definition cannot land without the vectors
+      # moving with it.
+      - name: vector gate (regenerate and diff)
+        run: |
+          # --check first: it fails on a MISSING file, which a bare `git diff`
+          # would pass over silently if the vectors were never committed.
+          python pipeline/vectors.py --check
+          python pipeline/vectors.py
+          git diff --exit-code -- tests/vectors
+
       - name: copy lint
         run: bash scripts/lint-copy.sh
 
@@ -50,3 +62,69 @@ jobs:
       - name: next build (static export)
         if: hashFiles('site/package.json') != ''
         run: npm run build --prefix site
+
+  # The other half of the vector gate. The `check` job proves the committed
+  # vectors are what Python produces; this job proves the Worker reproduces
+  # them. A drift on either side has to fail both, or it is not a gate.
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: hashFiles('worker/package.json') != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: install worker deps
+        run: npm ci --prefix worker
+
+      - name: typecheck
+        run: npm run typecheck --prefix worker
+
+      # Gate 2 (no arithmetic in lookup/ladder/text) and gate 3 (no verdict
+      # word anywhere in worker/src), as a legible step as well as a test.
+      - name: worker lint
+        run: bash scripts/lint-worker.sh
+
+      # `npm test` runs both halves: the pure suite (text, lookups, the ladder,
+      # the response schema, the card, the lints, and the vector gate) and the
+      # workers-pool suite (the minute tick against a real D1, and the API
+      # end to end through the real router).
+      - name: vitest
+        run: npm test --prefix worker
+
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: hashFiles('contracts/foundry.toml') != ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: forge build
+        run: forge build --deny warnings
+        working-directory: contracts
+
+      - name: forge test
+        run: forge test -vv
+        working-directory: contracts
+
+      - name: reading occupies one storage slot
+        run: |
+          forge inspect LedgeOracle storage-layout --json > /tmp/layout.json
+          python3 - <<'EOF'
+          import json
+          layout = json.load(open("/tmp/layout.json"))
+          reading = [s for s in layout["storage"] if s["label"] == "_latest"][0]
+          size = int(layout["types"][reading["type"]]["numberOfBytes"])
+          assert size == 32, f"Reading is {size} bytes, not one slot"
+          print("Reading packs into one slot")
+          EOF
+        working-directory: contracts

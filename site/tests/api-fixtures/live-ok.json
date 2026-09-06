@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-06T18:14:07Z",
+  "lastIndexedBlock": 56172588,
+  "count": 4,
+  "rows": [
+    {
+      "pairClass": "eth",
+      "taxBucket": "0%",
+      "ageSeconds": 41,
+      "graduated": false
+    },
+    {
+      "pairClass": "eth",
+      "taxBucket": "2-3%",
+      "ageSeconds": 190,
+      "graduated": false
+    },
+    {
+      "pairClass": "stable",
+      "taxBucket": "1%",
+      "ageSeconds": 900,
+      "graduated": true
+    },
+    {
+      "pairClass": "other",
+      "taxBucket": null,
+      "ageSeconds": 3600,
+      "graduated": false
+    }
+  ],
+  "live": {
+    "stale": false,
+    "lastSuccessAt": "2026-09-06T18:13:47Z",
+    "lastIndexedBlock": 56172588
+  }
+}

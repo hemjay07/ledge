@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "address": "0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2",
+  "venue": "pons",
+  "observedAt": "2026-09-06T18:14:07Z",
+  "source": "chain",
+  "config": {
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "pairClass": "eth",
+    "creatorTaxBps": 300,
+    "taxBucket": "2-3%"
+  },
+  "state": {
+    "phase": 0,
+    "phaseLabel": "on the bonding curve",
+    "curveFilledWei": "1743200000000000000",
+    "graduationThresholdWei": "4200000000000000000",
+    "curveFilledShare": 0.415048,
+    "fillNote": null,
+    "launchBlock": 56172001,
+    "launchedAt": "2026-09-06T18:00:36Z",
+    "elapsedSeconds": 811,
+    "graduated": false,
+    "graduatedAt": null,
+    "timeToGraduationSeconds": null,
+    "indexed": true
+  },
+  "cohort": {
+    "crawledAt": "2026-09-06T18:00:36Z",
+    "definitionsVersion": "2026-09-06",
+    "key": {
+      "pairClass": "eth",
+      "taxBucket": "2-3%"
+    },
+    "h24": {
+      "window": "24h",
+      "crawledAt": "2026-09-06T18:00:36Z",
+      "launches": 1047,
+      "graduations": 17,
+      "rate": 0.016237,
+      "insufficient": false,
+      "excludingFast": {
+        "cutoffSeconds": 300,
+        "graduations": 8,
+        "rate": 0.007641,
+        "oneIn": 131,
+        "insufficient": false
+      }
+    },
+    "allTime": {
+      "window": "allTime",
+      "crawledAt": "2026-09-06T18:00:36Z",
+      "launches": 1047,
+      "graduations": 17,
+      "rate": 0.016237,
+      "insufficient": false,
+      "excludingFast": {
+        "cutoffSeconds": 300,
+        "graduations": 8,
+        "rate": 0.007641,
+        "oneIn": 131,
+        "insufficient": false
+      }
+    }
+  },
+  "placement": {
+    "crawledAt": "2026-09-06T18:00:36Z",
+    "window": "allTime",
+    "elapsedSeconds": 811,
+    "rung": {
+      "atSeconds": 600,
+      "cumulative": 79,
+      "cumulativeShare": 0.738318
+    },
+    "n": 107,
+    "insufficient": false,
+    "reason": "ok"
+  },
+  "live": {
+    "stale": true,
+    "lastSuccessAt": "2026-09-06T17:07:27Z",
+    "lastIndexedBlock": 56172588
+  },
+  "notice": null,
+  "links": {
+    "method": "https://ledge.tools/method",
+    "numberJson": "https://ledge.tools/number.json"
+  },
+  "text": "0x23fe54b3…f98fe2 · Pons\nETH · 2–3% · on the bonding curve\nminute 13 · on the curve · cohort 1.62% (n=1,047) · ETH · 2–3%\nLaunches configured this way, all time: 17 of 1,047 graduated, 1.62%. Excluding launches that graduated inside 5 min: 8 of 1,047, 0.76% (1 in 131).\nIn the last 24 hours: 17 of 1,047 graduated, 1.62%. Excluding launches that graduated inside 5 min: 8 of 1,047, 0.76% (1 in 131).\nBy 10 min, 73.8% of the 107 graduations measured in this window had already happened.\nCurve fill: 1743200000000000000 of 4200000000000000000 in the pair token's smallest unit.\nMeasured 6 Sep 2026 · 18:00 UTC\nThe live index has not completed a pass in over 5 minutes. Nothing below it is being estimated.\nhttps://ledge.tools/method"
+}

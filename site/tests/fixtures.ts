@@ -30,15 +30,33 @@ export function insufficientRaw(): Record<string, unknown> {
       n: 0,
       insufficient: true,
       p10: null, p25: null, p50: null, p75: null, p90: null, p95: null, max: null,
+      /* The ladder survives an insufficient window: it still says what was
+         observed at each rung. Only the shares are gone. */
+      ladder: w.ttg.ladder.map((rung: { atSeconds: number }) => ({
+        atSeconds: rung.atSeconds,
+        cumulative: 0,
+        cumulativeShare: null,
+      })),
     };
 
     for (const name of Object.keys(w.cohorts)) {
-      w.cohorts[name] = w.cohorts[name].map((row: { bucket: string }, i: number) => ({
-        bucket: row.bucket,
+      w.cohorts[name] = w.cohorts[name].map((row: Record<string, any>, i: number) => ({
+        ...row,
         launches: i === 0 ? 12 : 0,
         graduations: 0,
         rate: null,
         insufficient: true,
+        ...(row.excludingFast
+          ? {
+              excludingFast: {
+                cutoffSeconds: row.excludingFast.cutoffSeconds,
+                graduations: 0,
+                rate: null,
+                oneIn: null,
+                insufficient: true,
+              },
+            }
+          : {}),
       }));
       w.cohortsExcluded[name] = 0;
     }

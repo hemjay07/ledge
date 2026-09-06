@@ -1,16 +1,43 @@
 {
+  "rewrites": [
+    {
+      "source": "/t/:address",
+      "destination": "https://api.ledge.tools/t/:address"
+    },
+    {
+      "source": "/t/:address/og.png",
+      "destination": "https://api.ledge.tools/t/:address/og.png"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.ledge.tools/api/:path*"
+    },
+    {
+      "source": "/og/t/:path*",
+      "destination": "https://api.ledge.tools/og/t/:path*"
+    }
+  ],
   "headers": [
     {
       "source": "/number.json",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=300" },
-        { "key": "Access-Control-Allow-Origin", "value": "*" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
       ]
     },
     {
       "source": "/og/number.png",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=300, stale-while-revalidate=86400" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, stale-while-revalidate=86400"
+        }
       ]
     }
   ]

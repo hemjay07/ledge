@@ -1,0 +1,1676 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "0%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 0,
+          "insufficient": false,
+          "n": 535,
+          "reason": "before_first_step",
+          "rung": null,
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 0 · on the curve · cohort 1.82% (n=3,566) · ETH · 0%",
+          "placement": "This launch is younger than the first step of the published table (n=535)."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 0,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 0
+      },
+      "name": "elapsed-below-first-rung",
+      "why": "under the ladder's first mark: no rung yet"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "0%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 30,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 30,
+            "cumulative": 169,
+            "cumulativeShare": 0.315888
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 0 · on the curve · cohort 1.82% (n=3,566) · ETH · 0%",
+          "placement": "By 30 s, 31.6% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 30,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 0
+      },
+      "name": "elapsed-on-first-rung",
+      "why": "exactly the first mark"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "0%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 299,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 120,
+            "cumulative": 285,
+            "cumulativeShare": 0.53271
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 4 · on the curve · cohort 1.82% (n=3,566) · ETH · 0%",
+          "placement": "By 2 min, 53.3% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 299,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 0
+      },
+      "name": "elapsed-one-second-before-mark",
+      "why": "one second under a ladder mark stays on the rung below"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "0%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 300,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 300,
+            "cumulative": 361,
+            "cumulativeShare": 0.674766
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 5 · on the curve · cohort 1.82% (n=3,566) · ETH · 0%",
+          "placement": "By 5 min, 67.5% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 300,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 0
+      },
+      "name": "elapsed-on-ladder-mark",
+      "why": "exactly the 300 s mark, the fast cutoff"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 19,
+              "insufficient": false,
+              "oneIn": 192,
+              "rate": 0.005218
+            },
+            "graduations": 58,
+            "insufficient": false,
+            "launches": 3641,
+            "rate": 0.01593,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 19,
+              "insufficient": false,
+              "oneIn": 192,
+              "rate": 0.005218
+            },
+            "graduations": 58,
+            "insufficient": false,
+            "launches": 3641,
+            "rate": 0.01593,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "1%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 811,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 13 · on the curve · cohort 1.59% (n=3,641) · ETH · 1%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 811,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 100
+      },
+      "name": "elapsed-between-rungs",
+      "why": "between two marks: the lower rung holds"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "0%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 21600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 21600,
+            "cumulative": 535,
+            "cumulativeShare": 1.0
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 360 · died · cohort 1.82% (n=3,566) · ETH · 0%",
+          "placement": "By 6 h, 100.0% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 21600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 0
+      },
+      "name": "elapsed-on-last-rung",
+      "why": "exactly the last mark"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "0%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 21601,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 21600,
+            "cumulative": 535,
+            "cumulativeShare": 1.0
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 360 · died · cohort 1.82% (n=3,566) · ETH · 0%",
+          "placement": "By 6 h, 100.0% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 21601,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 0
+      },
+      "name": "elapsed-past-last-rung",
+      "why": "past the last mark: the top rung still holds"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "0%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 17821,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 14400,
+            "cumulative": 531,
+            "cumulativeShare": 0.992523
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 297 · died · cohort 1.82% (n=3,566) · ETH · 0%",
+          "placement": "By 4 h, 99.3% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 17821,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 0
+      },
+      "name": "elapsed-past-max",
+      "why": "longer than any graduation measured in the window"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 29,
+            "rate": null,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 29,
+            "rate": null,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "other",
+            "taxBucket": "4-5%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort not enough data (n=29) · Other · 4–5%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "other",
+        "phase": 0,
+        "taxBps": 400
+      },
+      "name": "cohort-n-29",
+      "why": "a cell of 29: under the gate, no rate may be printed"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": false,
+              "oneIn": null,
+              "rate": 0.0
+            },
+            "graduations": 1,
+            "insufficient": false,
+            "launches": 30,
+            "rate": 0.033333,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": false,
+              "oneIn": null,
+              "rate": 0.0
+            },
+            "graduations": 1,
+            "insufficient": false,
+            "launches": 30,
+            "rate": 0.033333,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "other",
+            "taxBucket": "6-10%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort 3.3% (n=30) · Other · 6–10%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "other",
+        "phase": 0,
+        "taxBps": 600
+      },
+      "name": "cohort-n-30",
+      "why": "a cell of exactly 30: the gate opens"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "stable",
+            "taxBucket": "0%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort not enough data (n=0) · Stablecoin · 0%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "stable",
+        "phase": 0,
+        "taxBps": 0
+      },
+      "name": "cohort-empty-cell",
+      "why": "a cell nothing landed in"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "stock",
+            "taxBucket": "2-3%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort not enough data (n=0) · Tokenized stock · 2–3%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "stock",
+        "phase": 0,
+        "taxBps": 300
+      },
+      "name": "cohort-unobserved-pair-class",
+      "why": "a pair class with no launches in the window"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": null,
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": null,
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": null
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort not published · ETH · tax not read",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": null
+      },
+      "name": "tax-not-recorded",
+      "why": "no tax reading: no cell, and the card says so"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": null,
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": null,
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": null
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort not published · ETH · tax not read",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 1001
+      },
+      "name": "tax-out-of-range",
+      "why": "a tax outside the documented range is not bucketed"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "2-3%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 96,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 60,
+            "cumulative": 234,
+            "cumulativeShare": 0.437383
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 1 · graduated · cohort 1.57% (n=3,573) · ETH · 2–3%",
+          "placement": "By 60 s, 43.7% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 96,
+        "graduated": true,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 2,
+        "taxBps": 300
+      },
+      "name": "graduated-token",
+      "why": "an outcome already observed, in the past tense"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "2-3%"
+          }
+        },
+        "placement": null,
+        "text": {
+          "headline": "launch time not indexed · on the curve · cohort 1.57% (n=3,573) · ETH · 2–3%",
+          "placement": null
+        }
+      },
+      "input": {
+        "elapsedSeconds": null,
+        "graduated": false,
+        "indexed": false,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 300
+      },
+      "name": "not-indexed-token",
+      "why": "evicted from the live window: the cohort survives, the clock does not"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 32,
+              "insufficient": false,
+              "oneIn": 111,
+              "rate": 0.008974
+            },
+            "graduations": 65,
+            "insufficient": false,
+            "launches": 3566,
+            "rate": 0.018228,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "0%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort 1.82% (n=3,566) · ETH · 0%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 0
+      },
+      "name": "tax-bucket-boundary-0",
+      "why": "0 bps sits in one bucket and one only"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 19,
+              "insufficient": false,
+              "oneIn": 192,
+              "rate": 0.005218
+            },
+            "graduations": 58,
+            "insufficient": false,
+            "launches": 3641,
+            "rate": 0.01593,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 19,
+              "insufficient": false,
+              "oneIn": 192,
+              "rate": 0.005218
+            },
+            "graduations": 58,
+            "insufficient": false,
+            "launches": 3641,
+            "rate": 0.01593,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "1%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort 1.59% (n=3,641) · ETH · 1%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 1
+      },
+      "name": "tax-bucket-boundary-1",
+      "why": "1 bps sits in one bucket and one only"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 19,
+              "insufficient": false,
+              "oneIn": 192,
+              "rate": 0.005218
+            },
+            "graduations": 58,
+            "insufficient": false,
+            "launches": 3641,
+            "rate": 0.01593,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 19,
+              "insufficient": false,
+              "oneIn": 192,
+              "rate": 0.005218
+            },
+            "graduations": 58,
+            "insufficient": false,
+            "launches": 3641,
+            "rate": 0.01593,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "1%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort 1.59% (n=3,641) · ETH · 1%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 100
+      },
+      "name": "tax-bucket-boundary-100",
+      "why": "100 bps sits in one bucket and one only"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "2-3%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort 1.57% (n=3,573) · ETH · 2–3%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 101
+      },
+      "name": "tax-bucket-boundary-101",
+      "why": "101 bps sits in one bucket and one only"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "2-3%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort 1.57% (n=3,573) · ETH · 2–3%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 300
+      },
+      "name": "tax-bucket-boundary-300",
+      "why": "300 bps sits in one bucket and one only"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "4-5%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort not enough data (n=0) · ETH · 4–5%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 301
+      },
+      "name": "tax-bucket-boundary-301",
+      "why": "301 bps sits in one bucket and one only"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "4-5%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort not enough data (n=0) · ETH · 4–5%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 500
+      },
+      "name": "tax-bucket-boundary-500",
+      "why": "500 bps sits in one bucket and one only"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "6-10%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort not enough data (n=0) · ETH · 6–10%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 501
+      },
+      "name": "tax-bucket-boundary-501",
+      "why": "501 bps sits in one bucket and one only"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 0,
+              "insufficient": true,
+              "oneIn": null,
+              "rate": null
+            },
+            "graduations": 0,
+            "insufficient": true,
+            "launches": 0,
+            "rate": null,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "6-10%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 600,
+          "insufficient": false,
+          "n": 535,
+          "reason": "ok",
+          "rung": {
+            "atSeconds": 600,
+            "cumulative": 409,
+            "cumulativeShare": 0.764486
+          },
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 10 · on the curve · cohort not enough data (n=0) · ETH · 6–10%",
+          "placement": "By 10 min, 76.4% of the 535 graduations measured in this window had already happened."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 600,
+        "graduated": false,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 0,
+        "taxBps": 1000
+      },
+      "name": "tax-bucket-boundary-1000",
+      "why": "1000 bps sits in one bucket and one only"
+    }
+  ],
+  "crawledAt": "2025-11-07T17:20:15Z",
+  "definitionsVersion": "2026-09-06",
+  "generatedBy": "pipeline/vectors.py",
+  "ladderEdges": [
+    30,
+    60,
+    120,
+    300,
+    600,
+    900,
+    1800,
+    3600,
+    7200,
+    14400,
+    21600
+  ],
+  "numberFile": "tests/vectors/fixture-number.json",
+  "schemaVersion": 1,
+  "source": "pipeline/tests/fixture-backfill-20h.json (synthetic ts and tax, fixture-only)"
+}

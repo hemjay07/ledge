@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "address": "0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2",
+  "venue": "pons",
+  "observedAt": "2026-09-06T18:14:07Z",
+  "source": "chain",
+  "config": {
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "pairClass": "eth",
+    "creatorTaxBps": 300,
+    "taxBucket": "2-3%"
+  },
+  "state": {
+    "phase": 0,
+    "phaseLabel": "on the bonding curve",
+    "curveFilledWei": "1743200000000000000",
+    "graduationThresholdWei": "4200000000000000000",
+    "curveFilledShare": 0.415048,
+    "fillNote": null,
+    "launchBlock": 56172001,
+    "launchedAt": "2026-09-06T18:00:36Z",
+    "elapsedSeconds": 811,
+    "graduated": false,
+    "graduatedAt": null,
+    "timeToGraduationSeconds": null,
+    "indexed": true
+  },
+  "cohort": {
+    "crawledAt": "2026-09-06T18:00:36Z",
+    "definitionsVersion": "2026-09-06",
+    "key": {
+      "pairClass": "eth",
+      "taxBucket": "2-3%"
+    },
+    "h24": {
+      "window": "24h",
+      "crawledAt": "2026-09-06T18:00:36Z",
+      "launches": 12,
+      "graduations": 0,
+      "rate": null,
+      "insufficient": true,
+      "excludingFast": {
+        "cutoffSeconds": 300,
+        "graduations": 0,
+        "rate": null,
+        "oneIn": null,
+        "insufficient": true
+      }
+    },
+    "allTime": {
+      "window": "allTime",
+      "crawledAt": "2026-09-06T18:00:36Z",
+      "launches": 12,
+      "graduations": 0,
+      "rate": null,
+      "insufficient": true,
+      "excludingFast": {
+        "cutoffSeconds": 300,
+        "graduations": 0,
+        "rate": null,
+        "oneIn": null,
+        "insufficient": true
+      }
+    }
+  },
+  "placement": {
+    "crawledAt": "2026-09-06T18:00:36Z",
+    "window": "allTime",
+    "elapsedSeconds": 811,
+    "rung": null,
+    "n": 12,
+    "insufficient": true,
+    "reason": "insufficient"
+  },
+  "live": {
+    "stale": false,
+    "lastSuccessAt": "2026-09-06T18:13:47Z",
+    "lastIndexedBlock": 56172588
+  },
+  "notice": null,
+  "links": {
+    "method": "https://ledge.tools/method",
+    "numberJson": "https://ledge.tools/number.json"
+  },
+  "text": "0x23fe54b3…f98fe2 · Pons\nETH · 2–3% · on the bonding curve\nminute 13 · on the curve · cohort not enough data (n=12) · ETH · 2–3%\nLaunches configured this way, all time: not enough data (n=12).\nIn the last 24 hours: not enough data (n=12).\nNot enough graduations to place this launch (n=12).\nCurve fill: 1743200000000000000 of 4200000000000000000 in the pair token's smallest unit.\nMeasured 6 Sep 2026 · 18:00 UTC\nhttps://ledge.tools/method"
+}

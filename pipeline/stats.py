@@ -4,6 +4,7 @@ section 6. This is the only place a METHOD.md definition lives in code.
 """
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections import Counter
 from datetime import datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
@@ -34,10 +35,18 @@ DEFINITIONS_VERSION = "2026-09-06"
 
 PAIR_BUCKETS = ["eth", "stable", "stock", "other"]
 TAX_BUCKETS = ["0%", "1%", "2-3%", "4-5%", "6-10%"]
+PAIR_TAX_BUCKETS = [f"{p}/{t}" for p in PAIR_BUCKETS for t in TAX_BUCKETS]
 HOUR_BUCKETS = [f"{h:02d}" for h in range(24)]
 DAY_BUCKETS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 _PERCENTILES = (10, 25, 50, 75, 90, 95)
+
+# Fixed second marks of the time-to-graduation ladder. These are a
+# definition, not a rendering choice: the live layer places a token by
+# looking up the largest rung at or below its elapsed seconds, so moving one
+# of these marks moves a published figure and needs a dated /method entry
+# (CONSTRAINTS.md #9). ARCHITECTURE-PHASE2-4.md section 0.
+LADDER_EDGES = (30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600)
 
 
 def window(launches: list, graduations: list, since: Optional[int], until: int) -> dict:
@@ -86,16 +95,27 @@ def _ttg_deltas(w: dict) -> list[int]:
     return [g["ts"] - launch_ts[token] for token, g in w["grads_by_token"].items()]
 
 
+def _one_in(count: int, rate_value: Optional[float]) -> Optional[int]:
+    """"1 in N" for a rate, rounded half up. Null when nothing was observed:
+    there is no "1 in N" for a numerator of zero."""
+    if not count or not rate_value:
+        return None
+    return int(Decimal(1 / rate_value).quantize(0, rounding=ROUND_HALF_UP))
+
+
 def rate_excluding_fast(w: dict, cutoff: int = FAST_CUTOFF) -> dict:
     n = len(w["launches"])
     slow = sum(1 for delta in _ttg_deltas(w) if delta >= cutoff)
     if n < MIN_N:
         return {"launches": n, "graduations": slow, "rate": None, "oneIn": None, "insufficient": True}
     result_rate = round(slow / n, 6)
-    one_in = None
-    if slow > 0:
-        one_in = int(Decimal(1 / result_rate).quantize(0, rounding=ROUND_HALF_UP))
-    return {"launches": n, "graduations": slow, "rate": result_rate, "oneIn": one_in, "insufficient": False}
+    return {
+        "launches": n,
+        "graduations": slow,
+        "rate": result_rate,
+        "oneIn": _one_in(slow, result_rate),
+        "insufficient": False,
+    }
 
 
 def ttg_percentiles(w: dict) -> dict:
@@ -120,6 +140,42 @@ def ttg_percentiles(w: dict) -> dict:
     result["n"] = n
     result["insufficient"] = False
     return result
+
+
+def ttg_ladder(w: dict) -> list[dict]:
+    """The monotone cumulative step table over LADDER_EDGES.
+
+    `cumulative` counts matched graduations whose time to graduation is
+    strictly less than the rung's mark -- the same convention as the fast
+    cutoff ("graduated inside 5 minutes" is ttg < 300), so the rung at
+    300 s is fastShares.under300Share and the rung at 60 s is
+    under60Share by construction. The raw count is always published so a
+    reader can check the share; the share itself is null for every rung
+    below MIN_N, never 0.0 (CONSTRAINTS.md #4).
+
+    A graduation slower than the last mark is counted in no rung, so the
+    last rung's count can be below n. That is the observation, not a gap:
+    the tail is published as `max` beside the percentiles.
+    """
+    deltas = sorted(_ttg_deltas(w))
+    n = len(deltas)
+    insufficient = n < MIN_N
+    rungs = []
+    for mark in LADDER_EDGES:
+        cumulative = bisect_left(deltas, mark)
+        rungs.append(
+            {
+                "atSeconds": mark,
+                "cumulative": cumulative,
+                "cumulativeShare": None if insufficient else round(cumulative / n, 6),
+            }
+        )
+    return rungs
+
+
+def ttg_block(w: dict) -> dict:
+    """The published `ttg` object: percentiles plus the ladder, one gate."""
+    return {**ttg_percentiles(w), "ladder": ttg_ladder(w)}
 
 
 def fast_shares(w: dict) -> dict:
@@ -162,6 +218,12 @@ def _bucket_key(launch: dict, key: str) -> Optional[str]:
         return launch["pairClass"]
     if key == "taxBucket":
         return _tax_bucket(launch["creatorTaxBps"])
+    if key == "pairTax":
+        pair_class = launch["pairClass"]
+        tax = _tax_bucket(launch["creatorTaxBps"])
+        if pair_class not in PAIR_BUCKETS or tax is None:
+            return None
+        return f"{pair_class}/{tax}"
     if key == "hourUtc":
         return f"{datetime.fromtimestamp(launch['ts'], timezone.utc).hour:02d}"
     if key == "dayUtc":
@@ -173,6 +235,7 @@ def _bucket_list(key: str) -> list[str]:
     return {
         "pairClass": PAIR_BUCKETS,
         "taxBucket": TAX_BUCKETS,
+        "pairTax": PAIR_TAX_BUCKETS,
         "hourUtc": HOUR_BUCKETS,
         "dayUtc": DAY_BUCKETS,
     }[key]
@@ -208,6 +271,66 @@ def cohort(w: dict, key: str) -> list[dict]:
 
 def cohort_excluded(w: dict, key: str) -> int:
     return sum(1 for l in w["launches"] if _bucket_key(l, key) is None)
+
+
+def pair_tax_cohort(w: dict, cutoff: int = FAST_CUTOFF) -> list[dict]:
+    """The 2-D cross cohort: 4 pair classes x 5 tax buckets, 20 rows, always
+    emitted in pair-major order so the byte diff is stable.
+
+    Every row is a cohort row (launches, graduations, rate|null,
+    insufficient) plus the key it was cut on and its own excludingFast
+    block, gated on the row's own denominator. A launch with no tax
+    reading, or one outside the documented range, has no cell and is
+    counted by cohort_excluded(w, "pairTax").
+
+    ARCHITECTURE-PHASE2-4.md section 0, "Decision: the cross cohort".
+    """
+    launch_ts = {l["token"]: l["ts"] for l in w["launches"]}
+    members: dict[str, list[dict]] = {b: [] for b in PAIR_TAX_BUCKETS}
+    for l in w["launches"]:
+        bucket = _bucket_key(l, "pairTax")
+        if bucket is not None:
+            members[bucket].append(l)
+
+    rows = []
+    for bucket in PAIR_TAX_BUCKETS:
+        pair_class, tax_bucket = bucket.split("/", 1)
+        cell = members[bucket]
+        n = len(cell)
+        deltas = [
+            w["grads_by_token"][l["token"]]["ts"] - launch_ts[l["token"]]
+            for l in cell
+            if l["token"] in w["grads_by_token"]
+        ]
+        graduations = len(deltas)
+        slow = sum(1 for d in deltas if d >= cutoff)
+
+        if n < MIN_N:
+            row_rate = None
+            slow_rate = None
+        else:
+            row_rate = round(graduations / n, 6)
+            slow_rate = round(slow / n, 6)
+
+        rows.append(
+            {
+                "bucket": bucket,
+                "pairClass": pair_class,
+                "taxBucket": tax_bucket,
+                "launches": n,
+                "graduations": graduations,
+                "rate": row_rate,
+                "insufficient": n < MIN_N,
+                "excludingFast": {
+                    "cutoffSeconds": cutoff,
+                    "graduations": slow,
+                    "rate": slow_rate,
+                    "oneIn": _one_in(slow, slow_rate),
+                    "insufficient": n < MIN_N,
+                },
+            }
+        )
+    return rows
 
 
 def deployers(w: dict) -> dict:
@@ -247,6 +370,22 @@ def deployers(w: dict) -> dict:
     }
 
 
+def _format_iso(ts: int) -> str:
+    return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def first_indexed_at(launches: list) -> Optional[str]:
+    """The earliest launch timestamp in the record, as an ISO-8601 Z string.
+
+    Published beside `firstIndexedBlock` so a consumer can state coverage in
+    hours without converting blocks to time -- a conversion METHOD.md
+    forbids. Null when nothing is indexed yet.
+    """
+    if not launches:
+        return None
+    return _format_iso(min(l["ts"] for l in launches))
+
+
 def _parse_iso(value: str) -> int:
     return int(datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp())
 
@@ -261,12 +400,14 @@ def _window_block(launches: list, graduations: list, since: Optional[int], until
         "tax": cohort(w, "taxBucket"),
         "hour": cohort(w, "hourUtc"),
         "day": cohort(w, "dayUtc"),
+        "pairTax": pair_tax_cohort(w),
     }
     cohorts_excluded = {
         "pair": cohort_excluded(w, "pairClass"),
         "tax": cohort_excluded(w, "taxBucket"),
         "hour": cohort_excluded(w, "hourUtc"),
         "day": cohort_excluded(w, "dayUtc"),
+        "pairTax": cohort_excluded(w, "pairTax"),
     }
 
     return {
@@ -286,7 +427,7 @@ def _window_block(launches: list, graduations: list, since: Optional[int], until
             "insufficient": excluding_fast["insufficient"],
         },
         "fastShares": fast_shares(w),
-        "ttg": ttg_percentiles(w),
+        "ttg": ttg_block(w),
         "cohorts": cohorts,
         "cohortsExcluded": cohorts_excluded,
         "deployers": deployers(w),
@@ -318,6 +459,7 @@ def build_number(launches: list, graduations: list, state: dict, crawled_at: str
         "stale": stale,
         "headBlock": state.get("lastIndexedBlock"),
         "firstIndexedBlock": state.get("firstIndexedBlock"),
+        "firstIndexedAt": first_indexed_at(launches),
         "factory": FACTORY_ADDRESS,
         "chainId": CHAIN_ID,
         "h24": _window_block(launches, graduations, since_24h, until, lower_bound=True),

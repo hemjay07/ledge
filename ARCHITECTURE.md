@@ -171,10 +171,16 @@ def rate(w: Window) -> dict:            # {"launches", "graduations", "rate": fl
 def rate_excluding_fast(w: Window, cutoff: int = FAST_CUTOFF) -> dict
                                         # + {"oneIn": int|None}
 def ttg_percentiles(w: Window) -> dict  # {"p10","p25","p50","p75","p90","p95","max","n"} ints|None
+def ttg_ladder(w: Window) -> list[dict] # one rung per LADDER_EDGES mark:
+                                        # {"atSeconds", "cumulative", "cumulativeShare": float|None}
+def ttg_block(w: Window) -> dict        # the published `ttg`: percentiles + ladder
 def fast_shares(w: Window) -> dict      # {"under300Share", "under60Share", "n", "insufficient"}
 def cohort(w: Window, key: str) -> list[dict]
-                                        # key in {"pairClass","taxBucket","hourUtc","dayUtc"}
+                                        # key in {"pairClass","taxBucket","hourUtc","dayUtc","pairTax"}
+def pair_tax_cohort(w: Window, cutoff: int = FAST_CUTOFF) -> list[dict]
+                                        # the 20-row cross cohort, each row + excludingFast
 def cohort_excluded(w: Window, key: str) -> int
+def first_indexed_at(launches) -> str|None   # earliest launch ts, ISO-8601 Z
 def deployers(w: Window) -> dict
 def canonical_dumps(obj) -> str         # in pipeline/canonical.py
 def build_number(launches, graduations, state, crawled_at: str) -> dict
@@ -187,6 +193,9 @@ def build_number(launches, graduations, state, crawled_at: str) -> dict
 - **`oneIn = int(Decimal(1 / rate).quantize(0, ROUND_HALF_UP))`** — explicit half-up, never Python's banker's rounding. `null` when `graduations == 0` or `insufficient`. Check against the backfill: 174/23552 = 0.007388 → 135.4 → **135**, matching the recorded "0.74% (1 in 135)".
 - **Percentiles: nearest-rank.** Sort time-to-graduation ascending; `idx = ceil(p/100 * n) - 1`, clamped to `[0, n-1]`. Integer seconds. If matched graduations < 30, every percentile is `null` and `ttg.insufficient = true`.
 - **Tax buckets** (`creatorTaxBps`): `0`, `1–100`, `101–300`, `301–500`, `501–1000` → labels `"0%"`, `"1%"`, `"2-3%"`, `"4-5%"`, `"6-10%"`. `creatorTaxBps is None` → excluded from the cohort and counted in `cohortsExcluded.tax`.
+- **The ladder** (`LADDER_EDGES = (30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600)`): for each mark, `cumulative` counts matched graduations with time to graduation **strictly less than** the mark — the same convention as the fast cutoff, so the rung at 300 s equals `fastShares.under300Share` and the rung at 60 s equals `under60Share` by construction. Counts are monotone non-decreasing and always published raw; `cumulativeShare` is `null` on every rung when `ttg.insufficient`. A graduation slower than the last mark is in no rung, so the last count can be below `n`; the tail is published as `max`. The marks are a definition — moving one needs a dated `/method` entry. The live layer places a token by looking up the largest rung at or below its elapsed seconds and does no arithmetic (ARCHITECTURE-PHASE2-4 §0).
+- **The cross cohort** (`cohorts.pairTax`): 4 pair classes × 5 tax buckets = 20 rows, always emitted in pair-major order (`eth/0%` … `other/6-10%`), each a cohort row (`launches`, `graduations`, `rate|null`, `insufficient`) plus the `pairClass`/`taxBucket` it was cut on and its own `excludingFast` block gated on the row's own `n`. A launch with no tax reading, or one outside the documented range, has no cell and is counted in `cohortsExcluded.pairTax`.
+- **`firstIndexedAt`** is the earliest launch timestamp in the record, ISO-8601 Z, beside `firstIndexedBlock` — so a consumer states coverage in hours without converting blocks to time, which METHOD forbids. `null` when nothing is indexed.
 - **Hour/day** buckets from `datetime.fromtimestamp(ts, UTC)`. All 24 / all 7 rows are always emitted, even at n=0, so the renderer never has to reason about missing buckets.
 - **Day-of-week gating** (METHOD): the `day` cohort renders only if **every** row has `insufficient == false`. This is derivable from the array; no extra schema field.
 - **24 h lower bound**: `h24.lowerBound: true` is always set. Copy renders "lower bound — launches near the end of the window may still graduate".
@@ -207,6 +216,7 @@ def build_number(launches, graduations, state, crawled_at: str) -> dict
   "stale": false,
   "headBlock": 55919382,
   "firstIndexedBlock": 55219400,
+  "firstIndexedAt": "2026-09-05T16:41:12Z",
   "factory": "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e",
   "chainId": 4663,
   "h24": {
@@ -229,7 +239,13 @@ def build_number(launches, graduations, state, crawled_at: str) -> dict
     "ttg": {
       "n": 535, "insufficient": false,
       "p10": 12, "p25": 72, "p50": 96, "p75": 540,
-      "p90": 3000, "p95": 6600, "max": 18000
+      "p90": 3000, "p95": 6600, "max": 18000,
+      "ladder": [
+        { "atSeconds": 30,    "cumulative": 150, "cumulativeShare": 0.280374 },
+        { "atSeconds": 60,    "cumulative": 234, "cumulativeShare": 0.437383 },
+        { "atSeconds": 300,   "cumulative": 361, "cumulativeShare": 0.674766 },
+        { "atSeconds": 21600, "cumulative": 535, "cumulativeShare": 1.0 }
+      ]
     },
     "cohorts": {
       "pair": [
@@ -240,9 +256,17 @@ def build_number(launches, graduations, state, crawled_at: str) -> dict
       ],
       "tax":  [ { "bucket": "0%", "launches": 0, "graduations": 0, "rate": null, "insufficient": true } ],
       "hour": [ { "bucket": "00", "launches": 0, "graduations": 0, "rate": null, "insufficient": true } ],
-      "day":  [ { "bucket": "Mon","launches": 0, "graduations": 0, "rate": null, "insufficient": true } ]
+      "day":  [ { "bucket": "Mon","launches": 0, "graduations": 0, "rate": null, "insufficient": true } ],
+      "pairTax": [
+        { "bucket": "eth/0%", "pairClass": "eth", "taxBucket": "0%",
+          "launches": 1179, "graduations": 13, "rate": 0.011026, "insufficient": false,
+          "excludingFast": { "cutoffSeconds": 300, "graduations": 5, "rate": 0.004241, "oneIn": 236, "insufficient": false } },
+        { "bucket": "eth/1%", "pairClass": "eth", "taxBucket": "1%",
+          "launches": 12, "graduations": 0, "rate": null, "insufficient": true,
+          "excludingFast": { "cutoffSeconds": 300, "graduations": 0, "rate": null, "oneIn": null, "insufficient": true } }
+      ]
     },
-    "cohortsExcluded": { "pair": 0, "tax": 0, "hour": 0, "day": 0 },
+    "cohortsExcluded": { "pair": 0, "tax": 0, "hour": 0, "day": 0, "pairTax": 0 },
     "deployers": {
       "distinct": 15258,
       "launched2plusShare": 0.118363,
@@ -257,7 +281,7 @@ def build_number(launches, graduations, state, crawled_at: str) -> dict
 }
 ```
 
-Cohort arrays above are abbreviated with a single illustrative row; the real file always emits every bucket. Numeric values shown are drawn from the 20-hour backfill where the recorded figures exist (23,552 launches, 535 graduations, 361 under 300 s, 234 under 60 s, 24 orphans, 15,258 deployers, 1,806 with 2+, 5,020 launches from deployers with 10+) and are placeholders where they do not — the implementation must derive all of them.
+The ladder above is abbreviated to four of its eleven rungs, and the cohort arrays to one or two illustrative rows; the real file always emits every bucket. Numeric values shown are drawn from the 20-hour backfill where the recorded figures exist (23,552 launches, 535 graduations, 361 under 300 s, 234 under 60 s, 24 orphans, 15,258 deployers, 1,806 with 2+, 5,020 launches from deployers with 10+) and are placeholders where they do not — the implementation must derive all of them.
 
 ### `stale`
 

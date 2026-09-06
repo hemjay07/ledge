@@ -1,0 +1,44 @@
+name = "ledge-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-22"
+compatibility_flags = ["nodejs_compat"]
+
+# The minute indexer. One tick a minute; a tick that fails leaves the cursor
+# where it was and the next tick simply covers a wider window.
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+FACTORY_ADDRESS = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
+CHAIN_ID = "4663"
+RPC_URL = "https://rpc.mainnet.chain.robinhood.com"
+# Fallback used only when RPC_URL answers with a transport fault. Left equal to
+# RPC_URL until a second endpoint exists (risk register, "two indexers").
+RPC_URL_FALLBACK = "https://rpc.mainnet.chain.robinhood.com"
+NUMBER_JSON_URL = "https://ledge.tools/number.json"
+SITE_ORIGIN = "https://ledge.tools"
+
+[[d1_databases]]
+binding = "LEDGE_DB"
+database_name = "ledge"
+# Replaced with the real id by `wrangler d1 create ledge` before the first deploy.
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[kv_namespaces]]
+binding = "LEDGE_KV"
+# Replaced with the real id by `wrangler kv namespace create LEDGE_KV`.
+id = "0000000000000000000000000000000f"
+
+# The two faces the death card is set in, inlined as bytes at build time.
+[[rules]]
+type = "Data"
+globs = ["**/*.ttf"]
+fallthrough = true
+
+[observability]
+enabled = true
+
+# Secrets, set once with `wrangler secret put` (never in this file):
+#   TELEGRAM_BOT_TOKEN     bot token from @BotFather
+#   TELEGRAM_WEBHOOK_SECRET  32-byte random, the {secret} path segment
+#   TELEGRAM_HEADER_SECRET   32-byte random, X-Telegram-Bot-Api-Secret-Token

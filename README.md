@@ -45,6 +45,162 @@ against the committed file byte-for-byte, exiting non-zero on any
 difference. This is the same command CI runs on every push; it is also the
 gate a deploy cannot pass with a stale or hand-edited figure.
 
+## One place a statistic is defined
+
+`pipeline/stats.py` computes every rate, share, percentile and cohort row
+LEDGE publishes. Nothing else does — not the site, not the Worker, not the
+oracle. Each of those reads `data/number.json` and prints what it finds.
+
+The awkward case is the sentence the live lookup wants: *"minute 14 — 76.4% of
+graduations had already happened by now."* The "minute 14" is an observation
+about one token; the "76.4%" is a statistic. Computing that percentage in
+TypeScript would put a published figure outside the recompute gate. So
+`number.json` carries two extra structures and the live layer does a table
+lookup instead of arithmetic:
+
+- **`ttg.ladder`** — cumulative counts of graduations at eleven fixed second
+  marks (30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600), each with
+  its raw count and its share. Placing a token is finding the last mark at or
+  below its age. The 300 s and 60 s rungs are the "inside five minutes" and
+  "inside a minute" figures by construction, so the ladder cannot contradict
+  them.
+- **`cohorts.pairTax`** — pair class crossed with creator-tax bucket, 20 cells,
+  each with its own `n`, its own rate, and its own rate excluding fast
+  graduations. "What happened to launches configured like this one" is a row
+  lookup. Most cells are under n = 30 and say so.
+
+Both ship inside the file the byte-for-byte recompute gate already covers, so
+adding them extended that gate for free — which is the whole reason they live
+there.
+
+`tests/vectors/` holds the contract between the two languages: Python emits the
+exact objects and sentences the live layer must produce for a set of inputs,
+and the Worker's own code is run against them. See
+[`tests/vectors/README.md`](tests/vectors/README.md).
+
+```
+python pipeline/vectors.py --check   # are the committed vectors current?
+```
+
+## On-chain oracle
+
+The same reading `data/number.json` carries is mirrored on Robinhood Chain by
+`contracts/src/LedgeOracle.sol`, so a contract can read the Pons Number without
+trusting a web server. One packed storage slot holds both rates in basis points
+**and both counts**, so a reader never has a rate without its denominator. The
+contract has no proxy, no upgrade path, no pause, and no way to change a stored
+reading except by publishing a newer one: `crawledAt` must strictly increase, so
+a stalled publisher shows up on-chain as a reading that stopped advancing.
+
+`pipeline/publish_oracle.py` reads `data/number.json`, refuses to send when the
+24h window is flagged insufficient, signs an EIP-1559 transaction (stdlib only:
+`pipeline/secp256k1.py`, no web3 and no Foundry at run time), then reads the
+contract back and diffs all six fields against the file, exiting non-zero on a
+mismatch. It runs as a separate `continue-on-error` job in `crawl.yml`, after
+the data commit, so a failed publish can never block or dirty the dataset.
+
+```
+forge test                                  # in contracts/
+python pipeline/publish_oracle.py --dry-run # derive the reading, send nothing
+```
+
+### Cost
+
+Measured with `forge test --gas-report` (optimizer on, 200 runs): 589,740 gas to
+deploy, 55,760 gas for the first publish (cold slot), **38,660 gas for every
+publish after it**. `eth_estimateGas` on Robinhood Chain returns no L1 data
+surcharge for this call and receipts report `gasUsedForL1: 0x0`, so the L2
+number is the whole cost.
+
+At the 0.3696 gwei base fee read from the chain (`eth_gasPrice`, priority fee 0):
+
+| | gas | ETH |
+|---|---|---|
+| deploy, once | 589,740 | 0.000218 |
+| first publish | 55,760 | 0.0000206 |
+| each hourly publish | 38,660 | 0.0000143 |
+| one month, 720 publishes | 27,835,200 | 0.0103 |
+
+Fund the writer one month at a time and no further — 0.012 ETH covers a month
+with headroom. The gas price is read fresh on every run and printed in the job
+log; if it moves, the log moves with it.
+
+### One-time setup
+
+Run once, by hand. Nothing below is automated, and no key in this repo.
+
+1. **Generate two keys offline.** The owner key never touches CI; its only job
+   is `setWriter` if the writer key is ever exposed.
+   ```
+   cast wallet new        # owner  — write the key down offline, do not export it
+   cast wallet new        # writer — this one becomes a GitHub secret
+   ```
+
+2. **Fund the writer** with about 0.012 ETH on Robinhood Chain (a month of
+   publishes at the rate in the table above) and the owner with enough for the
+   deploy plus a rotation, about 0.001 ETH.
+
+3. **Deploy**, with the owner key. `--interactives 1` prompts for the key
+   instead of putting it in the shell history.
+   ```
+   cd contracts
+   export ETH_RPC_URL=https://rpc.mainnet.chain.robinhood.com
+   export LEDGE_ORACLE_WRITER=0x<the writer address from step 1>
+   forge script script/Deploy.s.sol:Deploy --rpc-url "$ETH_RPC_URL" \
+     --broadcast --interactives 1
+   ```
+   The deployer becomes `owner` and the address in `LEDGE_ORACLE_WRITER` becomes
+   `writer`; the run prints the contract address.
+
+4. **Check what was deployed** before trusting it.
+   ```
+   cast call <address> "owner()(address)"  --rpc-url "$ETH_RPC_URL"
+   cast call <address> "writer()(address)" --rpc-url "$ETH_RPC_URL"
+   ```
+   `setWriter` rotates the writer later without a redeploy — one transaction from
+   the owner key, no new address anywhere:
+   ```
+   cast send <address> "setWriter(address)" 0x<next> --rpc-url "$ETH_RPC_URL" --interactive
+   ```
+
+5. **Verify the source on Blockscout**, so the NatSpec is readable next to the
+   numbers.
+   ```
+   forge verify-contract <address> src/LedgeOracle.sol:LedgeOracle \
+     --chain 4663 \
+     --constructor-args $(cast abi-encode "constructor(address)" "$LEDGE_ORACLE_WRITER") \
+     --verifier blockscout \
+     --verifier-url https://robinhoodchain.blockscout.com/api
+   ```
+   That host answers non-browser clients with a bot challenge (HTTP 403/500 to
+   curl and to Foundry's user agent, checked 2026-09-06), so the command may
+   fail without ever reaching the verifier. If it does, produce the standard
+   JSON input and paste it into the explorer's own verify form:
+   ```
+   forge verify-contract <address> src/LedgeOracle.sol:LedgeOracle \
+     --show-standard-json-input > LedgeOracle.verify.json
+   ```
+   Verification is cosmetic — it changes nothing about what the contract does —
+   so a blocked verifier is not a reason to delay the deploy.
+
+6. **Tell the workflow**, in the repo's Settings:
+   - secret `LEDGE_ORACLE_KEY` — the writer's private key from step 1
+   - variable `LEDGE_ORACLE_ADDRESS` — the contract address from step 3
+
+   The oracle job is skipped entirely while either is absent.
+
+7. **Watch the first run.** The next hourly crawl that commits data runs the
+   oracle job; its log prints the reading, the gas, the cost, and the read-back
+   diff. To trigger one by hand, run the crawl workflow from the Actions tab.
+
+### Rotating a leaked writer key
+
+`cast send <address> "setWriter(address)" 0x<new writer>` from the owner key,
+then replace the `LEDGE_ORACLE_KEY` secret. The old key can do nothing from the
+next block onward. The writer holds gas and nothing else: it can call `publish`
+and no other function, and `publish` can only move `crawledAt` forward.
+
+
 ## Method
 
 Full definitions — what counts as a launch and a graduation, the five-minute

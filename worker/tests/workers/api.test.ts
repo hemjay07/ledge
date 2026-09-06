@@ -1,0 +1,360 @@
+import { env } from "cloudflare:test";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
+import worker from "../../src/index";
+import { SELECTOR_GET_LAUNCHED_TOKEN } from "../../src/pons";
+import {
+  SELECTOR_GRADUATED,
+  SELECTOR_GRADUATION_THRESHOLD,
+  SELECTOR_REAL_QUOTE_RESERVE,
+} from "../../src/curve";
+import curveFixtures from "../fixtures/curves.json";
+import { reset, seedCursor } from "./setup";
+import numberFixture from "../fixtures/number.json";
+
+
+const ADDRESS = "0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2";
+
+function word(value: bigint): string {
+  return "0x" + value.toString(16).padStart(64, "0");
+}
+
+function bareWord(value: bigint): string {
+  return value.toString(16).padStart(64, "0");
+}
+
+/** getLaunchedToken's 15-word tuple, as the factory would answer it. */
+function launchedTokenReturn(options: { exists?: boolean; taxBps?: number; phase?: number } = {}) {
+  const words = Array.from({ length: 15 }, () => bareWord(0n));
+  words[1] = bareWord(BigInt(LIVE_CURVE.curve));
+  words[5] = bareWord(4_200_000_000_000_000_000n);
+  words[8] = bareWord(BigInt(options.taxBps ?? 300));
+  words[10] = bareWord(BigInt(options.phase ?? 0));
+  words[14] = bareWord(options.exists === false ? 0n : 1n);
+  return "0x" + words.join("");
+}
+
+/** The chain, stubbed at the global fetch the RPC client uses. */
+function stubChain(handler: (body: any[]) => unknown) {
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.includes("robinhood")) {
+      const payload = JSON.parse(String(init?.body ?? "[]"));
+      const result = handler(payload);
+      if (result instanceof Response) return result;
+      return new Response(JSON.stringify(result), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response("not stubbed", { status: 500 });
+  });
+}
+
+/* The chain answers by selector: the factory view returns the launch tuple,
+   and the three curve views return the live curve the research recorded. */
+const LIVE_CURVE = curveFixtures.live;
+
+function chainAnswers(returnData: string | null, curveAnswers = true) {
+  stubChain((payload) =>
+    payload.map((request: any) => {
+      if (request.method !== "eth_call") return { id: request.id, result: null };
+      const data: string = request.params[0].data;
+      if (data.startsWith(SELECTOR_GET_LAUNCHED_TOKEN)) {
+        return { id: request.id, result: returnData };
+      }
+      if (!curveAnswers) return { id: request.id, result: null };
+      if (data === SELECTOR_GRADUATED) return { id: request.id, result: word(0n) };
+      if (data === SELECTOR_REAL_QUOTE_RESERVE) {
+        return { id: request.id, result: word(BigInt(LIVE_CURVE.realQuoteReserve)) };
+      }
+      if (data === SELECTOR_GRADUATION_THRESHOLD) {
+        return { id: request.id, result: word(BigInt(LIVE_CURVE.graduationThreshold)) };
+      }
+      return { id: request.id, result: null };
+    }),
+  );
+}
+
+async function get(path: string): Promise<Response> {
+  return worker.fetch(new Request(`https://api.ledge.tools${path}`), env);
+}
+
+async function seedLaunch(ts: number): Promise<void> {
+  await env.LEDGE_DB.prepare(
+    `INSERT OR REPLACE INTO launch VALUES (?, '0xf6e8', '0x0000000000000000000000000000000000000000', 'eth', 300, 56172001, ?, '0xtx', 0)`,
+  )
+    .bind(ADDRESS, ts)
+    .run();
+}
+
+beforeEach(async () => {
+  await reset();
+  await seedCursor(56_172_588, Math.floor(Date.now() / 1000));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("GET /api/token/{address}", () => {
+  it("answers the documented shape for an indexed Pons token", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    chainAnswers(launchedTokenReturn());
+    const response = await get(`/api/token/${ADDRESS}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(response.headers.get("Cache-Control")).toContain("max-age=15");
+
+    const body = (await response.json()) as any;
+    expect(body.schemaVersion).toBe(1);
+    expect(body.address).toBe(ADDRESS);
+    expect(body.venue).toBe("pons");
+    expect(body.source).toBe("chain");
+    expect(body.observedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+
+    // Class B
+    expect(body.state.indexed).toBe(true);
+    expect(body.state.phaseLabel).toBe("on the bonding curve");
+    expect(body.state.elapsedSeconds).toBeGreaterThanOrEqual(810);
+    // R1: the fill, read from this launch's OWN curve
+    expect(body.state.curveFilledShare).toBe(LIVE_CURVE.expected.share);
+    expect(body.state.curveFilledWei).toBe(LIVE_CURVE.expected.filledWei);
+    expect(body.state.graduationThresholdWei).toBe(LIVE_CURVE.expected.thresholdWei);
+    expect(body.state.fillNote).toBeNull();
+
+    // Class A: every object carries its n, its window and its crawledAt
+    for (const key of ["h24", "allTime"]) {
+      const w = body.cohort[key];
+      expect(w.launches, key).toBeTypeOf("number");
+      expect(w.window, key).toBeTruthy();
+      expect(w.crawledAt, key).toBe(numberFixture.crawledAt);
+      if (w.insufficient) expect(w.rate, key).toBeNull();
+    }
+    expect(body.placement.n).toBeTypeOf("number");
+    expect(body.placement.crawledAt).toBe(numberFixture.crawledAt);
+    expect(body.text).toContain("https://ledge.tools/method");
+  });
+
+  it("refuses anything that is not a 20-byte hex address", async () => {
+    const response = await get("/api/token/not-an-address");
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      schemaVersion: 1,
+      error: "bad_address",
+      message: "Not a 20-byte hex address.",
+    });
+  });
+
+  it("names the factory when the token did not come from it", async () => {
+    chainAnswers(launchedTokenReturn({ exists: false }));
+    const response = await get(`/api/token/${ADDRESS}`);
+    expect(response.status).toBe(404);
+    const body = (await response.json()) as any;
+    expect(body.error).toBe("not_a_pons_token");
+    expect(body.factory).toBe(env.FACTORY_ADDRESS);
+    expect(body.message).toContain(env.FACTORY_ADDRESS);
+  });
+
+  it("returns 200 with a partial, not a 404, when the launch is not indexed", async () => {
+    chainAnswers(launchedTokenReturn());
+    const response = await get(`/api/token/${ADDRESS}`);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body.error).toBe("not_indexed");
+    expect(body.lastIndexedBlock).toBe(56_172_588);
+    // four correct facts survive the one missing one
+    expect(body.partial.config.pairClass).toBe("eth");
+    expect(body.partial.config.taxBucket).toBe("2-3%");
+    expect(body.partial.cohort.allTime.launches).toBeGreaterThan(0);
+    expect(body.partial.state.phase).toBe(0);
+    expect(body.partial.state.elapsedSeconds).toBeNull();
+    expect(body.partial.placement).toBeNull();
+  });
+
+  it("says the RPC did not answer rather than estimating anything", async () => {
+    stubChain(() => new Response("boom", { status: 503 }));
+    const response = await get(`/api/token/${ADDRESS}`);
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as any;
+    expect(body.error).toBe("rpc_down");
+    expect(body.message).toContain("Nothing is being estimated");
+    expect(body.retryAfterSeconds).toBe(30);
+  }, 30_000);
+
+  it("shows live state alone when the published reading is not loadable", async () => {
+    await env.LEDGE_KV.delete("number:current");
+    const { resetNumberCache } = await import("../../src/numberFile");
+    resetNumberCache();
+    await seedLaunch(Math.floor(Date.now() / 1000) - 100);
+    stubChain((payload) =>
+      payload.map((r: any) => ({ id: r.id, result: r.method === "eth_call" ? launchedTokenReturn() : null })),
+    );
+    const response = await get(`/api/token/${ADDRESS}`);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body.error).toBe("number_unavailable");
+    expect(body.partial.cohort).toBeNull();
+    expect(body.partial.state.indexed).toBe(true);
+    expect(body.partial.text).toContain("No cohort has been published");
+  });
+
+  it("prints no percentage without an n anywhere in the rendered text", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    chainAnswers(launchedTokenReturn());
+    const body = (await (await get(`/api/token/${ADDRESS}`)).json()) as any;
+    for (const line of String(body.text).split("\n")) {
+      if (!/\d%/.test(line)) continue;
+      const isConfigLine = /ETH|Stablecoin|Tokenized stock|Other/.test(line);
+      expect(isConfigLine || /n=|\bof \d|graduations measured/.test(line), line).toBe(true);
+    }
+  });
+});
+
+describe("GET /api/live", () => {
+  it("renders the population with no address and no ticker in it", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES ('0xaaa', '0xc', '0x0', 'eth', 300, 10, ?, '0xt1', 0)`,
+      ).bind(now - 30),
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES ('0xbbb', '0xc', '0x0', 'stable', 0, 11, ?, '0xt2', 0)`,
+      ).bind(now - 60),
+      env.LEDGE_DB.prepare(
+        `INSERT INTO graduation VALUES ('0xbbb', 12, ?, '1', '0xt3', 0)`,
+      ).bind(now - 10),
+    ]);
+    const response = await get("/api/live");
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(text).not.toContain("0xaaa");
+    expect(text).not.toContain("0xbbb");
+
+    const body = JSON.parse(text);
+    expect(body.count).toBe(2);
+    expect(body.rows[0]).toEqual({
+      pairClass: "stable",
+      taxBucket: "0%",
+      ageSeconds: expect.any(Number),
+      graduated: true,
+    });
+    expect(body.lastIndexedBlock).toBe(56_172_588);
+  });
+
+  it("never returns more than 200 rows", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const statements = Array.from({ length: 210 }, (_, i) =>
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, ?, ?, '0xt', 0)`,
+      ).bind(`0x${i.toString(16).padStart(40, "0")}`, i, now - i),
+    );
+    await env.LEDGE_DB.batch(statements);
+    const body = (await (await get("/api/live")).json()) as any;
+    expect(body.rows).toHaveLength(200);
+  });
+});
+
+describe("the other endpoints", () => {
+  it("serves /api/number byte-identically from KV", async () => {
+    const response = await get("/api/number");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=300");
+    expect(await response.text()).toBe(JSON.stringify(numberFixture));
+  });
+
+  it("reports the two clocks on /api/health", async () => {
+    const body = (await (await get("/api/health")).json()) as any;
+    expect(body.lastIndexedBlock).toBe(56_172_588);
+    expect(body.consecutiveFailures).toBe(0);
+    expect(body.numberCrawledAt).toBe(numberFixture.crawledAt);
+  });
+
+  it("serves /t/{address} as HTML with per-address unfurl metadata", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    chainAnswers(launchedTokenReturn());
+    const response = await get(`/t/${ADDRESS}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+    const html = await response.text();
+    expect(html).toContain(`<meta property="og:image" content="https://ledge.tools/og/t/${ADDRESS}.png">`);
+    expect(html).toContain(`https://ledge.tools/t/${ADDRESS}`);
+    expect(html).toContain("minute 13");
+    expect(html).toContain("LEDGE.TOOLS");
+    // the facts are in the HTML, not only in a script
+    expect(html).toContain("graduated");
+  });
+
+  it("renders the death card as a PNG at 1200x630", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    chainAnswers(launchedTokenReturn());
+    const response = await get(`/og/t/${ADDRESS}.png`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("image/png");
+    const png = new Uint8Array(await response.arrayBuffer());
+    expect(Array.from(png.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    const view = new DataView(png.buffer);
+    expect(view.getUint32(16)).toBe(1200);
+    expect(view.getUint32(20)).toBe(630);
+  }, 30_000);
+
+  it("serves the same card under the shell's own path", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    chainAnswers(launchedTokenReturn());
+    const response = await get(`/t/${ADDRESS}/og.png`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("image/png");
+  }, 30_000);
+
+  it("answers a preflight with GET and OPTIONS only", async () => {
+    const response = await worker.fetch(
+      new Request("https://api.ledge.tools/api/live", { method: "OPTIONS" }),
+      env,
+    );
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
+  });
+
+  it("refuses a write to a read-only surface", async () => {
+    const response = await worker.fetch(
+      new Request("https://api.ledge.tools/api/live", { method: "POST" }),
+      env,
+    );
+    expect(response.status).toBe(405);
+  });
+});
+
+describe("the Telegram webhook", () => {
+  async function post(path: string, update: unknown, headers: Record<string, string> = {}) {
+    return worker.fetch(
+      new Request(`https://api.ledge.tools${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify(update),
+      }),
+      env,
+    );
+  }
+
+  it("is invisible without the secret path segment", async () => {
+    const response = await post("/tg/wrong-secret", {});
+    expect(response.status).toBe(404);
+  });
+});
+
+describe("the Telegram abuse limits", () => {
+  it("counts per chat and per hour, and stores no message text", async () => {
+    const { withinLimits, PER_CHAT_HOURLY_LIMIT } = await import("../../src/telegram");
+    const now = 1_788_720_000;
+    for (let i = 0; i < PER_CHAT_HOURLY_LIMIT; i++) {
+      expect(await withinLimits(env.LEDGE_DB, "chat-1", now), `message ${i}`).toBe(true);
+    }
+    // over the limit the bot goes silent rather than replying "rate limited"
+    expect(await withinLimits(env.LEDGE_DB, "chat-1", now)).toBe(false);
+    // a different chat is unaffected
+    expect(await withinLimits(env.LEDGE_DB, "chat-2", now)).toBe(true);
+    // and the next hour starts clean
+    expect(await withinLimits(env.LEDGE_DB, "chat-1", now + 3600)).toBe(true);
+
+    const columns = await env.LEDGE_DB.prepare("SELECT * FROM tg_usage LIMIT 1").first<any>();
+    expect(Object.keys(columns).sort()).toEqual(["chat_id", "count", "hour_key"]);
+  }, 30_000);
+});

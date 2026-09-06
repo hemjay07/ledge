@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { allTime, h24 } from "../lib/number";
-import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../lib/windows";
+import { SAME_MEASUREMENT_NOTE, coverageHours, sameMeasurement } from "../lib/windows";
 import { cohortFooting, cohortRateCell, cohortRegisterRow } from "../lib/rows";
 import { insufficientFile } from "./fixtures";
 import type { CohortRow } from "../lib/schema";
@@ -70,5 +70,30 @@ describe("the all-time window while it holds the same launches as 24 hours", () 
 
   it("matches the committed measurement's current state", () => {
     expect(sameMeasurement(h24, allTime)).toBe(h24.launches === allTime.launches);
+  });
+});
+
+describe("coverage, stated in hours", () => {
+  it("counts whole hours from the earliest launch to the measurement", () => {
+    expect(coverageHours("2026-09-06T13:53:57Z", "2026-09-06T18:00:36Z")).toBe(4);
+    expect(coverageHours("2026-09-06T13:53:57Z", "2026-09-06T14:53:56Z")).toBe(0);
+    expect(coverageHours("2026-09-06T13:53:57Z", "2026-09-06T14:53:57Z")).toBe(1);
+  });
+
+  it("rounds down: a record that covers 4 h 59 min has not covered five", () => {
+    expect(coverageHours("2026-09-06T00:00:00Z", "2026-09-06T04:59:59Z")).toBe(4);
+  });
+
+  it("has no coverage to state when nothing is indexed yet", () => {
+    expect(coverageHours(null, "2026-09-06T18:00:36Z")).toBeNull();
+  });
+
+  it("refuses a timestamp a clock cannot read, rather than printing NaN hours", () => {
+    expect(coverageHours("not a time", "2026-09-06T18:00:36Z")).toBeNull();
+    expect(coverageHours("2026-09-06T13:53:57Z", "not a time")).toBeNull();
+  });
+
+  it("never reports negative coverage", () => {
+    expect(coverageHours("2026-09-06T18:00:36Z", "2026-09-06T13:53:57Z")).toBe(0);
   });
 });
