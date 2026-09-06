@@ -1,5 +1,5 @@
 import type { WindowData } from "./schema";
-import { formatCount, isInsufficient, rateText } from "./format";
+import { formatCount, formatStamp, isInsufficient, rateText } from "./format";
 
 /* Every sentence that carries a rate off the page — the accessible text under
    the poster figures, the page description, the Open Graph and Twitter
@@ -19,10 +19,12 @@ export function excludingFastFact(w: WindowData) {
   return { rate: w.excludingFast.rate, n: w.launches, insufficient: w.excludingFast.insufficient };
 }
 
-/** The sentence a screen reader hears in place of the poster figure. */
+/** The sentence a screen reader hears in place of the poster figure.
+    The measurement time is spoken, not spelled: a raw ISO timestamp is read
+    out as character soup. formatStamp is the same form the colophon stamps. */
 export function ponsNumberSentence(w: WindowData, measuredAt?: string): string {
   const counts = `${formatCount(w.graduations)} of ${formatCount(w.launches)} Pons launches in the last 24 hours graduated.`;
-  const measured = measuredAt ? ` Measured ${measuredAt}.` : "";
+  const measured = measuredAt ? ` ${formatStamp(measuredAt)}.` : "";
   return `${rateText(ponsNumberFact(w))}: ${counts}${measured}`;
 }
 

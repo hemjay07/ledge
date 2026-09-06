@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
-import Link from "next/link";
 import { Age } from "../../components/Age";
 import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Figure } from "../../components/Figure";
 import { Footer } from "../../components/Footer";
+import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { h24, numberFile, SITE_URL } from "../../lib/number";
 import {
@@ -53,6 +53,7 @@ export default function NumberCard(): ReactElement {
       <StaleBanner crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
 
       <main className="sheet">
+        <SheetNav current="card" />
         <RunningHead mark="LEDGE" win="Trailing 24 hours · 01" />
 
         <div className="fold">
@@ -65,7 +66,7 @@ export default function NumberCard(): ReactElement {
               window="24h"
               updatedAt={crawledAt}
               insufficient={h24.insufficient}
-              accessibleText={ponsNumberSentence(h24)}
+              accessibleText={ponsNumberSentence(h24, crawledAt)}
             />
           </div>
           <p className="caption">
@@ -77,7 +78,7 @@ export default function NumberCard(): ReactElement {
           </p>
         </div>
 
-        <div className="rule-hair" style={{ marginTop: "1.5rem" }} />
+        <div className="rule-hair fold-rule" />
         <div className="second">
           <Figure
             name="excluding-fast"
@@ -106,20 +107,11 @@ export default function NumberCard(): ReactElement {
         <ColophonStrip stamp={formatStamp(crawledAt)} />
 
         <div className="card-note">
-          <p className="note">
-            <span className="mono">ledge.tools/number</span> — the shareable card. Paste it and the
-            unfurl carries both figures, the sample size, the age of the measurement and this URL.
-          </p>
           <p className="note note--fine">
             <span className="mono">stale</span> in <a href="/number.json">number.json</a> is what the
             generating run knew about itself when it wrote the file; compute the age of the
-            measurement from <span className="mono">crawledAt</span>.
-          </p>
-          <p className="note note--fine">
-            The card image is regenerated with every measurement, so the age printed on it is the
-            age at generation. <Link href="/">The full sheet</Link> ·{" "}
-            <Link href="/cohorts">cohorts</Link> · <Link href="/method">method</Link> ·{" "}
-            <a href="/number.json">number.json</a>
+            measurement from <span className="mono">crawledAt</span>. The card image carries the age
+            it had at generation.
           </p>
         </div>
 

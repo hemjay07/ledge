@@ -359,20 +359,21 @@ switches the frozen demo clock for the real one.
 The poster figures. Anton, and the only place Anton appears.
 
 ```css
-.figure-block{margin-left:6%}
-@media (min-width:48rem){ .figure-block{margin-left:12%} }
+.figure-block,.fold .kicker{margin-left:6%}
+@media (min-width:48rem){ .figure-block,.fold .kicker{margin-left:12%} }
 .figure{display:block;font-family:"Anton",Impact,"Arial Narrow",sans-serif;font-weight:400;
         font-size:var(--fs-figure);line-height:.82;letter-spacing:-.015em;
         font-variant-numeric:tabular-nums}
-.caption{margin-top:clamp(var(--s-4),3.5vw,var(--s-6));font-size:clamp(1rem,3.2vw,1.125rem);
-         max-width:36ch;text-wrap:balance}
+.figure .pct,.figure-2 .pct{font-size:.78em;padding-left:.03em}
+.caption{margin-top:clamp(var(--s-3),2.5vw,var(--s-4));font-size:clamp(1rem,3.2vw,1.125rem);
+         max-width:48ch;text-wrap:pretty}
 .caption b{font-weight:600}
-.caption .den{color:var(--ink-muted)}
+.caption .den{display:block;margin-top:var(--s-1);color:var(--ink-muted)}
 .second{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--s-2) var(--s-4);
         padding:var(--s-4) 0 1.1rem}
 .second .figure-2{font-family:"Anton",Impact,"Arial Narrow",sans-serif;font-weight:400;
                   font-size:var(--fs-figure-2);line-height:.9;letter-spacing:-.01em}
-.second .gloss{font-size:var(--fs-note);color:var(--ink-muted);max-width:34ch}
+.second .gloss{font-size:var(--fs-note);color:var(--ink-muted);max-width:46ch;text-wrap:pretty}
 .second .gloss b{color:var(--ink);font-weight:600}
 ```
 
@@ -568,3 +569,74 @@ Consequences for anyone extending the page:
 - [ ] One reveal; `prefers-reduced-motion` respected.
 - [ ] The colophon strip closes any block intended to be screenshotted.
 - [ ] Banned-phrase check (`CONSTRAINTS.md` NOT-THIS list + emoji regex) returns zero hits.
+
+
+---
+
+## 8. Amendments
+
+The opening claim — every value here is extractable from `design/hybrid.html` —
+holds for the prototype as approved. Where the built site has since departed from it,
+the departure is recorded here rather than left to drift. `CONSTRAINTS.md` §9 requires
+this of a threshold or a definition; a layout value is not a definition, but a
+constitution that quietly stops matching its implementation stops being binding.
+
+### 2026-09-06 — composition and setting corrections
+
+| Value | Prototype | Now | Why |
+|---|---|---|---|
+| `.fold .kicker` indent | flush | `6%` / `12%` | The fold had four elements and three left starts, and the odd one out was the poster figure. The kicker is indented **with** the figure rather than the figure flattened to meet it, because `--fs-figure`'s `23vw` term (§2) was verified with the indent applied and the indent optically centres the figure inside the measure. |
+| `.figure .pct` | not specified; set at `1em` | `.78em` | A display percentage sets its sign smaller than its digits. Anton has one weight and no small forms, so the sign is scaled. `.56em` was tried and rejected: it removed roughly a third of the figure's ink mass and left it marooned against the full-width heavy rules. `.78em` keeps the mass and stops the sign reading as a third group of numerals. |
+| `.caption` measure | `36ch`, `text-wrap:balance` | `48ch`, `text-wrap:pretty` | At `36ch` the clause broke after "24 hours" and stranded "graduated" onto the denominator's line, where it read as belonging to the count. `balance` evens line lengths and will strand a word to do it; `pretty` will not. |
+| `.caption` top margin | `clamp(--s-4,3.5vw,--s-6)` | `clamp(--s-3,2.5vw,--s-4)` | The denominator now hangs as its own block beneath the clause, so the caption is two blocks rather than one and needed less air above it to stay attached to the figure. |
+| `.caption .den` | inline | `display:block` | The denominator hangs beneath the clause it qualifies, as a caption does on a printed sheet, instead of running on from the end of the sentence. |
+| `.second .gloss` measure | `34ch` | `46ch`, `text-wrap:pretty` | `34ch` broke "graduated inside / 5 minutes", splitting the preposition from the quantity it governs, while a third of the sheet stood empty to its right. |
+| mono inside prose | not specified | `.92em`, `letter-spacing:0`, `word-spacing:-.04em`, `nowrap` | Plex Mono carries more apparent size and a wider word space than Newsreader at one `font-size`, so an uncorrected `3,347` inside a sentence read as a larger typeface dropped into the line. `nowrap` keeps a quantity whole: `1 in 279` does not break across lines. |
+| `.age .mono` | not specified | `word-spacing:-.32em` | `formatAge` returns "2 h"; at a full mono advance that set as `updated 2  h ago` and read as a typo. A quantity and its unit take a thin space. The data is unchanged — this is a setting decision. |
+| `.scale svg` | `min-width:30rem` inside a `.scroller` | no min-width; viewBox type doubled under `40rem` | At 390px the SVG renders ~350px against a 720-unit viewBox, a scale factor near `.49`, so the previous `17px`/`20px` mobile bump rendered ~8px — *smaller* than the desktop engraving it was meant to enlarge. `24px`/`28px` reach desktop parity without making the reader scroll the drawing. |
+| the reveal | `.sheet` only | `.sheet, .stale-slip:not([hidden])` | The correction slip sits outside `.sheet` in the DOM so it lands above the fold in any crop, which meant it appeared at `t=0` while the sheet it corrects faded in over 420ms. It is part of the sheet's arrival, not a thing that pops in over it. |
+
+### 2026-09-06 — the sheet index (new primitive)
+
+The prototype specified no navigation, and the built site had none: three of the four pages
+were reachable only from the footer, after 600 words and seven ledger entries, and the only
+link above it was the words "the cohorts page" inside a fine-print note. There were no
+`<header>` or `<nav>` landmarks on any page. The omission fell between the two documents —
+`CONSTRAINTS.md` bans anything "mistaken for a control inviting an action", which governs
+calls to action, not links; the footer already carried links.
+
+```css
+.sheet-nav{display:flex;flex-wrap:wrap;gap:var(--s-2) var(--s-4);padding:var(--s-4) 0 var(--s-3);
+  font-family:var(--font-mono);font-size:var(--fs-strip);font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.sheet-nav a{color:var(--ink-2);border-bottom-color:var(--rule-hair)}
+```
+
+It is seated **above the heavy rule that opens the sheet**: the first thing on the page, and
+still outside the crop a screenshot takes, which runs from that heavy rule to the one beneath
+the colophon. So the shareable sheet stays a finished citation while the page it came from is
+navigable from the first line. It was first placed below the colophon, which satisfied the crop
+but put it under the whole fold, where a short viewport never shows it and it reads as a caption
+hanging off the strip rather than as an index. It is set in the strip's own face, size and tracking so it reads as one more
+line of page furniture. Its links are underlined by a rule like every other link on the sheet;
+nothing in it is a button. `.colophon a` had been styled since the prototype and had no links
+to style, which is the tell that the strip was always the intended home for them.
+
+The running head is now a `<header>` and the index a `<nav aria-label="Sheet">`.
+
+### The mark in the running head
+
+The running head carries the Ruled L beside the wordmark. The glyph is inlined as SVG in
+`currentColor` rather than requested from `logo.svg` / `logo-dark.svg`, so one mark inverts
+with the sheet instead of two files and a media query deciding which to fetch. Geometry is
+`design/logo/finals/logo.svg`'s, unchanged. Wordmark tracking is `.18em` per
+`design/logo/README.md`, which is the wordmark's own specification and differs from the
+`.28em` the colophon stamp uses.
+
+### Still divergent, deliberately not amended
+
+- `?stale=1` and `?live=1` (§3) are documented demonstration triggers and are **not implemented**.
+  The stale state can currently only be reached by letting `crawledAt` age past `staleAfterSeconds`.
+- §6's `Stat` runtime is described as throwing on a missing denominator. The React `Stat`
+  throws on a missing `n`, `window` or `updatedAt`, but there is no document-wide sweep of
+  `[data-stat]` elements at runtime, because a static export has no script to run one.

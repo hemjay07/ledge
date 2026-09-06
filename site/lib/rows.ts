@@ -10,18 +10,39 @@ export function cohortRegisterRow(label: string, row: CohortRow): RegisterRow {
     cells: [
       { text: formatCount(row.launches), kind: "n" },
       { text: formatCount(row.graduations), kind: "n" },
-      rateCell({ rate: row.rate, n: row.launches, insufficient: row.insufficient }),
+      cohortRateCell(row),
     ],
   };
 }
 
+/* A bucket that recorded no graduations has not measured a rate of zero — it
+   has measured no graduations. Printing "0.0%" beside "2.16%" invites the
+   reader to compare them as findings, when 0 of 244 is statistically
+   indistinguishable from the headline rate. The count is what was observed, so
+   the count is what the cell prints. The file keeps rate: 0.0; only the
+   rendering changes. stats.py applies this same guard to fastShares, with the
+   comment "never 0.0, which would read as a measured finding rather than an
+   absent one". */
+export function cohortRateCell(row: CohortRow): RegisterCell {
+  if (!isInsufficient({ rate: row.rate, n: row.launches, insufficient: row.insufficient })
+      && row.graduations === 0) {
+    return { text: `0 of ${formatCount(row.launches)}`, kind: "thin" };
+  }
+  return rateCell({ rate: row.rate, n: row.launches, insufficient: row.insufficient });
+}
+
 export function cohortFooting(w: WindowData): RegisterRow {
+  const noGraduations =
+    w.graduations === 0 &&
+    !isInsufficient({ rate: w.rate, n: w.launches, insufficient: w.insufficient });
   return {
     label: "All",
     cells: [
       { text: formatCount(w.launches) },
       { text: formatCount(w.graduations) },
-      rateCell({ rate: w.rate, n: w.launches, insufficient: w.insufficient }),
+      noGraduations
+        ? { text: `0 of ${formatCount(w.launches)}`, kind: "thin" }
+        : rateCell({ rate: w.rate, n: w.launches, insufficient: w.insufficient }),
     ],
   };
 }

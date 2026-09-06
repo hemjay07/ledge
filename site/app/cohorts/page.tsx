@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
-import Link from "next/link";
 import { Age } from "../../components/Age";
 import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Footer } from "../../components/Footer";
 import { LedgerEntry } from "../../components/LedgerEntry";
 import { Register } from "../../components/Register";
+import { SheetNav } from "../../components/SheetNav";
 import { allTime, h24, numberFile, type WindowData } from "../../lib/number";
 import {
   formatCount,
@@ -16,6 +16,7 @@ import {
   taxLabel,
 } from "../../lib/format";
 import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow, shareCell } from "../../lib/rows";
+import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 
@@ -25,7 +26,13 @@ export const metadata: Metadata = {
     "Every cohort of the Pons Number in full: pair token, creator tax, hour of day, day of week, and the launches-per-deployer distribution, each with its sample size.",
 };
 
-const WINDOWS: { key: string; window: WindowData; label: string; note: string }[] = [
+/* While the all-time window holds exactly the launches the 24-hour window
+   holds, every table below would be printed twice, cell for cell. One
+   measurement rendered twice reads as two measurements agreeing. Keyed off the
+   data, so the second window returns on its own once history is indexed. */
+const allTimeIsSameMeasurement = sameMeasurement(h24, allTime);
+
+const ALL_WINDOWS: { key: string; window: WindowData; label: string; note: string }[] = [
   {
     key: "h24",
     window: h24,
@@ -39,6 +46,10 @@ const WINDOWS: { key: string; window: WindowData; label: string; note: string }[
     note: "Every launch since the first block indexed.",
   },
 ];
+
+const WINDOWS = allTimeIsSameMeasurement
+  ? ALL_WINDOWS.filter((w) => w.key === "h24")
+  : ALL_WINDOWS;
 
 function cohortTables(w: WindowData, label: string, folioBase: number): ReactElement[] {
   const n = `· ${label} · n = ${formatCount(w.launches)} launches`;
@@ -54,6 +65,17 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
   const emptyHoursNote =
     emptyHours === 0 ? "" : `${formatCount(emptyHours)} hours with n = 0 — not listed. `;
 
+  /* the day buckets get the hour buckets' treatment: an empty bucket is
+     counted in the note, not given a row that reads "not enough data (n=0)" */
+  const observedDays = w.cohorts.day.filter((r) => r.launches > 0);
+  const emptyDays = w.cohorts.day.length - observedDays.length;
+  const emptyDaysNote =
+    emptyDays === 0 ? "" : `${formatCount(emptyDays)} days with n = 0 — not listed. `;
+
+  /* nothing is said when nothing was excluded */
+  const excluded = (n: number) =>
+    n === 0 ? "" : `Launches excluded from this cohort: ${formatCount(n)}.`;
+
   return [
     <Register
       key="pair"
@@ -66,7 +88,7 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
       columns={COHORT_COLUMNS("Pair token")}
       rows={w.cohorts.pair.map((r) => cohortRegisterRow(pairLabel(r.bucket), r))}
       foot={cohortFooting(w)}
-      note={`Launches excluded from this cohort: ${formatCount(w.cohortsExcluded.pair)}.`}
+      note={excluded(w.cohortsExcluded.pair) || null}
     />,
     <Register
       key="tax"
@@ -79,7 +101,7 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
       columns={COHORT_COLUMNS("Creator tax")}
       rows={w.cohorts.tax.map((r) => cohortRegisterRow(taxLabel(r.bucket), r))}
       foot={cohortFooting(w)}
-      note={`Launches excluded from this cohort: ${formatCount(w.cohortsExcluded.tax)}.`}
+      note={excluded(w.cohortsExcluded.tax) || null}
     />,
     <Register
       key="hour"
@@ -92,7 +114,7 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
       columns={COHORT_COLUMNS("Hour (UTC)")}
       rows={observedHours.map((r) => cohortRegisterRow(hourLabel(r.bucket), r))}
       foot={cohortFooting(w)}
-      note={`${emptyHoursNote}Launches excluded from this cohort: ${formatCount(w.cohortsExcluded.hour)}.`}
+      note={`${emptyHoursNote}${excluded(w.cohortsExcluded.hour)}`.trim() || null}
     />,
     <Register
       key="day"
@@ -101,11 +123,11 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
       headingId={`h-day-${label}`}
       headingNote={n}
       ariaLabel={`Graduation rate by day of week, UTC, ${label}`}
-      caption="All seven daily buckets. A bucket renders a rate only at n = 30 or more."
+      caption="Daily buckets that recorded at least one launch. A bucket renders a rate only at n = 30 or more."
       columns={COHORT_COLUMNS("Day (UTC)")}
-      rows={w.cohorts.day.map((r) => cohortRegisterRow(r.bucket, r))}
+      rows={observedDays.map((r) => cohortRegisterRow(r.bucket, r))}
       foot={cohortFooting(w)}
-      note={`Launches excluded from this cohort: ${formatCount(w.cohortsExcluded.day)}.`}
+      note={`${emptyDaysNote}${excluded(w.cohortsExcluded.day)}`.trim() || null}
     />,
     <Register
       key="dep"
@@ -135,7 +157,8 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
 export default function Cohorts(): ReactElement {
   return (
     <main className="sheet">
-      <RunningHead mark="LEDGE · COHORTS" win="All buckets · 01" />
+      <SheetNav current="cohorts" />
+        <RunningHead mark="LEDGE · COHORTS" win="All buckets · 01" />
 
       <div className="fold" style={{ paddingBottom: "1.5rem" }}>
         <h1 className="kicker">Cohorts</h1>
@@ -144,9 +167,9 @@ export default function Cohorts(): ReactElement {
           count standing beside every rate. A bucket under n&nbsp;=&nbsp;30 prints its sample size
           instead of a percentage.
         </p>
+        {allTimeIsSameMeasurement ? <p className="note">{SAME_MEASUREMENT_NOTE}</p> : null}
         <p className="note">
-          <Age crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} /> ·{" "}
-          <Link href="/">the number</Link> · <Link href="/method">method</Link>
+          <Age crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
         </p>
       </div>
       <ColophonStrip stamp={formatStamp(crawledAt)} />

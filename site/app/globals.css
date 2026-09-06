@@ -302,6 +302,28 @@ a:focus-visible,
   border-bottom-color: var(--rule-hair);
 }
 
+/* The sheet's index, seated above the heavy rule that opens the sheet — the
+   first thing on the page, and still outside the crop a screenshot takes,
+   which runs from that heavy rule to the one under the colophon. Same face,
+   size and tracking as the strip, so it reads as page furniture rather than
+   as a control. */
+.sheet-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  padding: var(--s-4) 0 var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-strip);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.sheet-nav a {
+  color: var(--ink-2);
+  border-bottom-color: var(--rule-hair);
+}
+
 .fold {
   padding: clamp(2rem, 9vw, 4.25rem) 0 0;
 }
@@ -314,16 +336,28 @@ a:focus-visible,
   color: var(--ink-muted);
   margin-bottom: var(--s-2);
 }
-/* The fold hangs on one left margin. The poster figure used to be indented
-   6% / 12% while the kicker above it, the caption beneath it and the
-   excluding-fast figure below all sat on the sheet's own margin — four
-   elements, three left starts, and the odd one out was the largest thing on
-   the page. On a printed sheet a figure and its hanging caption share a
-   margin; the indent read as a mistake rather than as a decision. Removing it
-   also gives the figure the full measure, which is what the 23vw term in
-   --fs-figure was sized for. */
+/* The indent is the approved geometry (design/hybrid.html, DESIGN_SYSTEM §4)
+   and it is what --fs-figure's 23vw term was verified against. It optically
+   centres the figure inside the measure: flush left, a figure narrower than
+   the 7px heavy rules framing it reads as marooned in the corner rather than
+   as the subject of the band. */
 .figure-block {
-  margin-left: 0;
+  margin-left: 6%;
+}
+/* The kicker is indented WITH the figure it names, rather than the figure
+   being flattened to meet the kicker. The indent is the approved geometry
+   (design/hybrid.html, DESIGN_SYSTEM §4) and is what --fs-figure's 23vw term
+   was verified against; flush left, a figure narrower than the 7px heavy
+   rules framing it reads as marooned rather than as the subject of the band.
+   Indenting the label restores the single start without giving that up. */
+.fold .kicker {
+  margin-left: 6%;
+}
+@media (min-width: 48rem) {
+  .figure-block,
+  .fold .kicker {
+    margin-left: 12%;
+  }
 }
 .figure {
   display: block;
@@ -341,8 +375,13 @@ a:focus-visible,
    already at text size and stays untouched. */
 .figure .pct,
 .figure-2 .pct {
-  font-size: 0.56em;
-  padding-left: 0.04em;
+  font-size: 0.78em;
+  padding-left: 0.03em;
+}
+
+/* the hairline closing the primary figure, previously an inline style */
+.fold-rule {
+  margin-top: var(--s-6);
 }
 
 .caption {
@@ -739,7 +778,10 @@ footer {
 
 /* ---- the one reveal: the sheet settles once, on load ---- */
 @media (prefers-reduced-motion: no-preference) {
-  .sheet {
+  /* the slip is part of the sheet's arrival, not a thing that pops in over it:
+     it sits outside .sheet in the DOM so it lands above the fold in any crop */
+  .sheet,
+  .stale-slip:not([hidden]) {
     animation: settle 420ms cubic-bezier(0.2, 0.6, 0.2, 1) both;
   }
   @keyframes settle {
@@ -764,11 +806,21 @@ footer {
 
 /* the scale is one drawing at two reading distances: the type steps up on a
    narrow sheet so the engraving stays legible without a horizontal scroll */
+/* The engraving is one drawing read at two distances. At 390px the SVG renders
+   about 350px wide against a 720-unit viewBox — a scale factor near 0.49 — so
+   viewBox type must be roughly doubled to reach the same effective size it has
+   on a full sheet. At 17px/20px the mobile legends rendered ~8px, smaller than
+   the desktop engraving they were meant to enlarge. These values put both at
+   desktop parity, and the two label tiers keep them from colliding. */
 @media (max-width: 40rem) {
   .eng-text {
-    font-size: 17px;
+    font-size: 24px;
   }
   .eng-num {
-    font-size: 20px;
+    font-size: 28px;
+  }
+  /* the tiers separate further so the doubled legends clear each other */
+  .eng-text--pct {
+    font-size: 22px;
   }
 }

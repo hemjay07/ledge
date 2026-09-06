@@ -298,20 +298,31 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     if head_block is None:
         head_block = rpc_client.get_head_block()
 
-    if state.get("firstIndexedBlock") is None:
+    # Three modes. First run: from head (or `backfill_hours` behind it).
+    # Incremental: resume behind the cursor by the reorg window. Backfill with
+    # history: extend backwards from firstIndexedBlock and leave the forward
+    # cursor alone; dedupe absorbs any overlap.
+    backfilling_history = backfill_hours is not None and state.get("firstIndexedBlock") is not None
+    if backfilling_history:
+        blocks_back = int(backfill_hours * 3600 / AVG_BLOCK_SECONDS)
+        start_block = max(0, state["firstIndexedBlock"] - blocks_back)
+        to_block = state["firstIndexedBlock"] - 1
+    elif state.get("firstIndexedBlock") is None:
         if backfill_hours is not None:
             blocks_back = int(backfill_hours * 3600 / AVG_BLOCK_SECONDS)
             start_block = max(0, head_block - blocks_back)
         else:
             start_block = head_block  # first run with no backfill: start from head
+        to_block = head_block
     else:
         start_block = resume_start_block(state)
+        to_block = head_block
 
-    windows = plan_windows(start_block, head_block)
+    windows = plan_windows(start_block, to_block)
 
     raw_launches = []
     raw_grads = []
-    _log(f"crawl: {len(windows)} windows, blocks {start_block}-{head_block}")
+    _log(f"crawl: {len(windows)} windows, blocks {start_block}-{to_block}")
     for i, (frm, to) in enumerate(windows, 1):
         if i % 10 == 0 or i == len(windows):
             _log(f"crawl: [{i}/{len(windows)}] launches={len(raw_launches)} grads={len(raw_grads)}")
@@ -376,9 +387,12 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     pair_tokens_payload = (json.dumps(pair_tokens, sort_keys=True, indent=2) + "\n").encode()
 
     new_state = dict(state)
-    new_state["lastIndexedBlock"] = head_block
-    if new_state.get("firstIndexedBlock") is None:
+    if backfilling_history:
         new_state["firstIndexedBlock"] = start_block
+    else:
+        new_state["lastIndexedBlock"] = head_block
+        if new_state.get("firstIndexedBlock") is None:
+            new_state["firstIndexedBlock"] = start_block
     now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     new_state["lastRunAt"] = now_iso
     new_state["lastSuccessAt"] = now_iso

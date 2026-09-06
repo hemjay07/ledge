@@ -9,7 +9,28 @@ const X0 = 40.5;
 const W = 639;
 const T_MAX = 3600;
 const LOG_MAX = Math.log10(T_MAX);
-const BASE_Y = 136;
+
+/* The baseline sits low enough that both percentile tiers clear each other at
+   the mobile type size. At 390px the drawing renders about half its viewBox
+   width, so the legends are set at roughly double their desktop size to stay
+   legible (globals.css, max-width 40rem); at the old 44-unit tier separation
+   the doubled numerals overlapped their own labels and their neighbours'. The
+   geometry is derived from BASE_Y so the two stay in step. */
+const BASE_Y = 216;
+const MAJOR_LABEL_Y = BASE_Y + 40;
+const MAJOR_LABEL_Y2 = BASE_Y + 60;
+const AXIS_CAPTION_Y = BASE_Y + 82;
+const VIEWBOX_H = BASE_Y + 106;
+const NEEDLE_TIP_Y = BASE_Y + 16;
+
+/* Four legend rows, each with sole occupancy, because at the mobile type size
+   any two that share a row collide: the descriptive cutoff, then the longest
+   observed time, then the two percentile tiers. The longest observed time is
+   usually the rightmost mark and used to share tier A with p90. */
+const CUT_LABEL_Y = 22;
+const CUT_LINE_TOP = 32;
+const MAX_LABEL_Y = 56;
+const MAX_TICK_TOP = 64;
 
 export function scaleX(seconds: number): number {
   const t = Math.min(Math.max(seconds, 1), T_MAX);
@@ -36,8 +57,8 @@ interface Tier {
 /* percentile legends alternate between two tiers so neighbouring marks never
    collide once the type steps up on a narrow sheet */
 const TIER: Record<"A" | "B", Tier> = {
-  A: { num: 56, label: 74, top: 80 },
-  B: { num: 100, label: 118, top: 124 },
+  A: { num: 92, label: 124, top: 132 },
+  B: { num: 166, label: 198, top: 206 },
 };
 
 interface Mark {
@@ -86,7 +107,7 @@ export function Scale({ ttg, cutoffSeconds }: ScaleProps): ReactElement {
 
   return (
     <div className="scale">
-      <svg viewBox="0 0 720 226" role="img" aria-label={description}>
+      <svg viewBox={`0 0 720 ${VIEWBOX_H}`} role="img" aria-label={description}>
         <g shapeRendering="crispEdges">
           <line x1={X0 - 0.5} y1={BASE_Y + 0.5} x2={679.5} y2={BASE_Y + 0.5} className="eng-line" strokeWidth="1" />
 
@@ -104,7 +125,7 @@ export function Scale({ ttg, cutoffSeconds }: ScaleProps): ReactElement {
             <line x1={679.5} y1={BASE_Y - 11} x2={679.5} y2={BASE_Y} />
           </g>
 
-          <line x1={cutX} y1="30" x2={cutX} y2={BASE_Y} className="eng-cut" strokeWidth="1" />
+          <line x1={cutX} y1={CUT_LINE_TOP} x2={cutX} y2={BASE_Y} className="eng-cut" strokeWidth="1" />
 
           <g className="eng-pct" strokeWidth="1.25">
             {marks.map((m) => (
@@ -113,11 +134,11 @@ export function Scale({ ttg, cutoffSeconds }: ScaleProps): ReactElement {
           </g>
 
           {maxX === null ? null : (
-            <line x1={maxX} y1={TIER.A.top} x2={maxX} y2={BASE_Y} className="eng-tick" strokeWidth="1" />
+            <line x1={maxX} y1={MAX_TICK_TOP} x2={maxX} y2={BASE_Y} className="eng-tick" strokeWidth="1" />
           )}
         </g>
 
-        <text x={cutX} y="24" className="eng-text" textAnchor="middle">
+        <text x={cutX} y={CUT_LABEL_Y} className="eng-text" textAnchor="middle">
           {formatDuration(cutoffSeconds)} cutoff
         </text>
 
@@ -137,29 +158,34 @@ export function Scale({ ttg, cutoffSeconds }: ScaleProps): ReactElement {
         </g>
 
         {maxX === null || maxSeconds === null ? null : (
-          <text x={maxX} y={TIER.A.label} className="eng-text" textAnchor="middle">
+          <text
+            x={maxX}
+            y={MAX_LABEL_Y}
+            className="eng-text"
+            textAnchor={overflow ? "end" : "middle"}
+          >
             {overflow ? "max past 1 h" : `max ${formatDuration(maxSeconds)}`}
           </text>
         )}
 
         <g className="eng-text" textAnchor="middle">
           {MAJORS.map((m) => (
-            <text key={m.t} x={scaleX(m.t)} y={m.tier === 1 ? 176 : 196}>
+            <text key={m.t} x={scaleX(m.t)} y={m.tier === 1 ? MAJOR_LABEL_Y : MAJOR_LABEL_Y2}>
               {m.label}
             </text>
           ))}
         </g>
-        <text x="40" y="216" className="eng-text" textAnchor="start">
+        <text x="40" y={AXIS_CAPTION_Y} className="eng-text" textAnchor="start">
           Logarithmic · seconds since launch
         </text>
 
         <g className="needle">
-          <line x1={needleX} y1="16" x2={needleX} y2="152" className="needle-body" />
+          <line x1={needleX} y1={MAX_LABEL_Y + 12} x2={needleX} y2={NEEDLE_TIP_Y} className="needle-body" />
           <polygon
-            points={`${needleX},152 ${needleX - 4.5},141 ${needleX + 4.5},141`}
+            points={`${needleX},${NEEDLE_TIP_Y} ${needleX - 4.5},${NEEDLE_TIP_Y - 11} ${needleX + 4.5},${NEEDLE_TIP_Y - 11}`}
             className="needle-cap"
           />
-          <circle cx={needleX} cy="16" r="3" className="needle-cap" />
+          <circle cx={needleX} cy={MAX_LABEL_Y + 12} r="3" className="needle-cap" />
         </g>
       </svg>
     </div>

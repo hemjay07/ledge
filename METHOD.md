@@ -24,6 +24,10 @@ This is the source for the public `/method` page. Definitions here are binding o
 - **Excluding fast graduations (24h)**: same denominator; numerator excludes fast graduations. Shown beside the Pons Number, never instead of it. Also displayed as "1 in N" where N = round(1 / rate).
 - **All-time**: same two rates over every launch since the first block LEDGE indexed (block recorded on `/method`).
 
+## Precision
+
+Rates are printed to the precision the sample supports: two decimals at n ≥ 1,000, one decimal below, and "not enough data (n=…)" under 30. A bucket that recorded no graduations prints the count it observed ("0 of 244") rather than "0.0%", which would read as a measured finding rather than an absent one.
+
 ## Cohorts (all with n; n < 30 renders as "not enough data")
 
 The n < 30 rule applies to **every** published proportion, not only cohort rates: the share of graduations under 300 s and under 60 s, and both deployer shares. Below 30 the share is `null` with `insufficient: true` — never `0.0`, which would read as a measured finding rather than an absent one.

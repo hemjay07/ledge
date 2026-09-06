@@ -411,3 +411,31 @@ def test_successful_run_leaves_no_temp_files_behind(run_dir, monkeypatch):
 
     assert list(run_dir.rglob("*.tmp")) == []
     assert (run_dir / "number.json").exists()
+
+
+# --- backfill extends history backwards once firstIndexedBlock is set --------
+def test_backfill_with_existing_history_crawls_backwards_from_first_indexed_block(committed_data_dir):
+    seen = []
+
+    class _RecordingRpcClient:
+        def get_logs(self, frm, to, topic0):
+            seen.append((frm, to))
+            return []
+
+        def call_batch(self, *a, **k):
+            return []
+
+    state = json.loads((committed_data_dir / "state.json").read_text())
+    first, last = state["firstIndexedBlock"], state["lastIndexedBlock"]
+    hours = 1
+    blocks_back = int(hours * 3600 / crawl.AVG_BLOCK_SECONDS)
+
+    crawl.run(data_dir=committed_data_dir, rpc_client=_RecordingRpcClient(),
+              head_block=last + 5000, backfill_hours=hours)
+
+    assert seen, "backfill must scan something when history exists"
+    assert min(f for f, _ in seen) == max(0, first - blocks_back)
+    assert max(t for _, t in seen) == first - 1, "backfill never re-reads the head range"
+    after = json.loads((committed_data_dir / "state.json").read_text())
+    assert after["firstIndexedBlock"] == max(0, first - blocks_back)
+    assert after["lastIndexedBlock"] == last, "a backfill does not move the forward cursor"

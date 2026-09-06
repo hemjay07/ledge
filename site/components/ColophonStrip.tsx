@@ -40,7 +40,7 @@ function RuledL(): ReactElement {
 /* The same strip run as a head, opening the sheet, with the mark set into it. */
 export function RunningHead({ mark, win }: { mark: string; win: ReactNode }): ReactElement {
   return (
-    <>
+    <header>
       <div className="rule-heavy" />
       <div className="head">
         <span className="mark">
@@ -50,6 +50,6 @@ export function RunningHead({ mark, win }: { mark: string; win: ReactNode }): Re
         <span className="win">{win}</span>
       </div>
       <div className="rule-hair" />
-    </>
+    </header>
   );
 }

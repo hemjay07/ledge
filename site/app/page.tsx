@@ -7,6 +7,7 @@ import { Footer } from "../components/Footer";
 import { LedgerEntry } from "../components/LedgerEntry";
 import { Register } from "../components/Register";
 import { Scale } from "../components/Scale";
+import { SheetNav } from "../components/SheetNav";
 import { StaleBanner } from "../components/StaleBanner";
 import { Stat } from "../components/Stat";
 import { allTime, h24, numberFile } from "../lib/number";
@@ -23,13 +24,17 @@ import {
   histogramLabel,
 } from "../lib/format";
 import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow, shareCell } from "../lib/rows";
+import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../lib/windows";
 import { excludingFastSentence, ponsNumberSentence } from "../lib/summary";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 
+/* keyed off the data, so the all-time surfaces return by themselves once the
+   index reaches back further than a day */
+const allTimeIsSameMeasurement = sameMeasurement(h24, allTime);
+
 export default function Home(): ReactElement {
   const exFast = h24.excludingFast;
-  const cutoff = formatDuration(exFast.cutoffSeconds);
   const cutoffWords = formatDurationLong(exFast.cutoffSeconds);
   const observedHours = h24.cohorts.hour.filter((r) => r.launches > 0);
   const emptyHours = h24.cohorts.hour.length - observedHours.length;
@@ -51,6 +56,7 @@ export default function Home(): ReactElement {
       <StaleBanner crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
 
       <main className="sheet">
+        <SheetNav current="number" />
         {/* the fold — everything a phone screenshot must carry */}
         <RunningHead mark="LEDGE" win="Trailing 24 hours · 01" />
 
@@ -76,7 +82,7 @@ export default function Home(): ReactElement {
           </p>
         </div>
 
-        <div className="rule-hair" style={{ marginTop: "1.5rem" }} />
+        <div className="rule-hair fold-rule" />
         <div className="second">
           <Figure
             name="excluding-fast"
@@ -150,8 +156,9 @@ export default function Home(): ReactElement {
             {h24.lowerBound
               ? "A launch near the end of the window may still graduate, so the 24-hour figure is a lower bound for the most recent hours. "
               : ""}
-            Rates are printed to the precision the sample supports: two decimals at
-            n&nbsp;≥&nbsp;1,000, one decimal below, and “not enough data” under 30.
+            {h24.orphans > 0
+              ? `${formatCount(h24.orphans)} graduations had no launch in the record and are excluded from every rate.`
+              : ""}
           </p>
         </LedgerEntry>
 
@@ -185,8 +192,7 @@ export default function Home(): ReactElement {
               .filter(([, v]) => v !== null)
               .map(([k, v]) => `${k} ${formatDuration(v as number)}`)
               .join(" · ")}
-            . The {cutoff} mark is the descriptive threshold used for the excluding-fast figure,
-            not a boundary. The scale ends at one hour.
+            .
           </p>
         </LedgerEntry>
 
@@ -295,6 +301,9 @@ export default function Home(): ReactElement {
           heading="All-time"
           headingNote={`· since block ${formatCount(numberFile.firstIndexedBlock)}`}
         >
+          {allTimeIsSameMeasurement ? (
+            <p className="note">{SAME_MEASUREMENT_NOTE}</p>
+          ) : (
           <div className="alltime">
             <div>
               <Stat
@@ -331,12 +340,10 @@ export default function Home(): ReactElement {
               </span>
             </div>
           </div>
+          )}
           <p className="note note--fine">
             Indexed from block {formatCount(numberFile.firstIndexedBlock)} to block{" "}
-            {formatCount(numberFile.headBlock)}.{" "}
-            {allTime.orphans > 0
-              ? `${formatCount(allTime.orphans)} graduations had no launch in the record and are excluded from every rate.`
-              : "Every graduation in the record has a launch behind it."}
+            {formatCount(numberFile.headBlock)}.
           </p>
         </LedgerEntry>
 
@@ -346,8 +353,11 @@ export default function Home(): ReactElement {
   );
 }
 
-function excludedNote(excluded: number): string {
+/* Nothing is said when nothing was excluded: a sentence whose only content is
+   an absence is padding, and the All footing already reconciles the buckets
+   against the population. */
+function excludedNote(excluded: number): string | null {
   return excluded === 0
-    ? "No launches were excluded from this cohort."
+    ? null
     : `${formatCount(excluded)} launches were excluded from this cohort because the factory read failed. They still count in every rate.`;
 }
