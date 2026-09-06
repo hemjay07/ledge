@@ -80,6 +80,11 @@ export default function Home(): ReactElement {
               <Age crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
             </span>
           </p>
+          <p className="dek">
+            Pons is a token launchpad on Robinhood Chain. A launch graduates when its bonding
+            curve fills to 4.2&nbsp;ETH and the token moves to an open market. LEDGE reads every
+            launch from the factory contract and counts, hourly.
+          </p>
         </div>
 
         <div className="rule-hair fold-rule" />

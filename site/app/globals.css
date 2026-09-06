@@ -341,6 +341,17 @@ a:focus-visible,
    centres the figure inside the measure: flush left, a figure narrower than
    the 7px heavy rules framing it reads as marooned in the corner rather than
    as the subject of the band. */
+/* The dek: the one sentence a cold visitor needs. Units for the instrument,
+   not a pitch. Indented with the kicker and the figure. */
+.dek {
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  color: var(--ink-2);
+  max-width: 46ch;
+  margin: var(--s-4) 0 0;
+  text-wrap: pretty;
+}
 .figure-block {
   margin-left: 6%;
 }
