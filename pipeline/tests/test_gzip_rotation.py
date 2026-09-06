@@ -105,3 +105,61 @@ def test_rotation_handles_multiple_old_partitions_independently(tmp_path):
     for day in ("2026-09-01", "2026-09-02", "2026-09-03"):
         assert (tmp_path / "launches" / f"{day}.jsonl.gz").exists()
         assert not (tmp_path / "launches" / f"{day}.jsonl").exists()
+
+
+# --- W10: rotating onto an existing archive merges, never overwrites --------
+def test_rotation_merges_new_plain_lines_into_an_existing_archive(tmp_path):
+    """After an outage crossing midnight, day D is already `.jsonl.gz` when
+    a new `D.jsonl` appears. Rotating must not replace the archive with the
+    new fragment -- that silently deletes every earlier record of the day."""
+    today = date(2026, 9, 6)
+    archived = [{"token": "0xOLD1", "txHash": "0xa", "logIndex": 0},
+                {"token": "0xOLD2", "txHash": "0xb", "logIndex": 0}]
+    fresh = [{"token": "0xNEW", "txHash": "0xc", "logIndex": 0}]
+    gz_path = tmp_path / "launches" / "2026-09-05.jsonl.gz"
+    gz_path.parent.mkdir(parents=True)
+    with gzip.open(gz_path, "wt") as f:
+        f.write("".join(json.dumps(r) + "\n" for r in archived))
+    _write_plain(tmp_path / "launches" / "2026-09-05.jsonl", fresh)
+
+    crawl.rotate_partitions(tmp_path, today=today)
+
+    with gzip.open(gz_path, "rt") as f:
+        merged = [json.loads(line) for line in f if line.strip()]
+    assert merged == archived + fresh
+    assert not (tmp_path / "launches" / "2026-09-05.jsonl").exists()
+
+
+def test_rotation_merge_dedupes_on_txhash_and_logindex(tmp_path):
+    today = date(2026, 9, 6)
+    archived = [{"token": "0xA", "txHash": "0xa", "logIndex": 0}]
+    overlapping = [{"token": "0xA", "txHash": "0xa", "logIndex": 0},
+                   {"token": "0xB", "txHash": "0xa", "logIndex": 1}]
+    gz_path = tmp_path / "graduations" / "2026-09-04.jsonl.gz"
+    gz_path.parent.mkdir(parents=True)
+    with gzip.open(gz_path, "wt") as f:
+        f.write("".join(json.dumps(r) + "\n" for r in archived))
+    _write_plain(tmp_path / "graduations" / "2026-09-04.jsonl", overlapping)
+
+    crawl.rotate_partitions(tmp_path, today=today)
+
+    with gzip.open(gz_path, "rt") as f:
+        merged = [json.loads(line) for line in f if line.strip()]
+    assert merged == [{"token": "0xA", "txHash": "0xa", "logIndex": 0},
+                      {"token": "0xB", "txHash": "0xa", "logIndex": 1}]
+
+
+def test_merged_rotation_is_still_deterministic(tmp_path):
+    today = date(2026, 9, 6)
+
+    def _build(root):
+        gz_path = root / "launches" / "2026-09-02.jsonl.gz"
+        gz_path.parent.mkdir(parents=True)
+        with gzip.open(gz_path, "wt") as f:
+            f.write(json.dumps({"token": "0xA", "txHash": "0xa", "logIndex": 0}) + "\n")
+        _write_plain(root / "launches" / "2026-09-02.jsonl",
+                     [{"token": "0xB", "txHash": "0xb", "logIndex": 0}])
+        crawl.rotate_partitions(root, today=today)
+        return (root / "launches" / "2026-09-02.jsonl.gz").read_bytes()
+
+    assert _build(tmp_path / "one") == _build(tmp_path / "two")

@@ -34,20 +34,12 @@ jobs:
       - name: recompute (byte-for-byte gate)
         run: python pipeline/recompute.py --check
 
-      - name: regenerate OG image
-        if: hashFiles('site/package.json') != ''
-        run: |
-          npm ci --prefix site
-          npm run og --prefix site
 
-      - name: commit data (and OG image if present)
+      - name: commit data
         run: |
           git config user.name  "ledge-bot"
           git config user.email "ledge-bot@users.noreply.github.com"
           git add data
-          if [ -f site/public/og/number.png ]; then
-            git add site/public/og/number.png
-          fi
           git diff --cached --quiet && { echo "no data change"; exit 0; }
           git commit -m "data: backfill ${{ inputs.hours }}h $(date -u +%Y-%m-%dT%H:%MZ)"
           for i in 1 2 3; do

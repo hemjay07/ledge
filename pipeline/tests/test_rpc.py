@@ -225,7 +225,9 @@ def test_call_batch_backoff_increases_between_retries(monkeypatch):
         [
             {"code": 429, "message": "Too Many Requests"},
             {"code": 429, "message": "Too Many Requests"},
-            [{"jsonrpc": "2.0", "id": 1, "result": "0x1"}],
+            # id must match the request id (0) -- call_batch matches results
+            # by id, so a mismatched id is a malformed response, not a hit.
+            [{"jsonrpc": "2.0", "id": 0, "result": "0x1"}],
         ]
     )
 
@@ -238,3 +240,124 @@ def test_call_batch_backoff_increases_between_retries(monkeypatch):
     backoff_sleeps = [s for s in sleep_calls if s > 0]
     assert len(backoff_sleeps) >= 2
     assert backoff_sleeps[1] > backoff_sleeps[0]  # exponential-style backoff, not constant
+
+
+# --- B2: batch responses are matched by id, never positionally --------------
+def test_call_batch_reorders_results_by_id_not_by_position(monkeypatch):
+    """JSON-RPC permits a server to answer a batch in any order. Results must
+    be re-indexed by `id` so request i always gets response i."""
+    monkeypatch.setattr(rpc.time, "sleep", lambda *_: None)
+
+    def shuffling_transport(payload):
+        responses = [{"jsonrpc": "2.0", "id": r["id"], "result": hex(r["id"])} for r in payload]
+        return list(reversed(responses))
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=shuffling_transport)
+    requests = [{"method": "eth_getBlockByNumber", "params": [hex(i), False]} for i in range(5)]
+    results = client.call_batch(requests)
+
+    assert results == [hex(i) for i in range(5)]
+
+
+def test_call_batch_reorders_across_multiple_chunks(monkeypatch):
+    monkeypatch.setattr(rpc.time, "sleep", lambda *_: None)
+
+    def shuffling_transport(payload):
+        responses = [{"jsonrpc": "2.0", "id": r["id"], "result": r["params"][0]} for r in payload]
+        return list(reversed(responses))
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=shuffling_transport)
+    requests = [{"method": "eth_getBlockByNumber", "params": [hex(i), False]} for i in range(120)]
+    results = client.call_batch(requests)
+
+    assert results == [hex(i) for i in range(120)]
+
+
+def test_call_batch_raises_when_response_is_short(monkeypatch):
+    """A truncated array must never be silently zipped against the requests:
+    that would shift every subsequent result onto the wrong block."""
+    monkeypatch.setattr(rpc.time, "sleep", lambda *_: None)
+
+    def truncating_transport(payload):
+        return [{"jsonrpc": "2.0", "id": r["id"], "result": "0x1"} for r in payload[:-1]]
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=truncating_transport)
+    with pytest.raises(Exception):
+        client.call_batch([{"method": "eth_call", "params": []} for _ in range(3)])
+
+
+def test_call_batch_raises_when_an_id_is_missing_or_duplicated(monkeypatch):
+    monkeypatch.setattr(rpc.time, "sleep", lambda *_: None)
+
+    def duplicate_id_transport(payload):
+        return [{"jsonrpc": "2.0", "id": 0, "result": "0x1"} for _ in payload]
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=duplicate_id_transport)
+    with pytest.raises(Exception):
+        client.call_batch([{"method": "eth_call", "params": []} for _ in range(3)])
+
+
+def test_call_batch_retries_a_malformed_response_before_giving_up(monkeypatch):
+    """A short/garbled array is retried through the same backoff path as a
+    429 -- it is a transport fault, not a data answer."""
+    monkeypatch.setattr(rpc.time, "sleep", lambda *_: None)
+    attempts = {"n": 0}
+
+    def flaky_transport(payload):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            return [{"jsonrpc": "2.0", "id": 0, "result": "0x1"}]  # short by 2
+        return [{"jsonrpc": "2.0", "id": r["id"], "result": hex(r["id"])} for r in payload]
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=flaky_transport)
+    results = client.call_batch([{"method": "eth_call", "params": []} for _ in range(3)])
+
+    assert attempts["n"] == 2
+    assert results == ["0x0", "0x1", "0x2"]
+
+
+# --- W7: get_logs must never read a resultless item as an empty window ------
+def test_get_logs_raises_when_item_has_neither_result_nor_error(monkeypatch):
+    """An item with no `result` key is not an empty log window; treating it
+    as [] silently deletes a block range from the dataset."""
+    monkeypatch.setattr(rpc.time, "sleep", lambda *_: None)
+
+    def resultless_transport(payload):
+        return [{"jsonrpc": "2.0", "id": 0}]
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=resultless_transport)
+    with pytest.raises(Exception):
+        client.get_logs(1000, 1999, rpc.TOPIC_TOKEN_LAUNCHED)
+
+
+def test_get_logs_retries_a_resultless_item_then_succeeds(monkeypatch):
+    monkeypatch.setattr(rpc.time, "sleep", lambda *_: None)
+    attempts = {"n": 0}
+
+    def flaky_transport(payload):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            return [{"jsonrpc": "2.0", "id": 0}]
+        return [{"jsonrpc": "2.0", "id": 0, "result": [_make_token_launched_log()]}]
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=flaky_transport)
+    logs = client.get_logs(1000, 1999, rpc.TOPIC_TOKEN_LAUNCHED)
+
+    assert attempts["n"] == 2
+    assert len(logs) == 1
+
+
+def test_get_logs_returns_empty_list_for_a_genuinely_empty_window(monkeypatch):
+    monkeypatch.setattr(rpc.time, "sleep", lambda *_: None)
+
+    def empty_transport(payload):
+        return [{"jsonrpc": "2.0", "id": 0, "result": []}]
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=empty_transport)
+    assert client.get_logs(1000, 1999, rpc.TOPIC_POOL_GRADUATED) == []
+
+
+def test_is_rate_limited_still_distinguishes_429_from_other_retryables():
+    assert rpc.is_rate_limited({"code": 429, "message": "Too Many Requests"}) is True
+    assert rpc.is_rate_limited({"code": 503, "message": "unavailable"}) is False
+    assert rpc.is_retryable({"code": 503, "message": "unavailable"}) is True

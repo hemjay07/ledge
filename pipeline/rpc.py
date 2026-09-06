@@ -24,8 +24,9 @@ SYMBOL_SELECTOR = "0x95d89b41"  # symbol()
 
 MAX_BATCH = 50
 BATCH_PACING_SECONDS = 2.0
-MAX_RETRIES = 6
+MAX_RETRIES = 9
 BACKOFF_BASE_SECONDS = 2.0
+BACKOFF_CAP_SECONDS = 120.0
 RETRYABLE_HTTP = (408, 429, 500, 502, 503, 504)
 
 Transport = Callable[[list], object]
@@ -44,17 +45,48 @@ def _data_word(data: str, index: int) -> str:
     return data[start : start + 64]
 
 
-def is_rate_limited(response: object) -> bool:
-    """A 429 comes back as a single JSON object instead of the requested
-    array. Any other single-object response is a real error, not a
-    rate limit."""
-    return isinstance(response, dict) and response.get("code") == 429
-
-
 def is_retryable(response: object) -> bool:
     """Transport-level failures (HTTP 429/5xx, timeouts) the transport hands
     back as a single object; retried with the same backoff as a 429."""
     return isinstance(response, dict) and response.get("code") in RETRYABLE_HTTP
+
+
+def is_rate_limited(response: object) -> bool:
+    """A 429 comes back as a single JSON object instead of the requested
+    array. Any other single-object response is a real error, not a
+    rate limit. Narrows is_retryable to the one code that means "slow down".
+    """
+    return is_retryable(response) and response.get("code") == 429
+
+
+class MalformedBatchResponse(Exception):
+    """The provider answered a batch with something that cannot be matched
+    back to the requests (wrong length, missing/duplicate ids). Retried on
+    the same backoff path as a 429: it is a transport fault, never data."""
+
+
+def index_batch_response(response: object, expected: int) -> list:
+    """Match a JSON-RPC batch response back to its requests by `id`.
+
+    JSON-RPC 2.0 lets a server return batch responses in any order, and a
+    short array would otherwise be zipped positionally against the requests
+    -- shifting every later result onto the wrong block. Both are refused.
+    """
+    if not isinstance(response, list):
+        raise MalformedBatchResponse(f"expected an array of {expected} responses, got {type(response).__name__}")
+    if len(response) != expected:
+        raise MalformedBatchResponse(f"expected {expected} responses, got {len(response)}")
+    by_id: dict = {}
+    for item in response:
+        if not isinstance(item, dict) or "id" not in item:
+            raise MalformedBatchResponse("batch response item carries no id")
+        if item["id"] in by_id:
+            raise MalformedBatchResponse(f"duplicate id {item['id']!r} in batch response")
+        by_id[item["id"]] = item
+    missing = [i for i in range(expected) if i not in by_id]
+    if missing:
+        raise MalformedBatchResponse(f"batch response missing ids {missing}")
+    return [by_id[i].get("result") for i in range(expected)]
 
 
 def decode_token_launched(log: dict) -> dict:
@@ -120,7 +152,11 @@ class RpcClient:
         self.url = url
         self.transport = transport or _urllib_transport(url)
 
-    def _send_with_retry(self, payload: list) -> list:
+    def _send_with_retry(self, payload: list, validate: Optional[Callable[[object], list]] = None) -> list:
+        """Send one payload, retrying transport faults with exponential
+        backoff. `validate` maps a raw response to the value to return and
+        may raise MalformedBatchResponse to send the request down that same
+        retry path."""
         delay = BACKOFF_BASE_SECONDS
         for attempt in range(MAX_RETRIES):
             response = self.transport(payload)
@@ -128,16 +164,24 @@ class RpcClient:
                 if attempt == MAX_RETRIES - 1:
                     raise RuntimeError(f"rpc: gave up after repeated failures: {response}")
                 time.sleep(delay)
-                delay *= 2
+                delay = min(delay * 2, BACKOFF_CAP_SECONDS)
                 continue
-            return response
+            if validate is None:
+                return response
+            try:
+                return validate(response)
+            except MalformedBatchResponse as exc:
+                if attempt == MAX_RETRIES - 1:
+                    raise RuntimeError(f"rpc: malformed batch response after retries: {exc}") from exc
+                time.sleep(delay)
+                delay = min(delay * 2, BACKOFF_CAP_SECONDS)
         raise RuntimeError("rpc: gave up after repeated 429 responses")
 
     def call_batch(self, requests: list) -> list:
-        # Response order is assumed to match request order positionally
-        # (true of every batch response observed from this provider); the
-        # "id" field is set for JSON-RPC compliance but not relied on for
-        # re-ordering.
+        """Results are matched back to requests by `id`, never positionally.
+        A response that is short, over-long, or missing an id is refused and
+        retried; it never reaches the caller as a shifted or truncated list.
+        """
         results: list = []
         chunks = [requests[i : i + MAX_BATCH] for i in range(0, len(requests), MAX_BATCH)]
         for chunk_index, chunk in enumerate(chunks):
@@ -145,8 +189,10 @@ class RpcClient:
                 {"jsonrpc": "2.0", "id": i, "method": r["method"], "params": r["params"]}
                 for i, r in enumerate(chunk)
             ]
-            response = self._send_with_retry(payload)
-            results.extend(item.get("result") for item in response)
+            expected = len(chunk)
+            results.extend(
+                self._send_with_retry(payload, validate=lambda r, n=expected: index_batch_response(r, n))
+            )
             if chunk_index < len(chunks) - 1:
                 time.sleep(BATCH_PACING_SECONDS)
         return results
@@ -172,16 +218,18 @@ class RpcClient:
                 ],
             }
         ]
-        # A per-item error (e.g. "log query timed out") must never be read
-        # as an empty window: retry, then fail the run.
+        # A per-item error (e.g. "log query timed out") -- or an item with no
+        # "result" at all -- must never be read as an empty window: only an
+        # explicit result is an answer. Anything else retries, then fails
+        # the run.
         delay = BACKOFF_BASE_SECONDS
         for attempt in range(MAX_RETRIES):
             response = self._send_with_retry(payload)
-            item = response[0]
-            if "error" not in item:
-                return item.get("result") or []
+            item = response[0] if isinstance(response, list) and response else None
+            if isinstance(item, dict) and "error" not in item and "result" in item:
+                return item["result"] or []
             if attempt == MAX_RETRIES - 1:
-                raise RuntimeError(f"rpc: eth_getLogs error after retries: {item['error']}")
+                raise RuntimeError(f"rpc: eth_getLogs gave no result after retries: {item!r}")
             time.sleep(delay)
             delay *= 2
         raise RuntimeError("rpc: unreachable")

@@ -83,10 +83,11 @@ Selector `0x3cf28b5a` (`getLaunchedToken(address)`), called on the factory, retu
 1. Read `data/state.json`. Start at `max(firstIndexedBlock, lastIndexedBlock - REORG_WINDOW + 1)`; `REORG_WINDOW = 3000` blocks (~5 minutes of chain, 3 extra windows, ~6 extra requests).
 2. Fetch head via `eth_blockNumber`. Scan to head in 1,000-block windows, two `eth_getLogs` per window (one per topic0), 0.9 s pacing, `crawl0.py` retry/backoff.
 3. **Accumulate everything in memory.** An hour is ~800 records; a 20-hour backfill is ~24,000 — both trivial.
-4. Load the `(txHash, logIndex)` key set from the partitions the scan range can touch (today's and, near midnight UTC, yesterday's). Drop any accumulated record whose key is already present. **Dedupe is on `(txHash, logIndex)` only** — never on token address, because a token can in principle appear twice and because a reorg replay produces identical keys.
-5. Enrich, then fetch timestamps, then assign each record to its UTC-day partition by its **block timestamp** (not by run wall-clock).
-6. **Commit point.** Only after every stage returns without an unrecoverable error: append new lines to partitions, write `data/pair-tokens.json`, run `recompute.py`, write `data/number.json`, write `data/state.json` with the new `lastIndexedBlock`. Any earlier failure exits non-zero having written **nothing** — state is unchanged and the next run re-scans the same range. Files are written via write-to-temp + `os.replace`.
-7. If no new records and `lastIndexedBlock` is unchanged, exit 0 with no file writes so the Action makes no commit (SPEC acceptance: two consecutive empty runs produce no commit). If `lastIndexedBlock` advanced but there were no events, `state.json` still changes and a commit is made — that is correct, it advances the resume point.
+4. Fetch block timestamps for **every** scanned record, before the dedupe. A record's UTC-day partition is decided by its **block timestamp**, never by the run's wall clock, so the set of partitions the dedupe must consult is derived from the timestamps of the records about to be written (each record's day, ± one day) — *not* from `now`. Keying that day set off `now` is wrong: after an outage the reorg re-scan reaches blocks days older than the run, whose partitions would then go unread and every record in them be appended a second time.
+5. Load the `(txHash, logIndex)` key set from those partitions (plain and `.gz`) and drop any accumulated record whose key is already present. **Dedupe is on `(txHash, logIndex)` only** — never on token address, because a token can in principle appear twice and because a reorg replay produces identical keys. Then enrich the surviving new launches.
+6. Decide `orphan` for each new graduation against **every launch token LEDGE has ever recorded** — the existing partitions plus this run's new launches — not against this run's new launches alone. In steady state most graduations belong to launches from earlier runs, and the narrower comparison marks them all orphan. `state.counts.orphanGraduations` is re-derived the same way, so it always agrees with `number.json`.
+7. **Commit point.** Every output is computed into memory first: the appended partition payloads, the merged/rotated `.gz` archives, `data/pair-tokens.json`, `data/number.json` (from the staged in-memory record set, not by re-reading disk) and `data/state.json`. Only after the last of those returns successfully does the run write anything, and it then writes each payload to a sibling `.tmp` and `os.replace`s it into place, in the order partitions → rotations → pair-tokens → `number.json` → `state.json`. A failure at any earlier point — an RPC error, a missing block header, a stats bug — exits non-zero having written **nothing**: the data directory is byte-for-byte unchanged, `state.json` still points at the old `lastIndexedBlock`, no `.tmp` file survives, and the next run re-scans the same range.
+8. If no new records and `lastIndexedBlock` is unchanged, exit 0 with no file writes so the Action makes no commit (SPEC acceptance: two consecutive empty runs produce no commit). If `lastIndexedBlock` advanced but there were no events, `state.json` still changes and a commit is made — that is correct, it advances the resume point.
 
 Records are appended in block order and never rewritten, so each hourly commit is a small tail diff rather than an 8 MB rewrite.
 
@@ -137,7 +138,7 @@ Records are appended in block order and never rewritten, so each hourly commit i
 
 A launch line is ~430 bytes. At 19,000/day that is **~8.2 MB/day** plain; graduations add ~130 KB/day.
 
-**Policy:** the current UTC day's partition stays plain text (append-only, tiny diffs). At the start of each run, any partition older than today is rewritten as `YYYY-MM-DD.jsonl.gz` and the plain file deleted — one 2.9 MB git blob written once and never re-diffed. Gzip must be deterministic: `gzip.GzipFile(filename="", mtime=0, compresslevel=9)`, so re-running the rotation is a no-op. Loaders accept both extensions. Net growth **≈ 3 MB/day, ~1 GB/year** — acceptable for Phase 1; the v1.1 escape hatch is moving partitions older than 90 days to GitHub Releases with a checksum manifest.
+**Policy:** the current UTC day's partition stays plain text (append-only, tiny diffs). At the start of each run, any partition older than today is rewritten as `YYYY-MM-DD.jsonl.gz` and the plain file deleted — one 2.9 MB git blob written once and never re-diffed. Gzip must be deterministic: `gzip.GzipFile(filename="", mtime=0, compresslevel=9)`, so re-running the rotation is a no-op. Rotation **merges, never overwrites**: after an outage crossing midnight a day can hold both `D.jsonl.gz` and a fresh `D.jsonl`, and replacing the archive with the fragment would silently drop every earlier record of that day. The archive and the plain file are concatenated in that order, deduped on `(txHash, logIndex)`, and rewritten as one deterministic `.gz`. Loaders accept both extensions. Net growth **≈ 3 MB/day, ~1 GB/year** — acceptable for Phase 1; the v1.1 escape hatch is moving partitions older than 90 days to GitHub Releases with a checksum manifest.
 
 The site build reads **only `data/number.json`** (~40 KB). Raw partitions are never bundled, imported, or copied into `site/public`.
 
@@ -161,14 +162,16 @@ def window(launches: list[Launch], graduations: list[Graduation],
            since: int | None, until: int) -> Window: ...
     # Window = {"launches": list[Launch], "grads_by_token": dict[str, Graduation],
     #           "since": int | None, "until": int, "orphans": int}
-    # Selection: launch.ts in [since, until]. A graduation is included iff its token
-    # has a launch IN THIS WINDOW; graduation ts may fall outside it. since=None => all-time.
+    # Selection: launch.ts in the HALF-OPEN interval [since, until) -- a launch at
+    # exactly `until` belongs to the next window, so adjacent windows partition the
+    # timeline. A graduation is included iff its token has a launch IN THIS WINDOW;
+    # graduation ts may fall outside it. since=None => all-time.
 
 def rate(w: Window) -> dict:            # {"launches", "graduations", "rate": float|None, "insufficient": bool}
 def rate_excluding_fast(w: Window, cutoff: int = FAST_CUTOFF) -> dict
                                         # + {"oneIn": int|None}
 def ttg_percentiles(w: Window) -> dict  # {"p10","p25","p50","p75","p90","p95","max","n"} ints|None
-def fast_shares(w: Window) -> dict      # {"under300Share", "under60Share", "n"}
+def fast_shares(w: Window) -> dict      # {"under300Share", "under60Share", "n", "insufficient"}
 def cohort(w: Window, key: str) -> list[dict]
                                         # key in {"pairClass","taxBucket","hourUtc","dayUtc"}
 def cohort_excluded(w: Window, key: str) -> int
@@ -179,7 +182,7 @@ def build_number(launches, graduations, state, crawled_at: str) -> dict
 
 ### Binding computation rules
 
-- **`n` is the bucket's launch count** (the denominator). `n < 30` → `rate: null`, `insufficient: true`. Applied uniformly, including the top-line figures.
+- **`n` is the bucket's launch count** (the denominator). `n < 30` → `rate: null`, `insufficient: true`. Applied uniformly, including the top-line figures — and to every published proportion, not only rates: `fastShares.under300Share`/`under60Share` (n = matched graduations) and `deployers.launched2plusShare` (n = distinct deployers) / `from10plusShare` (n = launches) are `null` with `insufficient: true` below 30, never `0.0`. A `0.0` share reads as a measured finding; an absent one must not.
 - **`rate = round(graduations / launches, 6)`**. `graduations` = launches in the window that have a matching graduation record at any time.
 - **`oneIn = int(Decimal(1 / rate).quantize(0, ROUND_HALF_UP))`** — explicit half-up, never Python's banker's rounding. `null` when `graduations == 0` or `insufficient`. Check against the backfill: 174/23552 = 0.007388 → 135.4 → **135**, matching the recorded "0.74% (1 in 135)".
 - **Percentiles: nearest-rank.** Sort time-to-graduation ascending; `idx = ceil(p/100 * n) - 1`, clamped to `[0, n-1]`. Integer seconds. If matched graduations < 30, every percentile is `null` and `ttg.insufficient = true`.
@@ -197,7 +200,7 @@ def build_number(launches, graduations, state, crawled_at: str) -> dict
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "definitionsVersion": "2026-09-06",
   "crawledAt": "2026-09-06T12:45:03Z",
   "staleAfterSeconds": 7200,
@@ -222,7 +225,7 @@ def build_number(launches, graduations, state, crawled_at: str) -> dict
       "oneIn": 135,
       "insufficient": false
     },
-    "fastShares": { "under300Share": 0.674766, "under60Share": 0.437383, "n": 535 },
+    "fastShares": { "under300Share": 0.674766, "under60Share": 0.437383, "n": 535, "insufficient": false },
     "ttg": {
       "n": 535, "insufficient": false,
       "p10": 12, "p25": 72, "p50": 96, "p75": 540,
@@ -244,6 +247,7 @@ def build_number(launches, graduations, state, crawled_at: str) -> dict
       "distinct": 15258,
       "launched2plusShare": 0.118363,
       "from10plusShare": 0.213154,
+      "insufficient": false,
       "histogram": [ { "bucket": "1", "deployers": 13452 }, { "bucket": "2-4", "deployers": 0 },
                      { "bucket": "5-9", "deployers": 0 }, { "bucket": "10-49", "deployers": 0 },
                      { "bucket": "50+", "deployers": 0 } ]
@@ -259,7 +263,7 @@ Cohort arrays above are abbreviated with a single illustrative row; the real fil
 
 `number.json` is static, so `stale` cannot track wall-clock time. Binding rules:
 
-- `stale` in the file is `true` **only** when the generating run knows the data is already old — i.e. the file is regenerated while `lastSuccessAt` is more than `staleAfterSeconds` before generation time. In the normal path it is `false`.
+- `stale` in the file is `true` **only** when the generating run knows it is behind — `consecutiveFailures > 0`, `lastRunAt` later than `lastSuccessAt`, or no successful run yet. It is not a wall-clock measure: a successful run publishes `stale: false` no matter how old the data later becomes. In the normal path it is `false`.
 - **Wall-clock staleness is computed in the browser** from `crawledAt` (§10). A consumer of `/number.json` computes it the same way; `staleAfterSeconds` is published so the threshold is not folklore.
 - **Crawl-failed collapses into stale by design**: a failed run commits nothing, `crawledAt` ages, and the banner appears with "Last successful measurement {crawledAt}" — which is exactly the copy SPEC §9 specifies.
 

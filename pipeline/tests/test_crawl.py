@@ -14,6 +14,7 @@ Binding rules (ARCHITECTURE.md §4):
   - Two consecutive empty runs (no new records, lastIndexedBlock unchanged)
     produce no commit / no file writes.
 """
+import gzip
 import json
 
 import pytest
@@ -179,3 +180,234 @@ def test_run_with_no_new_blocks_and_no_new_records_makes_no_file_writes(committe
     state_after_bytes = (committed_data_dir / "state.json").read_bytes()
     assert state_before_mtime_bytes == state_after_bytes
     assert result.get("committed") is False
+
+
+# --- shared stub RPC for whole-run tests -------------------------------------
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+_TOKEN_LAUNCHED_TOPIC0 = "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607"
+_POOL_GRADUATED_TOPIC0 = "0x0a44ef75df69c534f43cd6c1aa3ef8983065fe5fe79ef9e79f6494e6f258c259"
+
+
+def _word(value: int) -> str:
+    return format(value, "064x")
+
+
+def _addr_topic(addr: str) -> str:
+    return "0x" + addr[2:].rjust(64, "0")
+
+
+def _launch_log(token, block, tx_hash, log_index=0, pair_token=ZERO_ADDRESS):
+    return {
+        "topics": [
+            _TOKEN_LAUNCHED_TOPIC0,
+            _addr_topic(token),
+            _addr_topic("0xf6e86610771ee7838cabe2f9c376265ca25ef04c"),
+            _addr_topic("0x3102c27b522664e643441bf86492bf652c2251ca"),
+        ],
+        "data": "0x" + _word(int(pair_token, 16)) + _word(0) + _word(4 * 10**18),
+        "blockNumber": hex(block),
+        "transactionHash": tx_hash,
+        "logIndex": hex(log_index),
+    }
+
+
+def _grad_log(token, block, tx_hash, log_index=0):
+    return {
+        "topics": [_POOL_GRADUATED_TOPIC0, _addr_topic(token)],
+        "data": "0x" + _word(1) + _word(10**24) + _word(8_090_000_094),
+        "blockNumber": hex(block),
+        "transactionHash": tx_hash,
+        "logIndex": hex(log_index),
+    }
+
+
+class _StubRpc:
+    """Serves canned logs, block timestamps and a well-formed 15-word
+    getLaunchedToken return."""
+
+    def __init__(self, launch_logs=(), grad_logs=(), timestamps=None):
+        self.launch_logs = list(launch_logs)
+        self.grad_logs = list(grad_logs)
+        self.timestamps = dict(timestamps or {})
+
+    def get_logs(self, from_block, to_block, topic0):
+        source = self.launch_logs if topic0 == _TOKEN_LAUNCHED_TOPIC0 else self.grad_logs
+        return [log for log in source if from_block <= int(log["blockNumber"], 16) <= to_block]
+
+    def call_batch(self, requests):
+        results = []
+        for request in requests:
+            if request["method"] == "eth_getBlockByNumber":
+                block = int(request["params"][0], 16)
+                results.append({"timestamp": hex(self.timestamps[block])})
+            else:
+                words = [0] * 15
+                words[8] = 300
+                results.append("0x" + "".join(_word(w) for w in words))
+        return results
+
+    def symbol_of(self, address):
+        return "STUB"
+
+
+def _iso_day_ts(day: str, hour: int = 12) -> int:
+    from datetime import datetime, timezone
+
+    return int(datetime.fromisoformat(f"{day}T{hour:02d}:00:00+00:00").replace(tzinfo=timezone.utc).timestamp())
+
+
+@pytest.fixture
+def run_dir(tmp_path):
+    (tmp_path / "state.json").write_text(json.dumps(_state(first=1000, last=1500)))
+    (tmp_path / "pair-tokens.json").write_text(json.dumps({}))
+    (tmp_path / "launches").mkdir()
+    (tmp_path / "graduations").mkdir()
+    return tmp_path
+
+
+def _now(day="2026-09-06", hour=12):
+    from datetime import datetime, timezone
+
+    return datetime(*(int(p) for p in day.split("-")), hour, 0, 0, tzinfo=timezone.utc)
+
+
+def _write_partition(path, records):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(r) + "\n" for r in records))
+
+
+def _read_partition(kind_dir, day):
+    """Read a day's records whichever extension it currently carries."""
+    plain, gz = kind_dir / f"{day}.jsonl", kind_dir / f"{day}.jsonl.gz"
+    if gz.exists():
+        with gzip.open(gz, "rt") as f:
+            text = f.read()
+    else:
+        text = plain.read_text()
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
+def _launch_record(token, block, tx_hash, ts, log_index=0):
+    return {
+        "token": token, "curve": "0xf6e86610771ee7838cabe2f9c376265ca25ef04c",
+        "deployer": "0x3102c27b522664e643441bf86492bf652c2251ca",
+        "pairToken": ZERO_ADDRESS, "pairClass": "eth", "creatorTaxBps": 300,
+        "block": block, "ts": ts, "txHash": tx_hash, "logIndex": log_index,
+    }
+
+
+# --- B3: the dedupe day set comes from the records, not from `now` -----------
+def test_dedupe_day_set_covers_days_older_than_yesterday_after_an_outage(run_dir, monkeypatch):
+    """After a multi-day outage the reorg re-scan can reach blocks whose
+    timestamps land days before `now`. Keying the dedupe day set off `now`
+    misses those partitions and re-appends every record, inflating the
+    launch denominator."""
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    old_ts = _iso_day_ts("2026-09-01")
+    _write_partition(
+        run_dir / "launches" / "2026-09-01.jsonl",
+        [_launch_record("0x" + "1" * 40, 1400, "0x" + "aa" * 32, old_ts)],
+    )
+    rpc = _StubRpc(
+        launch_logs=[_launch_log("0x" + "1" * 40, 1400, "0x" + "aa" * 32)],
+        timestamps={1400: old_ts},
+    )
+
+    crawl.run(data_dir=run_dir, rpc_client=rpc, head_block=1600, now=_now("2026-09-06"))
+
+    records = _read_partition(run_dir / "launches", "2026-09-01")
+    assert len(records) == 1  # the re-scanned record was recognised, not duplicated
+    state = json.loads((run_dir / "state.json").read_text())
+    assert state["counts"]["launches"] == 1
+
+
+def test_new_records_from_two_days_are_both_deduped(run_dir, monkeypatch):
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    ts_a, ts_b = _iso_day_ts("2026-09-05", 23), _iso_day_ts("2026-09-06", 1)
+    _write_partition(run_dir / "launches" / "2026-09-05.jsonl",
+                     [_launch_record("0x" + "2" * 40, 1400, "0x" + "bb" * 32, ts_a)])
+    _write_partition(run_dir / "launches" / "2026-09-06.jsonl",
+                     [_launch_record("0x" + "3" * 40, 1450, "0x" + "cc" * 32, ts_b)])
+    rpc = _StubRpc(
+        launch_logs=[
+            _launch_log("0x" + "2" * 40, 1400, "0x" + "bb" * 32),
+            _launch_log("0x" + "3" * 40, 1450, "0x" + "cc" * 32),
+        ],
+        timestamps={1400: ts_a, 1450: ts_b},
+    )
+
+    crawl.run(data_dir=run_dir, rpc_client=rpc, head_block=1600, now=_now("2026-09-06"))
+
+    state = json.loads((run_dir / "state.json").read_text())
+    assert state["counts"]["launches"] == 2
+
+
+# --- W12: orphan is decided against every known launch, not just this run ----
+def test_graduation_of_an_earlier_launch_is_not_marked_orphan(run_dir, monkeypatch):
+    """Steady state: a token launched hours ago graduates now. Its launch is
+    in an existing partition, not in this run's new records."""
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    token = "0x" + "4" * 40
+    launch_ts = _iso_day_ts("2026-09-05")
+    grad_ts = _iso_day_ts("2026-09-06")
+    _write_partition(run_dir / "launches" / "2026-09-05.jsonl",
+                     [_launch_record(token, 1400, "0x" + "dd" * 32, launch_ts)])
+    rpc = _StubRpc(
+        grad_logs=[_grad_log(token, 1550, "0x" + "ee" * 32)],
+        timestamps={1550: grad_ts},
+    )
+
+    crawl.run(data_dir=run_dir, rpc_client=rpc, head_block=1600, now=_now("2026-09-06"))
+
+    grads = [json.loads(l) for l in (run_dir / "graduations" / "2026-09-06.jsonl").read_text().splitlines() if l.strip()]
+    assert len(grads) == 1
+    assert grads[0]["orphan"] is False
+    state = json.loads((run_dir / "state.json").read_text())
+    assert state["counts"]["orphanGraduations"] == 0
+
+
+def test_graduation_of_a_never_seen_token_is_still_marked_orphan(run_dir, monkeypatch):
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    grad_ts = _iso_day_ts("2026-09-06")
+    rpc = _StubRpc(grad_logs=[_grad_log("0x" + "5" * 40, 1550, "0x" + "ff" * 32)], timestamps={1550: grad_ts})
+
+    crawl.run(data_dir=run_dir, rpc_client=rpc, head_block=1600, now=_now("2026-09-06"))
+
+    grads = [json.loads(l) for l in (run_dir / "graduations" / "2026-09-06.jsonl").read_text().splitlines() if l.strip()]
+    assert grads[0]["orphan"] is True
+    state = json.loads((run_dir / "state.json").read_text())
+    assert state["counts"]["orphanGraduations"] == 1
+
+
+# --- W11: the whole write phase is staged, then renamed ----------------------
+def test_a_failure_after_the_scan_writes_no_partition_line(run_dir, monkeypatch):
+    """number.json is computed from the staged records BEFORE anything is
+    renamed into place, so a failure there must not leave new launch lines
+    (or a half-written pair-tokens.json) behind."""
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+
+    def _boom(*a, **k):
+        raise RuntimeError("simulated stats failure")
+
+    monkeypatch.setattr(crawl, "build_number", _boom)
+    ts = _iso_day_ts("2026-09-06")
+    rpc = _StubRpc(launch_logs=[_launch_log("0x" + "6" * 40, 1550, "0x" + "12" * 32)], timestamps={1550: ts})
+    state_before = (run_dir / "state.json").read_bytes()
+
+    with pytest.raises(Exception):
+        crawl.run(data_dir=run_dir, rpc_client=rpc, head_block=1600, now=_now("2026-09-06"))
+
+    assert not (run_dir / "launches" / "2026-09-06.jsonl").exists()
+    assert (run_dir / "state.json").read_bytes() == state_before
+    assert list((run_dir / "launches").glob("*.tmp")) == []
+
+
+def test_successful_run_leaves_no_temp_files_behind(run_dir, monkeypatch):
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    ts = _iso_day_ts("2026-09-06")
+    rpc = _StubRpc(launch_logs=[_launch_log("0x" + "7" * 40, 1550, "0x" + "34" * 32)], timestamps={1550: ts})
+
+    crawl.run(data_dir=run_dir, rpc_client=rpc, head_block=1600, now=_now("2026-09-06"))
+
+    assert list(run_dir.rglob("*.tmp")) == []
+    assert (run_dir / "number.json").exists()

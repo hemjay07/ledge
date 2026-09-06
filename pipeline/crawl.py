@@ -1,21 +1,47 @@
 """Incremental crawl: windows, resume, dedupe, all-or-nothing commit, gz
 rotation. Binding rules: ARCHITECTURE.md section 4/5. Supersedes crawl0.py.
 
-A single run: read state.json, scan new blocks in <=1,000-block windows,
-dedupe on (txHash, logIndex), enrich, timestamp, accumulate everything in
-memory, and only then commit -- partitions, pair-tokens.json, number.json,
-state.json. Any unrecoverable failure before the commit point writes
-nothing, so the next run re-scans the same range.
+A single run reads state.json, scans new blocks in <=1,000-block windows,
+fetches block timestamps, dedupes on (txHash, logIndex), enriches, and
+accumulates everything in memory.
+
+Commit guarantee (ARCHITECTURE.md section 4 step 6): *every* output --
+partition payloads, the merged/rotated .jsonl.gz archives, pair-tokens.json,
+number.json and state.json -- is computed into memory first. Nothing touches
+the data directory until the last stage (build_number + canonical
+serialization) has returned successfully; only then does the run write each
+payload to a sibling `.tmp` and os.replace it into place, in the order
+partitions -> rotations -> pair-tokens -> number.json -> state.json. A
+failure at any earlier point -- an RPC error, a missing block header, a stats
+bug -- leaves the data directory byte-for-byte unchanged, leaves state.json
+pointing at the old lastIndexedBlock, and leaves no `.tmp` files behind, so
+the next run re-scans exactly the same range.
+
+Three ordering consequences of that guarantee are load-bearing:
+
+  - Timestamps are fetched for *every* scanned record, before dedupe, because
+    the partition a record belongs to (and therefore the set of partitions the
+    dedupe must consult) is decided by its block timestamp, never by the run's
+    wall clock. After an outage the reorg re-scan can reach blocks that are
+    days older than `now`.
+  - Orphan status is decided against every launch token LEDGE has ever
+    recorded (loaded from the existing partitions, plain and .gz), not just
+    the launches new in this run. In steady state most graduations belong to
+    launches from earlier runs.
+  - Rotation merges into an existing archive rather than replacing it: after
+    an outage crossing midnight a day can have both `D.jsonl.gz` and a fresh
+    `D.jsonl`.
 """
 from __future__ import annotations
 
 import gzip
+import io
 import json
 import sys
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 if __package__ in (None, ""):
     # allows `python pipeline/crawl.py` (no PYTHONPATH) as used by the
@@ -60,47 +86,144 @@ def dedupe_records(records: list, existing_keys: set) -> list:
     return [r for r in records if (r["txHash"], r["logIndex"]) not in existing_keys]
 
 
-def _write_gzip_deterministic(path: Path, data: bytes) -> None:
+# --- record / partition primitives -------------------------------------------
+def _record_key(record: dict) -> tuple:
+    return (record.get("txHash"), record.get("logIndex"))
+
+
+def _merge_dedupe(*groups: Iterable[dict]) -> list:
+    """Concatenate record groups in order, dropping any record whose
+    (txHash, logIndex) has already been seen. Records carrying no txHash at
+    all are not dedupe-able and pass through untouched."""
+    seen: set = set()
+    merged: list = []
+    for group in groups:
+        for record in group:
+            key = _record_key(record)
+            if key != (None, None):
+                if key in seen:
+                    continue
+                seen.add(key)
+            merged.append(record)
+    return merged
+
+
+def _jsonl_text(records: Iterable[dict]) -> str:
+    return "".join(json.dumps(r) + "\n" for r in records)
+
+
+def _parse_jsonl(text: str) -> list:
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
+def _read_partition_file(path: Path) -> list:
+    opener = gzip.open if path.name.endswith(".gz") else open
+    with opener(path, "rt") as f:
+        return _parse_jsonl(f.read())
+
+
+def _gzip_bytes(data: bytes) -> bytes:
+    """Deterministic gzip (ARCHITECTURE.md section 5): empty filename field,
+    mtime=0, compresslevel=9, so re-running a rotation is byte-identical."""
+    buf = io.BytesIO()
+    with gzip.GzipFile(filename="", mode="wb", mtime=0, fileobj=buf, compresslevel=9) as gz:
+        gz.write(data)
+    return buf.getvalue()
+
+
+def _atomic_write_bytes(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
-    with open(tmp, "wb") as raw:
-        with gzip.GzipFile(filename="", mode="wb", mtime=0, fileobj=raw, compresslevel=9) as gz:
-            gz.write(data)
+    tmp.write_bytes(payload)
     tmp.replace(path)
+
+
+def _partition_days(kind_dir: Path) -> set:
+    """Days that currently have a *plain* partition file on disk."""
+    days = set()
+    if not kind_dir.exists():
+        return days
+    for path in kind_dir.glob("*.jsonl"):
+        try:
+            days.add(date.fromisoformat(path.stem))
+        except ValueError:
+            continue
+    return days
+
+
+def plan_partition_writes(data_dir, today: date, new_by_day: Optional[dict] = None) -> tuple:
+    """Compute (writes, deletes) for the partition layer without touching disk.
+
+    `writes` is a list of (final_path, payload_bytes); `deletes` is the plain
+    files superseded by a rotation. Days at or after `today` stay plain and
+    are appended to byte-for-byte (existing lines are never re-serialized).
+    Days before `today` are rewritten as a single deterministic `.jsonl.gz`
+    holding the existing archive, the existing plain file and this run's new
+    records merged in that order and deduped on (txHash, logIndex) -- so a
+    fresh `D.jsonl` appearing beside an existing `D.jsonl.gz` after an
+    overnight outage merges into the archive instead of replacing it.
+    """
+    data_dir = Path(data_dir)
+    new_by_day = new_by_day or {}
+    writes: list = []
+    deletes: list = []
+
+    for kind in ("launches", "graduations"):
+        kind_dir = data_dir / kind
+        pending = new_by_day.get(kind, {})
+        for day in sorted(_partition_days(kind_dir) | set(pending)):
+            plain = kind_dir / f"{day.isoformat()}.jsonl"
+            archive = kind_dir / f"{day.isoformat()}.jsonl.gz"
+            new_records = pending.get(day, [])
+
+            if day >= today:
+                existing_text = plain.read_text() if plain.exists() else ""
+                existing_keys = {_record_key(r) for r in _parse_jsonl(existing_text)}
+                added = [r for r in new_records if _record_key(r) not in existing_keys]
+                if not added:
+                    continue
+                writes.append((plain, (existing_text + _jsonl_text(added)).encode()))
+                continue
+
+            if not new_records and not plain.exists():
+                continue  # already archived and untouched: leave the .gz alone
+            archived = _read_partition_file(archive) if archive.exists() else []
+            current = _read_partition_file(plain) if plain.exists() else []
+            merged = _merge_dedupe(archived, current, new_records)
+            writes.append((archive, _gzip_bytes(_jsonl_text(merged).encode())))
+            if plain.exists():
+                deletes.append(plain)
+
+    return writes, deletes
 
 
 def rotate_partitions(data_dir, today: Optional[date] = None) -> None:
-    """Gzip every plain partition older than `today`, deterministically."""
+    """Fold every plain partition older than `today` into its deterministic
+    `.jsonl.gz`, merging with an existing archive rather than overwriting it,
+    and delete the plain file."""
     if today is None:
         today = datetime.now(timezone.utc).date()
-    data_dir = Path(data_dir)
-    for kind in ("launches", "graduations"):
-        kind_dir = data_dir / kind
-        if not kind_dir.exists():
-            continue
-        for path in sorted(kind_dir.glob("*.jsonl")):
-            try:
-                partition_date = date.fromisoformat(path.stem)
-            except ValueError:
-                continue
-            if partition_date >= today:
-                continue
-            _write_gzip_deterministic(path.with_name(path.name + ".gz"), path.read_bytes())
-            path.unlink()
+    writes, deletes = plan_partition_writes(data_dir, today)
+    for path, payload in writes:
+        _atomic_write_bytes(path, payload)
+    for path in deletes:
+        path.unlink()
 
 
-def _atomic_write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(content)
-    tmp.replace(path)
+def dedupe_day_set(timestamps: Iterable[int]) -> set:
+    """The UTC days whose partitions can hold a record with one of these
+    timestamps, plus a day either side.
 
-
-def _append_jsonl(path: Path, records: list) -> None:
-    if not records:
-        return
-    existing = path.read_text() if path.exists() else ""
-    added = "".join(json.dumps(r) + "\n" for r in records)
-    _atomic_write_text(path, existing + added)
+    Derived from the records about to be written, never from `now`: the
+    reorg re-scan after an outage reaches blocks days older than the run's
+    wall clock, and keying this off `now` would miss those partitions and
+    re-append every record in them.
+    """
+    days: set = set()
+    for ts in timestamps:
+        day = datetime.fromtimestamp(ts, timezone.utc).date()
+        days.update({day - timedelta(days=1), day, day + timedelta(days=1)})
+    return days
 
 
 def _load_existing_keys(data_dir: Path, kind: str, days: set) -> set:
@@ -110,13 +233,8 @@ def _load_existing_keys(data_dir: Path, kind: str, days: set) -> set:
             path = data_dir / kind / f"{day.isoformat()}{suffix}"
             if not path.exists():
                 continue
-            opener = gzip.open if suffix == ".jsonl.gz" else open
-            with opener(path, "rt") as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        record = json.loads(line)
-                        keys.add((record["txHash"], record["logIndex"]))
+            for record in _read_partition_file(path):
+                keys.add((record["txHash"], record["logIndex"]))
     return keys
 
 
@@ -153,12 +271,20 @@ def _shape_graduation(decoded: dict, launch_tokens: set) -> dict:
     return {
         "token": decoded["token"],
         "block": decoded["block"],
-        "ts": None,
+        "ts": decoded.get("ts"),
         "pairTokenAmount": str(decoded["pairTokenAmount"]),
         "orphan": decoded["token"] not in launch_tokens,
         "txHash": decoded["txHash"],
         "logIndex": decoded["logIndex"],
     }
+
+
+def _group_by_day(records: list) -> dict:
+    by_day: dict = {}
+    for record in records:
+        day = datetime.fromtimestamp(record["ts"], timezone.utc).date()
+        by_day.setdefault(day, []).append(record)
+    return by_day
 
 
 def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[datetime] = None,
@@ -196,57 +322,58 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
             raw_grads.append(decode_pool_graduated(log))
         time.sleep(LOG_PACING_SECONDS)
 
-    _log(f"crawl: logs done, enriching {len(raw_launches)} launches")
     if now is None:
         now = datetime.now(timezone.utc)
-    days_to_check = {now.date(), (now - timedelta(days=1)).date()}
-    existing_launch_keys = _load_existing_keys(data_dir, "launches", days_to_check)
-    existing_grad_keys = _load_existing_keys(data_dir, "graduations", days_to_check)
+    today = now.date()
 
-    new_launches = dedupe_records(raw_launches, existing_launch_keys)
-    new_grads = dedupe_records(raw_grads, existing_grad_keys)
+    # Timestamps come before dedupe: a record's partition -- and so the set of
+    # partitions the dedupe has to consult -- is decided by its block
+    # timestamp, not by the run's wall clock.
+    scanned = [_shape_launch(l) for l in raw_launches]
+    _log(f"crawl: logs done, timestamping {len(scanned) + len(raw_grads)} records")
+    timestamps = _fetch_block_timestamps(
+        rpc_client, [r["block"] for r in scanned] + [g["block"] for g in raw_grads]
+    )
+    for record in scanned:
+        record["ts"] = timestamps[record["block"]]
+    for record in raw_grads:
+        record["ts"] = timestamps[record["block"]]
+
+    days_to_check = dedupe_day_set(timestamps.values())
+    new_launches = dedupe_records(scanned, _load_existing_keys(data_dir, "launches", days_to_check))
+    new_grads = dedupe_records(raw_grads, _load_existing_keys(data_dir, "graduations", days_to_check))
 
     if not new_launches and not new_grads and head_block == state["lastIndexedBlock"]:
         return {"committed": False}
 
+    existing_launches = load_partitions(data_dir / "launches")
+    existing_grads = load_partitions(data_dir / "graduations")
+
+    _log(f"crawl: enriching {len(new_launches)} new launches")
     enrichment_failures = 0
-    enriched_launches = []
+    enriched_launches: list = []
     if new_launches:
-        shaped_launches = [_shape_launch(l) for l in new_launches]
-        enriched_launches, enrichment_failures = enrich_mod.enrich_launches(shaped_launches, rpc_client, pair_tokens)
+        enriched_launches, enrichment_failures = enrich_mod.enrich_launches(new_launches, rpc_client, pair_tokens)
 
-    launch_tokens = {l["token"] for l in enriched_launches}
-    shaped_grads = [_shape_graduation(g, launch_tokens) for g in new_grads]
+    # Orphan is decided against every launch token LEDGE has ever recorded --
+    # the existing partitions plus this run's new launches -- so a token that
+    # launched hours ago and graduates now is not mislabelled.
+    known_launch_tokens = {l["token"] for l in existing_launches}
+    known_launch_tokens.update(l["token"] for l in enriched_launches)
+    shaped_grads = [_shape_graduation(g, known_launch_tokens) for g in new_grads]
 
-    blocks_needing_ts = [l["block"] for l in enriched_launches] + [g["block"] for g in shaped_grads]
-    timestamps = _fetch_block_timestamps(rpc_client, blocks_needing_ts)
-    for l in enriched_launches:
-        l["ts"] = timestamps[l["block"]]
-    for g in shaped_grads:
-        g["ts"] = timestamps[g["block"]]
+    all_launches = _merge_dedupe(existing_launches, enriched_launches)
+    all_grads = _merge_dedupe(existing_grads, shaped_grads)
+    for launch in all_launches:
+        launch["pairClass"] = resolve_pair_class(launch, pair_tokens)
 
-    launches_by_day: dict = {}
-    for l in enriched_launches:
-        day = datetime.fromtimestamp(l["ts"], timezone.utc).date()
-        launches_by_day.setdefault(day, []).append(l)
-    grads_by_day: dict = {}
-    for g in shaped_grads:
-        day = datetime.fromtimestamp(g["ts"], timezone.utc).date()
-        grads_by_day.setdefault(day, []).append(g)
-
-    # --- commit point: everything above is in-memory only -----------------
-    for day, records in launches_by_day.items():
-        _append_jsonl(data_dir / "launches" / f"{day.isoformat()}.jsonl", records)
-    for day, records in grads_by_day.items():
-        _append_jsonl(data_dir / "graduations" / f"{day.isoformat()}.jsonl", records)
-
-    _atomic_write_text(pair_tokens_path, json.dumps(pair_tokens, sort_keys=True, indent=2) + "\n")
-    rotate_partitions(data_dir, today=now.date())
-
-    all_launches = load_partitions(data_dir / "launches")
-    all_grads = load_partitions(data_dir / "graduations")
-    for l in all_launches:
-        l["pairClass"] = resolve_pair_class(l, pair_tokens)
+    # --- stage every output in memory ------------------------------------
+    partition_writes, partition_deletes = plan_partition_writes(
+        data_dir,
+        today,
+        {"launches": _group_by_day(enriched_launches), "graduations": _group_by_day(shaped_grads)},
+    )
+    pair_tokens_payload = (json.dumps(pair_tokens, sort_keys=True, indent=2) + "\n").encode()
 
     new_state = dict(state)
     new_state["lastIndexedBlock"] = head_block
@@ -257,16 +384,28 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     new_state["lastSuccessAt"] = now_iso
     new_state["consecutiveFailures"] = 0
     new_state["lastError"] = None
+    # orphanGraduations is re-derived against the full launch set, exactly as
+    # stats.window does, so the count in state.json always agrees with
+    # number.json even where an older partition line carries a stale snapshot.
+    all_launch_tokens = {l["token"] for l in all_launches}
     new_state["counts"] = {
         "launches": len(all_launches),
         "graduations": len(all_grads),
-        "orphanGraduations": sum(1 for g in all_grads if g.get("orphan")),
+        "orphanGraduations": sum(1 for g in all_grads if g["token"] not in all_launch_tokens),
         "enrichmentFailures": enrichment_failures,
     }
 
-    number = build_number(all_launches, all_grads, new_state, now_iso)
-    _atomic_write_text(data_dir / "number.json", canonical_dumps(number))
-    _atomic_write_text(state_path, json.dumps(new_state, sort_keys=True, indent=2) + "\n")
+    number_payload = canonical_dumps(build_number(all_launches, all_grads, new_state, now_iso)).encode()
+    state_payload = (json.dumps(new_state, sort_keys=True, indent=2) + "\n").encode()
+
+    # --- commit point: nothing above this line touched the data dir -------
+    for path, payload in partition_writes:
+        _atomic_write_bytes(path, payload)
+    for path in partition_deletes:
+        path.unlink()
+    _atomic_write_bytes(pair_tokens_path, pair_tokens_payload)
+    _atomic_write_bytes(data_dir / "number.json", number_payload)
+    _atomic_write_bytes(state_path, state_payload)
 
     return {"committed": True, "state": new_state}
 

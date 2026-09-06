@@ -128,3 +128,53 @@ def test_already_known_pair_token_does_not_trigger_another_symbol_call(monkeypat
 
     assert symbol_calls["n"] == 0
     assert pair_tokens[pair_token]["class"] == "stable"
+
+
+# --- W8: a truncated getLaunchedToken return is a failure, not tax 0% -------
+def test_truncated_return_data_decodes_to_null_not_zero_tax():
+    """getLaunchedToken returns a 15-word static tuple. "0x" (the return of
+    a reverted/absent call) must not decode to creatorTaxBps 0, which would
+    silently inflate the 0% tax cohort."""
+    assert enrich._decode_get_launched_token("0x")["creatorTaxBps"] is None
+
+
+def test_short_return_data_below_15_words_decodes_to_null():
+    short = "0x" + "00" * 32 * 9  # 9 words: word[8] readable, tuple still truncated
+    assert enrich._decode_get_launched_token(short)["creatorTaxBps"] is None
+
+
+def test_full_15_word_return_data_decodes_creator_tax_bps():
+    words = [0] * 15
+    words[8] = 300
+    full = "0x" + "".join(format(w, "064x") for w in words)
+    assert enrich._decode_get_launched_token(full)["creatorTaxBps"] == 300
+
+
+def test_truncated_return_counts_as_an_enrichment_failure(monkeypatch):
+    monkeypatch.setattr(enrich.time, "sleep", lambda *_: None)
+
+    class _TruncatingRpc:
+        def call_batch(self, requests):
+            return ["0x" for _ in requests]
+
+    launches = [_launch("0x" + "7" * 40)]
+    enriched, failures = enrich.enrich_launches(launches, _TruncatingRpc(), pair_tokens={})
+
+    assert len(enriched) == 1  # the launch still counts in every rate
+    assert enriched[0]["creatorTaxBps"] is None
+    assert failures == 1
+
+
+def test_full_return_data_over_the_wire_is_not_a_failure(monkeypatch):
+    monkeypatch.setattr(enrich.time, "sleep", lambda *_: None)
+    words = [0] * 15
+    words[8] = 0  # a genuine 0% tax is data, not a failure
+    full = "0x" + "".join(format(w, "064x") for w in words)
+
+    class _Rpc:
+        def call_batch(self, requests):
+            return [full for _ in requests]
+
+    enriched, failures = enrich.enrich_launches([_launch("0x" + "a" * 40)], _Rpc(), pair_tokens={})
+    assert enriched[0]["creatorTaxBps"] == 0
+    assert failures == 0

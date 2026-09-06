@@ -1,10 +1,12 @@
 """
 pipeline/stats.py — window(launches, graduations, since, until) -> Window
 
-Per ARCHITECTURE.md §6:
-  Selection: launch.ts in [since, until]. A graduation is included iff its
-  token has a launch IN THIS WINDOW; graduation ts may fall outside it.
-  since=None => all-time.
+Per ARCHITECTURE.md §6 / METHOD.md "Definitions":
+  Selection: launch.ts in the HALF-OPEN interval [since, until). A launch at
+  exactly `until` belongs to the next window, so adjacent windows partition
+  the timeline with no launch counted twice at the seam. A graduation is
+  included iff its token has a launch IN THIS WINDOW; graduation ts may fall
+  outside it. since=None => all-time.
 """
 from pipeline.stats import window
 
@@ -21,10 +23,25 @@ def test_launch_at_since_boundary_is_included(make_launch):
     assert len(w["launches"]) == 1
 
 
-def test_launch_at_until_boundary_is_included(make_launch):
+def test_launch_at_until_boundary_is_excluded(make_launch):
+    # Half-open [since, until): the launch at exactly `until` is the first
+    # launch of the NEXT window, never a member of this one.
     launches = [make_launch(token="0xA", ts=2_000)]
     w = window(launches, [], since=1_000, until=2_000)
+    assert len(w["launches"]) == 0
+
+
+def test_launch_one_second_before_until_is_included(make_launch):
+    launches = [make_launch(token="0xA", ts=1_999)]
+    w = window(launches, [], since=1_000, until=2_000)
     assert len(w["launches"]) == 1
+
+
+def test_adjacent_windows_never_double_count_a_launch_at_the_seam(make_launch):
+    launches = [make_launch(token="0xA", ts=2_000)]
+    first = window(launches, [], since=1_000, until=2_000)
+    second = window(launches, [], since=2_000, until=3_000)
+    assert len(first["launches"]) + len(second["launches"]) == 1
 
 
 def test_launch_one_second_before_since_is_excluded(make_launch):

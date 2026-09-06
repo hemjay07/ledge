@@ -18,6 +18,10 @@ GET_LAUNCHED_TOKEN_SELECTOR = "0x3cf28b5a"
 BATCH_SIZE = 50
 BATCH_RETRY_DELAYS = (2, 4, 8)
 
+# getLaunchedToken returns a 15-word static tuple (ARCHITECTURE.md section 3).
+RETURN_WORDS = 15
+CREATOR_TAX_WORD = 8
+
 
 def _chunks(items: list, size: int) -> list:
     return [items[i : i + size] for i in range(0, len(items), size)]
@@ -30,12 +34,26 @@ def _get_launched_token_request(token: str) -> dict:
 
 def _decode_get_launched_token(result: object) -> dict:
     """Accepts either a pre-decoded dict (test doubles) or a raw eth_call
-    hex string (production), returning {"creatorTaxBps": int|None}."""
+    hex string (production), returning {"creatorTaxBps": int|None}.
+
+    The return is a 15-word static tuple. A short return ("0x" from a
+    reverted or absent call, or a truncated body) is a failure, not data:
+    reading word[8] out of it would decode to 0 and silently inflate the
+    "0%" tax cohort. Short returns yield None and are counted in the
+    enrichment failure total by enrich_launches.
+    """
     if isinstance(result, dict):
         return result
-    raw = bytes.fromhex(result[2:])
-    word = lambda i: int.from_bytes(raw[i * 32 : i * 32 + 32], "big")
-    return {"creatorTaxBps": word(8)}
+    if not isinstance(result, str) or not result.startswith("0x"):
+        return {"creatorTaxBps": None}
+    try:
+        raw = bytes.fromhex(result[2:])
+    except ValueError:
+        return {"creatorTaxBps": None}
+    if len(raw) < RETURN_WORDS * 32:
+        return {"creatorTaxBps": None}
+    start = CREATOR_TAX_WORD * 32
+    return {"creatorTaxBps": int.from_bytes(raw[start : start + 32], "big")}
 
 
 def _call_batch_with_item_fallback(rpc, batch: list) -> list:
@@ -85,6 +103,8 @@ def enrich_launches(launches: list, rpc, pair_tokens: dict) -> tuple:
             else:
                 decoded = _decode_get_launched_token(result)
                 launch["creatorTaxBps"] = decoded.get("creatorTaxBps")
+                if launch["creatorTaxBps"] is None:
+                    failures += 1
             _assign_pair_class(launch, rpc, pair_tokens)
             enriched.append(launch)
 

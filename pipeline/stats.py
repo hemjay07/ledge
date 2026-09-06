@@ -29,7 +29,7 @@ DEFAULT_STALE_AFTER_SECONDS = 7200
 
 FACTORY_ADDRESS = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
 CHAIN_ID = 4663
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DEFINITIONS_VERSION = "2026-09-06"
 
 PAIR_BUCKETS = ["eth", "stable", "stock", "other"]
@@ -41,12 +41,17 @@ _PERCENTILES = (10, 25, 50, 75, 90, 95)
 
 
 def window(launches: list, graduations: list, since: Optional[int], until: int) -> dict:
-    """Select launches with ts in [since, until] and the graduations that
-    match a launch inside that selection. A graduation whose token has no
-    launch anywhere in `launches` is an orphan; a graduation whose token
-    launched outside this window is neither matched nor an orphan.
+    """Select launches with ts in the HALF-OPEN interval [since, until) and
+    the graduations that match a launch inside that selection.
+
+    Half-open is the binding convention (METHOD.md "Definitions"): a launch
+    at exactly `until` belongs to the next window, so two adjacent windows
+    partition the timeline without double-counting a launch at the seam.
+    A graduation whose token has no launch anywhere in `launches` is an
+    orphan; a graduation whose token launched outside this window is
+    neither matched nor an orphan.
     """
-    selected = [l for l in launches if (since is None or l["ts"] >= since) and l["ts"] <= until]
+    selected = [l for l in launches if (since is None or l["ts"] >= since) and l["ts"] < until]
     tokens_in_window = {l["token"] for l in selected}
     tokens_anywhere = {l["token"] for l in launches}
 
@@ -118,16 +123,21 @@ def ttg_percentiles(w: dict) -> dict:
 
 
 def fast_shares(w: dict) -> dict:
+    """Shares of matched graduations under 300s / 60s, gated on MIN_N like
+    every other rate. Below MIN_N -- including an empty population -- the
+    shares are null with insufficient: true, never 0.0 (CONSTRAINTS.md #4:
+    a 0.0 share reads as a measured finding)."""
     deltas = _ttg_deltas(w)
     n = len(deltas)
-    if n == 0:
-        return {"under300Share": 0.0, "under60Share": 0.0, "n": 0}
+    if n < MIN_N:
+        return {"under300Share": None, "under60Share": None, "n": n, "insufficient": True}
     under300 = sum(1 for d in deltas if d < 300)
     under60 = sum(1 for d in deltas if d < 60)
     return {
         "under300Share": round(under300 / n, 6),
         "under60Share": round(under60 / n, 6),
         "n": n,
+        "insufficient": False,
     }
 
 
@@ -219,10 +229,20 @@ def deployers(w: dict) -> dict:
         for label, pred in histogram_buckets
     ]
 
+    # Each share is gated on its own denominator: launched2plusShare over
+    # the deployer population, from10plusShare over the launch population.
+    # Below MIN_N -- an empty population included -- the share is null, not
+    # 0.0 (CONSTRAINTS.md #4).
+    two_plus_share = round(two_plus / distinct, 6) if distinct >= MIN_N else None
+    from_10plus_share = (
+        round(from_10plus_launches / total_launches, 6) if total_launches >= MIN_N else None
+    )
+
     return {
         "distinct": distinct,
-        "launched2plusShare": round(two_plus / distinct, 6) if distinct else 0.0,
-        "from10plusShare": round(from_10plus_launches / total_launches, 6) if total_launches else 0.0,
+        "launched2plusShare": two_plus_share,
+        "from10plusShare": from_10plus_share,
+        "insufficient": two_plus_share is None or from_10plus_share is None,
         "histogram": histogram,
     }
 
@@ -277,11 +297,18 @@ def build_number(launches: list, graduations: list, state: dict, crawled_at: str
     until = _parse_iso(crawled_at)
     since_24h = until - 86400
 
+    # `stale` means exactly one thing: the run that generated this file
+    # reported a failure since its last success, so it knows it is behind.
+    # It is NOT wall-clock freshness -- a static file cannot age its own
+    # field. Consumers compute age from `crawledAt` against
+    # `staleAfterSeconds` at render time (METHOD.md "Freshness").
     last_run_at = state.get("lastRunAt")
     last_success_at = state.get("lastSuccessAt")
-    stale = False
-    if last_run_at and last_success_at:
-        stale = (_parse_iso(last_run_at) - _parse_iso(last_success_at)) > DEFAULT_STALE_AFTER_SECONDS
+    stale = bool(state.get("consecutiveFailures"))
+    if last_run_at and not last_success_at:
+        stale = True
+    elif last_run_at and last_success_at:
+        stale = stale or _parse_iso(last_run_at) > _parse_iso(last_success_at)
 
     return {
         "schemaVersion": SCHEMA_VERSION,

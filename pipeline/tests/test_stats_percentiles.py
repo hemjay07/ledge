@@ -123,3 +123,44 @@ def test_fast_shares_on_big_fixture_matches_manual_computation(big_fixture):
     assert result["n"] == n
     assert result["under60Share"] == round(under60 / n, 6)
     assert result["under300Share"] == round(under300 / n, 6)
+
+
+# --- B6: fast_shares is gated on MIN_N like every other rate ----------------
+def test_fast_shares_below_min_n_returns_null_shares_and_insufficient(make_launch, make_grad):
+    deltas = [10, 50, 299, 400]  # 4 matched graduations, far below MIN_N=30
+    w = _build_window(make_launch, make_grad, deltas)
+    result = fast_shares(w)
+    assert result["n"] == 4
+    assert result["insufficient"] is True
+    assert result["under300Share"] is None
+    assert result["under60Share"] is None
+
+
+def test_fast_shares_with_no_graduations_returns_null_not_zero(make_launch):
+    """CONSTRAINTS.md #4: an empty population is "not enough data", never a
+    0% share -- 0.0 reads as a measured finding."""
+    launches = [make_launch(ts=1_000) for _ in range(50)]
+    w = window(launches, [], since=None, until=10**12)
+    result = fast_shares(w)
+    assert result["n"] == 0
+    assert result["insufficient"] is True
+    assert result["under300Share"] is None
+    assert result["under60Share"] is None
+
+
+def test_fast_shares_at_exactly_min_n_is_sufficient(make_launch, make_grad):
+    deltas = [10] * 15 + [400] * 15  # exactly 30 matched graduations
+    w = _build_window(make_launch, make_grad, deltas)
+    result = fast_shares(w)
+    assert result["n"] == 30
+    assert result["insufficient"] is False
+    assert result["under300Share"] == 0.5
+
+
+def test_fast_shares_one_below_min_n_is_insufficient(make_launch, make_grad):
+    deltas = [10] * 29
+    w = _build_window(make_launch, make_grad, deltas)
+    result = fast_shares(w)
+    assert result["n"] == 29
+    assert result["insufficient"] is True
+    assert result["under300Share"] is None

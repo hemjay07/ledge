@@ -59,10 +59,13 @@ PATTERN+='|you should'
 
 
 # Targets: site source, README, and pipeline copy strings.
+# site/scripts ships copy too — the share card is generated there — so it is
+# checked. site/tools is dev-only tooling and stays out.
 TARGETS=()
 [ -d site/app ] && TARGETS+=("site/app")
 [ -d site/components ] && TARGETS+=("site/components")
 [ -d site/lib ] && TARGETS+=("site/lib")
+[ -d site/scripts ] && TARGETS+=("site/scripts")
 [ -f README.md ] && TARGETS+=("README.md")
 [ -d pipeline ] && TARGETS+=("pipeline")
 
