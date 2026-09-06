@@ -53,9 +53,10 @@ describe("the sentences that carry a rate off the page", () => {
     expect(excludingFastSentence(h24, CUTOFF, true)).toBe(
       `0.53% excluding launches that graduated inside ${CUTOFF}: 31 of 5,900.`,
     );
+    // Order follows LEAD (excludingFast first); tests/lead.test.tsx covers both.
     expect(shareSummary(h24, CUTOFF)).toBe(
-      "1.81% of 5,900 Pons launches in the last 24 hours graduated. " +
-        `0.53% excluding launches that graduated inside ${CUTOFF}.`,
+      `0.53% excluding launches that graduated inside ${CUTOFF}. ` +
+        "1.81% of 5,900 Pons launches in the last 24 hours graduated.",
     );
     // the cutoff is set with a non-breaking space: "5 minutes" never wraps
     expect(CUTOFF).toBe("5\u00A0minutes");
