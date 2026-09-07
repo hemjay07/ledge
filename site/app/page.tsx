@@ -12,47 +12,67 @@ import { SheetNav } from "../components/SheetNav";
 import { StaleBanner } from "../components/StaleBanner";
 import { Stat } from "../components/Stat";
 import { allTime, h24, numberFile } from "../lib/number";
+import type { CohortRow, WindowData } from "../lib/schema";
 import {
   formatCount,
   formatDuration,
   formatDurationLong,
-  formatOneIn,
   formatStamp,
-  isInsufficient,
-  hourLabel,
   pairLabel,
-  taxLabel,
-  histogramLabel,
 } from "../lib/format";
-import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow, shareCell } from "../lib/rows";
-import { SAME_MEASUREMENT_NOTE, coverageHours, sameMeasurement } from "../lib/windows";
+import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow } from "../lib/rows";
+import { fastShareFacts } from "../lib/summary";
+import { sameMeasurement } from "../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 
-/* keyed off the data, so the all-time surfaces return by themselves once the
-   index reaches back further than a day */
+/* keyed off the data: while all-time holds exactly what the trailing 24 hours
+   holds, the second pair sentence would restate one measurement as two */
 const allTimeIsSameMeasurement = sameMeasurement(h24, allTime);
 
-/* the record's span, in hours, rather than the block it starts at */
-const coverage = coverageHours(numberFile.firstIndexedAt, crawledAt);
+/** A pair bucket, or an empty one standing in its place: a missing bucket has
+    measured nothing, so it carries n = 0 and prints its sample size. */
+function pairRow(w: WindowData, bucket: string): CohortRow {
+  return (
+    w.cohorts.pair.find((r) => r.bucket === bucket) ?? {
+      bucket,
+      launches: 0,
+      graduations: 0,
+      rate: null,
+      insufficient: true,
+    }
+  );
+}
 
 export default function Home(): ReactElement {
   const exFast = h24.excludingFast;
   const cutoffWords = formatDurationLong(exFast.cutoffSeconds);
-  const observedHours = h24.cohorts.hour.filter((r) => r.launches > 0);
-  const emptyHours = h24.cohorts.hour.length - observedHours.length;
-  const distinct = h24.deployers.distinct;
-  const fastSharesInsufficient =
-    isInsufficient({
-      rate: h24.fastShares.under300Share,
-      n: h24.fastShares.n,
-      insufficient: h24.fastShares.insufficient,
-    }) ||
-    isInsufficient({
-      rate: h24.fastShares.under60Share,
-      n: h24.fastShares.n,
-      insufficient: h24.fastShares.insufficient,
-    });
+  const fast = fastShareFacts(h24);
+
+  const stable = pairRow(h24, "stable");
+  const eth = pairRow(h24, "eth");
+  const stableAll = pairRow(allTime, "stable");
+  const ethAll = pairRow(allTime, "eth");
+
+  /* the rate slot of a pair sentence: the shared gate decides whether a
+     percentage may stand there, exactly as it does in the table below it */
+  const pairRate = (row: CohortRow, name: string, window: string) => (
+    <Stat
+      className="mono"
+      name={name}
+      value={row.rate}
+      n={row.launches}
+      window={window}
+      updatedAt={crawledAt}
+      insufficient={row.insufficient}
+    />
+  );
+
+  const counts = (row: CohortRow) => (
+    <span className="mono">
+      {formatCount(row.graduations)} of {formatCount(row.launches)}
+    </span>
+  );
 
   return (
     <>
@@ -75,6 +95,56 @@ export default function Home(): ReactElement {
               launch from the factory contract and counts, hourly.
             </p>
           }
+          /* why the second figure exists: most graduations are the fast ones */
+          finding={
+            fast.insufficient ? (
+              <Stat
+                value={null}
+                n={fast.n}
+                window="24h"
+                updatedAt={crawledAt}
+                insufficient
+                name="fast-shares"
+              />
+            ) : (
+              <>
+                <Stat
+                  className="mono"
+                  name="fast-under-cutoff"
+                  value={fast.underCutoff.rate}
+                  n={fast.n}
+                  window="24h"
+                  updatedAt={crawledAt}
+                  insufficient={fast.underCutoff.insufficient}
+                />{" "}
+                of graduations completed inside {cutoffWords};{" "}
+                <Stat
+                  className="mono"
+                  name="fast-under-60"
+                  value={fast.under60.rate}
+                  n={fast.n}
+                  window="24h"
+                  updatedAt={crawledAt}
+                  insufficient={fast.under60.insufficient}
+                />{" "}
+                inside 60 seconds.{" "}
+                <span className="den">
+                  (n&nbsp;=&nbsp;<span className="mono">{formatCount(fast.n)}</span> graduations ·
+                  24 h)
+                </span>
+              </>
+            )
+          }
+          fine={
+            <>
+              {h24.lowerBound
+                ? "A launch near the end of the window may still graduate, so the 24-hour figure is a lower bound for the most recent hours. "
+                : ""}
+              {h24.orphans > 0
+                ? `${formatCount(h24.orphans)} graduations had no launch in the record and are excluded from every rate.`
+                : ""}
+            </>
+          }
         />
         <ColophonStrip stamp={formatStamp(crawledAt)} />
         {/* end of fold */}
@@ -88,77 +158,36 @@ export default function Home(): ReactElement {
           <Lookup />
         </LedgerEntry>
 
-        <LedgerEntry folio="03" id="h-what" heading="What this is">
-          <p className="lede">
-            LEDGE reads the Pons factory contract every hour, records every launch it finds, and
-            counts how many graduated — in the last 24 hours and over the indexed record, split by
-            pair token and by creator tax. Every figure on this page is printed with the number of
-            launches it was counted from.
-          </p>
-          <p className="note">
-            It will never rank a token, never name a wallet, and never print a rate without its
-            denominator.
-          </p>
-          <p className="note">
-            No public tool publishes the graduation rate of launches by configuration; this does.
-          </p>
-        </LedgerEntry>
-
-        <LiveBoard folio="04" />
-
         <LedgerEntry
-          folio="05"
-          id="h-fast"
-          heading="Fast graduations"
-          headingNote={`· n = ${formatCount(h24.fastShares.n)} graduations · 24 h`}
+          folio="03"
+          id="h-pair"
+          heading="By pair token"
+          headingNote={`· 24 h · n = ${formatCount(h24.launches)} launches`}
         >
-          <p className="note">
-            {fastSharesInsufficient ? (
-              <Stat
-                value={null}
-                n={h24.fastShares.n}
-                window="24h"
-                updatedAt={crawledAt}
-                insufficient
-                name="fast-shares"
-              />
-            ) : (
-              <>
-                <Stat
-                  className="mono"
-                  name="fast-under-cutoff"
-                  value={h24.fastShares.under300Share}
-                  n={h24.fastShares.n}
-                  window="24h"
-                  updatedAt={crawledAt}
-                  insufficient={h24.fastShares.insufficient}
-                />{" "}
-                of graduations completed inside {cutoffWords};{" "}
-                <Stat
-                  className="mono"
-                  name="fast-under-60"
-                  value={h24.fastShares.under60Share}
-                  n={h24.fastShares.n}
-                  window="24h"
-                  updatedAt={crawledAt}
-                  insufficient={h24.fastShares.insufficient}
-                />{" "}
-                inside 60 seconds.
-              </>
-            )}
+          <p className="lede">
+            Launches paired with a stablecoin graduated at {pairRate(stable, "pair-stable", "24h")}{" "}
+            ({counts(stable)}); paired with ETH, {pairRate(eth, "pair-eth", "24h")} ({counts(eth)}).
+            Two counts over the same window, not a cause.
           </p>
-          <p className="note note--fine">
-            {h24.lowerBound
-              ? "A launch near the end of the window may still graduate, so the 24-hour figure is a lower bound for the most recent hours. "
-              : ""}
-            {h24.orphans > 0
-              ? `${formatCount(h24.orphans)} graduations had no launch in the record and are excluded from every rate.`
-              : ""}
-          </p>
+          {allTimeIsSameMeasurement ? null : (
+            <p className="note">
+              Over the indexed record: stablecoin{" "}
+              {pairRate(stableAll, "pair-stable-all-time", "all-time")} ({counts(stableAll)}), ETH{" "}
+              {pairRate(ethAll, "pair-eth-all-time", "all-time")} ({counts(ethAll)}).
+            </p>
+          )}
+          <Register
+            ariaLabel="Graduation rate by pair token"
+            caption="Graduations of launches, by the token the pool is paired against."
+            columns={COHORT_COLUMNS("Pair token")}
+            rows={h24.cohorts.pair.map((r) => cohortRegisterRow(pairLabel(r.bucket), r))}
+            foot={cohortFooting(h24)}
+            note={excludedNote(h24.cohortsExcluded.pair)}
+          />
         </LedgerEntry>
 
         <LedgerEntry
-          folio="06"
+          folio="04"
           id="h-ttg"
           heading="Time to graduation"
           headingNote={`· n = ${formatCount(h24.ttg.n)} graduations · 24 h`}
@@ -191,158 +220,28 @@ export default function Home(): ReactElement {
           </p>
         </LedgerEntry>
 
-        <Register
-          folio="07"
-          heading="By pair token"
-          headingId="h-pair"
-          headingNote={`· 24 h · n = ${formatCount(h24.launches)} launches`}
-          ariaLabel="Graduation rate by pair token"
-          caption="Graduations of launches, by the token the pool is paired against."
-          columns={COHORT_COLUMNS("Pair token")}
-          rows={h24.cohorts.pair.map((r) => cohortRegisterRow(pairLabel(r.bucket), r))}
-          foot={cohortFooting(h24)}
-          note={excludedNote(h24.cohortsExcluded.pair)}
-        />
+        <LiveBoard folio="05" />
 
-        <Register
-          folio="08"
-          heading="By creator tax"
-          headingId="h-tax"
-          headingNote={`· 24 h · n = ${formatCount(h24.launches)} launches`}
-          ariaLabel="Graduation rate by creator tax"
-          caption="Creator tax read from the factory at launch."
-          columns={COHORT_COLUMNS("Creator tax")}
-          rows={h24.cohorts.tax.map((r) => cohortRegisterRow(taxLabel(r.bucket), r))}
-          foot={cohortFooting(h24)}
-          note={excludedNote(h24.cohortsExcluded.tax)}
-        />
-
-        <Register
-          folio="09"
-          heading="By hour (UTC)"
-          headingId="h-hour"
-          headingNote={`· 24 h · ${observedHours.length} hours observed`}
-          ariaLabel="Graduation rate by hour, UTC"
-          caption="Hours holding n = 0 in this window are not listed."
-          columns={COHORT_COLUMNS("Hour (UTC)")}
-          rows={observedHours.map((r) => cohortRegisterRow(hourLabel(r.bucket), r))}
-          foot={cohortFooting(h24)}
-          note={
-            <>
-              The remaining {emptyHours} hourly buckets hold n&nbsp;=&nbsp;0 in this window. Both
-              windows, and the day-of-week rows, are on{" "}
-              <Link href="/cohorts">the cohorts page</Link>.
-            </>
-          }
-        />
-
-        <LedgerEntry
-          folio="10"
-          id="h-dep"
-          heading="Deployers"
-          headingNote={`· 24 h · n = ${formatCount(distinct)} distinct`}
-        >
+        <LedgerEntry folio="06" id="h-what" heading="What this is">
           <p className="lede">
-            <span className="mono">{formatCount(distinct)}</span> distinct deployers launched{" "}
-            <span className="mono">{formatCount(h24.launches)}</span> tokens.
-{" "}
-            <Stat
-              className="mono"
-              name="deployers-launched-2plus"
-              value={h24.deployers.launched2plusShare}
-              n={distinct}
-              window="24h"
-              updatedAt={crawledAt}
-              insufficient={h24.deployers.insufficient}
-            />{" "}
-            launched two or more;{" "}
-            <Stat
-              className="mono"
-              name="deployers-from-10plus"
-              value={h24.deployers.from10plusShare}
-              n={h24.launches}
-              window="24h"
-              updatedAt={crawledAt}
-              insufficient={h24.deployers.insufficient}
-            />{" "}
-            of all launches came from deployers with ten or more.
+            LEDGE reads the Pons factory contract every hour, records every launch it finds, and
+            counts how many graduated — in the last 24 hours and over the indexed record, split by
+            pair token and by creator tax. Every figure on this page is printed with the number of
+            launches it was counted from.
           </p>
-          <Register
-            ariaLabel="Distribution of launches per deployer"
-            caption="Launches per deployer, as counts of deployers. No addresses."
-            columns={[
-              "Launches per deployer",
-              "Deployers (n)",
-              `Share of ${formatCount(distinct)}`,
-            ]}
-            rows={h24.deployers.histogram.map((row) => ({
-              label: histogramLabel(row.bucket),
-              cells: [
-                { text: formatCount(row.deployers), kind: "n" as const },
-                shareCell(row.deployers, distinct),
-              ],
-            }))}
-            foot={{
-              label: "All",
-              cells: [{ text: formatCount(distinct) }, shareCell(distinct, distinct)],
-            }}
-            note="Aggregate distribution only. No deployer address appears on this page."
-          />
+          <p className="note">
+            It will never rank a token, never name a wallet, and never print a rate without its
+            denominator.
+          </p>
+          <p className="note">
+            No public tool publishes the graduation rate of launches by configuration; this does.
+          </p>
         </LedgerEntry>
 
-        <LedgerEntry
-          folio="11"
-          id="h-all"
-          heading="All-time"
-          headingNote={
-            coverage === null
-              ? `· since block ${formatCount(numberFile.firstIndexedBlock)}`
-              : `· ${formatCount(coverage)} hours of record`
-          }
-        >
-          {allTimeIsSameMeasurement ? (
-            <p className="note">{SAME_MEASUREMENT_NOTE}</p>
-          ) : (
-          <div className="alltime">
-            <div>
-              <Stat
-                className="at-v"
-                name="all-time-rate"
-                value={allTime.rate}
-                n={allTime.launches}
-                window="all-time"
-                updatedAt={crawledAt}
-                insufficient={allTime.insufficient}
-              />
-              <span className="at-k">
-                {formatCount(allTime.graduations)} graduations of {formatCount(allTime.launches)}{" "}
-                launches
-              </span>
-            </div>
-            <div>
-              <Stat
-                className="at-v"
-                name="all-time-excluding-fast"
-                value={allTime.excludingFast.rate}
-                n={allTime.launches}
-                window="all-time"
-                updatedAt={crawledAt}
-                insufficient={allTime.excludingFast.insufficient}
-              />
-              <span className="at-k">
-                excluding launches that graduated inside {cutoffWords}
-                {allTime.excludingFast.oneIn === null
-                  ? ""
-                  : ` · ${formatOneIn(allTime.excludingFast.oneIn)}`}{" "}
-                · {formatCount(allTime.excludingFast.graduations)} of{" "}
-                {formatCount(allTime.launches)}
-              </span>
-            </div>
-          </div>
-          )}
-          <p className="note note--fine">
-            Indexed from block {formatCount(numberFile.firstIndexedBlock)} to block{" "}
-            {formatCount(numberFile.headBlock)}.
+        <LedgerEntry folio="07" id="h-cohorts" heading="More cohorts">
+          <p className="note">
+            Creator tax, hour of day, day of week, launches per deployer and the all-time window
+            are in full on <Link href="/cohorts">the cohorts page</Link>.
           </p>
         </LedgerEntry>
 

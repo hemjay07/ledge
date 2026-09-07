@@ -633,6 +633,29 @@ with the sheet instead of two files and a media query deciding which to fetch. G
 `design/logo/README.md`, which is the wordmark's own specification and differs from the
 `.28em` the colophon stamp uses.
 
+### 2026-09-07 — the finding line (new primitive)
+
+The fold carried two figures and no reason for the second one, while the sentence that gives
+the second figure its reason — the share of graduations that completed inside the cutoff — sat
+eleven entries down the sheet as one numbered entry among eleven of identical weight. It now
+closes the fold.
+
+```css
+.finding{font-family:var(--font-body);font-size:var(--fs-lede);color:var(--ink-2);
+  max-width:52ch;margin:0 0 var(--s-4);text-wrap:pretty}
+.fold-fine{margin:0 0 var(--s-4);max-width:56ch}
+```
+
+It is running prose in the body face, not a third figure: the two shares inside it keep the mono
+face at text size like every other quantity set in a sentence, and the sample size closes the
+line in `.den` because the fold has no heading to hang it from. `.fold-fine` is the fold's fine
+print — the lower bound and the orphan count — seated between the finding and the colophon
+strip, so both still fall inside the screenshot crop.
+
+The sheet's numbered entries dropped from ten to six: the creator-tax, hour and deployer
+registers and the all-time tables are printed in full on `/cohorts`, and `/` links to them in
+one line rather than reprinting them.
+
 ### Still divergent, deliberately not amended
 
 - `?stale=1` and `?live=1` (§3) are documented demonstration triggers and are **not implemented**.

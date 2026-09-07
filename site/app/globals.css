@@ -153,6 +153,7 @@ th,
    the full advance. */
 .lede .mono,
 .note .mono,
+.finding .mono,
 .caption .mono,
 .gloss .mono,
 .at-k .mono,
@@ -464,6 +465,28 @@ a:focus-visible,
 .second .gloss b {
   color: var(--ink);
   font-weight: 600;
+}
+
+/* The finding the second figure exists for, set as running prose in the body
+   face directly beneath it. It is a sentence, not a figure: the shares inside
+   it keep the mono face at text size, and the sample size they were counted
+   over closes the line rather than hanging off a heading the fold does not
+   have. */
+.finding {
+  font-family: var(--font-body);
+  font-size: var(--fs-lede);
+  color: var(--ink-2);
+  max-width: 52ch;
+  margin: 0 0 var(--s-4);
+  text-wrap: pretty;
+}
+.finding .den {
+  color: var(--ink-3);
+}
+/* the fold's fine print closes the fold, above the colophon strip */
+.fold-fine {
+  margin: 0 0 var(--s-4);
+  max-width: 56ch;
 }
 
 /* ================= THE BODY: ruled ledger entries ================= */

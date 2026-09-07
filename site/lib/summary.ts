@@ -83,3 +83,25 @@ export function shareSummary(w: WindowData, cutoffWords: string): string {
 
   return LEAD === "raw" ? `${headline} ${excluding}` : `${excluding} ${headline}`;
 }
+
+/* ---- the fast-graduation finding -------------------------------------- */
+
+/** The two fast-graduation shares as facts, both counted over the window's
+    graduations rather than its launches. The sentence is printed on the sheet
+    and again on the cohorts page, so the pair of facts and the sample size
+    they share are built once here and the two surfaces cannot disagree about
+    when either may be printed as a percentage. */
+export function fastShareFacts(w: WindowData) {
+  const n = w.fastShares.n;
+  const insufficient = w.fastShares.insufficient;
+  const underCutoff = { rate: w.fastShares.under300Share, n, insufficient };
+  const under60 = { rate: w.fastShares.under60Share, n, insufficient };
+  return {
+    n,
+    underCutoff,
+    under60,
+    /* either half missing takes the whole sentence down to its sample size:
+       half a finding reads as a finding */
+    insufficient: isInsufficient(underCutoff) || isInsufficient(under60),
+  };
+}

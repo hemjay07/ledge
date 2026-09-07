@@ -24,7 +24,9 @@ function copyOf(startMarker: string, endMarker: string): string {
     .trim();
 }
 
-const WHAT_THIS_IS = copyOf('<LedgerEntry folio="03"', "</LedgerEntry>");
+const WHAT_THIS_IS = copyOf('<LedgerEntry folio="06"', "</LedgerEntry>");
+const PAIR_FINDING = copyOf('<LedgerEntry\n          folio="03"', "<Register");
+const MORE_COHORTS = copyOf('<LedgerEntry folio="07"', "</LedgerEntry>");
 
 /* CONSTRAINTS.md's NOT-THIS list, plus the verdict vocabulary a lookup page is
    the likeliest surface to acquire. */
@@ -103,14 +105,48 @@ describe("the What this is entry", () => {
 describe("the register, renumbered", () => {
   it("runs the folios in order with no gap and no repeat", () => {
     const folios = [...PAGE.matchAll(/folio="(\d{2})"/g)].map((m) => m[1]);
-    expect(folios).toEqual(["02", "03", "04", "05", "06", "07", "08", "09", "10", "11"]);
+    expect(folios).toEqual(["02", "03", "04", "05", "06", "07"]);
   });
 
-  it("puts the lookup, the explanation and the board directly under the fold", () => {
-    const order = ["h-lookup", "h-what", "<LiveBoard", "h-fast", "h-ttg"].map((id) =>
+  it("runs lookup, the pair finding, the distribution, the board, the explanation, the index", () => {
+    const order = ["h-lookup", "h-pair", "h-ttg", "<LiveBoard", "h-what", "h-cohorts"].map((id) =>
       PAGE.indexOf(id),
     );
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(order[0]).toBeGreaterThan(PAGE.indexOf("end of fold"));
+  });
+
+  /* the entries the sheet no longer carries: they are on /cohorts in full,
+     and the sheet links to them rather than reprinting them */
+  it("carries neither the tax, the hour, the deployer nor the all-time entry", () => {
+    for (const id of ["h-tax", "h-hour", "h-dep", "h-all", "h-fast"]) {
+      expect(PAGE.includes(`id="${id}"`), `${id} is still on the sheet`).toBe(false);
+      expect(PAGE.includes(`headingId="${id}"`), `${id} is still on the sheet`).toBe(false);
+    }
+  });
+});
+
+describe("the two moved findings", () => {
+  it("states the pair finding as two counts over one window", () => {
+    expect(PAIR_FINDING).toContain("Launches paired with a stablecoin graduated at");
+    expect(PAIR_FINDING).toContain("paired with ETH");
+    expect(PAIR_FINDING).toContain("Two counts over the same window, not a cause.");
+  });
+
+  it("names what the cohorts page holds, in one line", () => {
+    expect(MORE_COHORTS).toContain("Creator tax, hour of day, day of week");
+    expect(MORE_COHORTS).toContain("launches per deployer");
+    expect(MORE_COHORTS).toContain("all-time");
+    expect(MORE_COHORTS.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length)
+      .toBeLessThanOrEqual(30);
+  });
+
+  it("passes the banned-words list", () => {
+    for (const copy of [PAIR_FINDING, MORE_COHORTS]) {
+      const lower = copy.toLowerCase();
+      for (const banned of BANNED) {
+        expect(lower.includes(banned), `"${banned}" is on the page`).toBe(false);
+      }
+    }
   });
 });

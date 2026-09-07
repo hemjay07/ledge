@@ -15,6 +15,10 @@ export interface FoldProps {
   dek?: ReactNode;
   /** the second figure's sentence names its counts on the sheet, not the card */
   secondaryCounts?: boolean;
+  /** the finding the second figure exists for, set directly beneath it */
+  finding?: ReactNode;
+  /** the fold's fine print: what the window's counts do not yet contain */
+  fine?: ReactNode;
 }
 
 /* The fold: kicker, poster figure, the denominator hanging beneath it as a
@@ -23,13 +27,19 @@ export interface FoldProps {
 
    Both figures are always here, over the same n, the same window and the same
    measurement, each with its own fine print. LEAD (lib/lead.ts) chooses which
-   of the two is the poster and which is the second block — nothing else. */
+   of the two is the poster and which is the second block — nothing else.
+
+   Beneath the pair sit two optional slots: the finding the second figure
+   exists for, and the fold's fine print. The card page passes neither, so the
+   two folds still cannot drift apart on anything they share. */
 export function Fold({
   w,
   crawledAt,
   staleAfterSeconds,
   dek = null,
   secondaryCounts = false,
+  finding = null,
+  fine = null,
 }: FoldProps): ReactElement {
   const exFast = w.excludingFast;
   const cutoffWords = formatDurationLong(exFast.cutoffSeconds);
@@ -127,6 +137,8 @@ export function Fold({
           </>
         )}
       </div>
+      {finding ? <p className="finding">{finding}</p> : null}
+      {fine ? <p className="note note--fine fold-fine">{fine}</p> : null}
     </>
   );
 }

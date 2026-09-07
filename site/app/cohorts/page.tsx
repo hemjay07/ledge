@@ -6,9 +6,12 @@ import { Footer } from "../../components/Footer";
 import { LedgerEntry } from "../../components/LedgerEntry";
 import { Register } from "../../components/Register";
 import { SheetNav } from "../../components/SheetNav";
+import { Stat } from "../../components/Stat";
 import { allTime, h24, numberFile, type WindowData } from "../../lib/number";
 import {
   formatCount,
+  formatDurationLong,
+  formatOneIn,
   formatStamp,
   histogramLabel,
   hourLabel,
@@ -16,6 +19,7 @@ import {
   taxLabel,
 } from "../../lib/format";
 import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow, shareCell } from "../../lib/rows";
+import { fastShareFacts } from "../../lib/summary";
 import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
@@ -76,10 +80,56 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
   const excluded = (n: number) =>
     n === 0 ? "" : `Launches excluded from this cohort: ${formatCount(n)}.`;
 
+  const fast = fastShareFacts(w);
+  const cutoffWords = formatDurationLong(w.excludingFast.cutoffSeconds);
+
   return [
+    <LedgerEntry
+      key="fast"
+      folio={folio(0)}
+      id={`h-fast-${label}`}
+      heading="Fast graduations"
+      headingNote={`· ${label} · n = ${formatCount(fast.n)} graduations`}
+    >
+      <p className="lede">
+        {fast.insufficient ? (
+          <Stat
+            value={null}
+            n={fast.n}
+            window={label}
+            updatedAt={crawledAt}
+            insufficient
+            name={`fast-shares-${label}`}
+          />
+        ) : (
+          <>
+            <Stat
+              className="mono"
+              name={`fast-under-cutoff-${label}`}
+              value={fast.underCutoff.rate}
+              n={fast.n}
+              window={label}
+              updatedAt={crawledAt}
+              insufficient={fast.underCutoff.insufficient}
+            />{" "}
+            of graduations completed inside {cutoffWords};{" "}
+            <Stat
+              className="mono"
+              name={`fast-under-60-${label}`}
+              value={fast.under60.rate}
+              n={fast.n}
+              window={label}
+              updatedAt={crawledAt}
+              insufficient={fast.under60.insufficient}
+            />{" "}
+            inside 60 seconds.
+          </>
+        )}
+      </p>
+    </LedgerEntry>,
     <Register
       key="pair"
-      folio={folio(0)}
+      folio={folio(1)}
       heading="By pair token"
       headingId={`h-pair-${label}`}
       headingNote={n}
@@ -92,7 +142,7 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
     />,
     <Register
       key="tax"
-      folio={folio(1)}
+      folio={folio(2)}
       heading="By creator tax"
       headingId={`h-tax-${label}`}
       headingNote={n}
@@ -105,7 +155,7 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
     />,
     <Register
       key="hour"
-      folio={folio(2)}
+      folio={folio(3)}
       heading="By hour (UTC)"
       headingId={`h-hour-${label}`}
       headingNote={n}
@@ -118,7 +168,7 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
     />,
     <Register
       key="day"
-      folio={folio(3)}
+      folio={folio(4)}
       heading="By day of week (UTC)"
       headingId={`h-day-${label}`}
       headingNote={n}
@@ -129,28 +179,55 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
       foot={cohortFooting(w)}
       note={`${emptyDaysNote}${excluded(w.cohortsExcluded.day)}`.trim() || null}
     />,
-    <Register
+    <LedgerEntry
       key="dep"
-      folio={folio(4)}
-      heading="Launches per deployer"
-      headingId={`h-dep-${label}`}
+      folio={folio(5)}
+      id={`h-dep-${label}`}
+      heading="Deployers"
       headingNote={`· ${label} · n = ${formatCount(distinct)} distinct`}
-      ariaLabel={`Distribution of launches per deployer, ${label}`}
-      caption="Counts of deployers by how many tokens they launched. No addresses."
-      columns={["Launches per deployer", "Deployers (n)", `Share of ${formatCount(distinct)}`]}
-      rows={w.deployers.histogram.map((row) => ({
-        label: histogramLabel(row.bucket),
-        cells: [
-          { text: formatCount(row.deployers), kind: "n" as const },
-          shareCell(row.deployers, distinct),
-        ],
-      }))}
-      foot={{
-        label: "All",
-        cells: [{ text: formatCount(distinct) }, shareCell(distinct, distinct)],
-      }}
-      note="Aggregate distribution only. No deployer address appears on this page."
-    />,
+    >
+      <p className="lede">
+        <span className="mono">{formatCount(distinct)}</span> distinct deployers launched{" "}
+        <span className="mono">{formatCount(w.launches)}</span> tokens.{" "}
+        <Stat
+          className="mono"
+          name={`deployers-launched-2plus-${label}`}
+          value={w.deployers.launched2plusShare}
+          n={distinct}
+          window={label}
+          updatedAt={crawledAt}
+          insufficient={w.deployers.insufficient}
+        />{" "}
+        launched two or more;{" "}
+        <Stat
+          className="mono"
+          name={`deployers-from-10plus-${label}`}
+          value={w.deployers.from10plusShare}
+          n={w.launches}
+          window={label}
+          updatedAt={crawledAt}
+          insufficient={w.deployers.insufficient}
+        />{" "}
+        of all launches came from deployers with ten or more.
+      </p>
+      <Register
+        ariaLabel={`Distribution of launches per deployer, ${label}`}
+        caption="Counts of deployers by how many tokens they launched. No addresses."
+        columns={["Launches per deployer", "Deployers (n)", `Share of ${formatCount(distinct)}`]}
+        rows={w.deployers.histogram.map((row) => ({
+          label: histogramLabel(row.bucket),
+          cells: [
+            { text: formatCount(row.deployers), kind: "n" as const },
+            shareCell(row.deployers, distinct),
+          ],
+        }))}
+        foot={{
+          label: "All",
+          cells: [{ text: formatCount(distinct) }, shareCell(distinct, distinct)],
+        }}
+        note="Aggregate distribution only. No deployer address appears on this page."
+      />
+    </LedgerEntry>,
   ];
 }
 
@@ -183,6 +260,49 @@ export default function Cohorts(): ReactElement {
             headingNote={`· n = ${formatCount(w.window.launches)} launches · ${formatCount(w.window.graduations)} graduations`}
           >
             <p className="note">{w.note}</p>
+            <div className="alltime">
+              <div>
+                <Stat
+                  className="at-v"
+                  name={`rate-${w.key}`}
+                  value={w.window.rate}
+                  n={w.window.launches}
+                  window={w.label}
+                  updatedAt={crawledAt}
+                  insufficient={w.window.insufficient}
+                />
+                <span className="at-k">
+                  {formatCount(w.window.graduations)} graduations of{" "}
+                  {formatCount(w.window.launches)} launches
+                </span>
+              </div>
+              <div>
+                <Stat
+                  className="at-v"
+                  name={`excluding-fast-${w.key}`}
+                  value={w.window.excludingFast.rate}
+                  n={w.window.launches}
+                  window={w.label}
+                  updatedAt={crawledAt}
+                  insufficient={w.window.excludingFast.insufficient}
+                />
+                <span className="at-k">
+                  excluding launches that graduated inside{" "}
+                  {formatDurationLong(w.window.excludingFast.cutoffSeconds)}
+                  {w.window.excludingFast.oneIn === null
+                    ? ""
+                    : ` · ${formatOneIn(w.window.excludingFast.oneIn)}`}{" "}
+                  · {formatCount(w.window.excludingFast.graduations)} of{" "}
+                  {formatCount(w.window.launches)}
+                </span>
+              </div>
+            </div>
+            {w.key === "all" ? (
+              <p className="note note--fine">
+                Indexed from block {formatCount(numberFile.firstIndexedBlock)} to block{" "}
+                {formatCount(numberFile.headBlock)}.
+              </p>
+            ) : null}
           </LedgerEntry>
           {cohortTables(w.window, w.label, wi * 10 + 3)}
         </div>
