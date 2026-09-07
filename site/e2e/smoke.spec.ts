@@ -18,7 +18,7 @@ import { expect, test, type Page } from "@playwright/test";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..");
 
-const ROUTES = ["/", "/cohorts", "/method", "/number"] as const;
+const ROUTES = ["/", "/cohorts/", "/method/", "/number/"] as const;
 
 /** A denominator, however the sheet chose to spell it: "533 of 26,265",
     "n = 26,265", "(n=812)", or the refusal that stands in for a rate the
@@ -145,7 +145,7 @@ test.describe("no number without its denominator", () => {
   }
 
   test("states an n beside every published rate on the cohorts page", async ({ page }) => {
-    await page.goto("/cohorts");
+    await page.goto("/cohorts/", { waitUntil: "networkidle" });
     const tables = page.locator("table");
     expect(await tables.count()).toBeGreaterThan(0);
 

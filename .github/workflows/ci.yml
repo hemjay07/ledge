@@ -55,6 +55,10 @@ jobs:
         if: hashFiles('site/package.json') != ''
         run: npm ci --prefix site
 
+      - name: prebuild (number.json copy, OG card)
+        if: hashFiles('site/package.json') != ''
+        run: npm run prebuild --prefix site
+
       - name: vitest
         if: hashFiles('site/package.json') != ''
         run: npm run test --prefix site

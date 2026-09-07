@@ -27,13 +27,11 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 
   webServer: {
-    /* `serve --config` resolves its path against the SERVED directory, so the
-       config is passed absolute. It is needed because the export writes both
-       `method.html` and a `method/` directory of RSC payloads, and a static
-       file server picks the directory, finds no index.html in it, and 404s
-       the real URL. Vercel routes this correctly; `serve` needs telling. */
-    command:
-      "npx --yes serve ../out --config \"$PWD/serve.json\" --listen 4173 --no-clipboard",
+    /* Python's stdlib server: serves `dir/index.html` for `/dir/` and 301s
+       `/dir` to `/dir/`, exactly what a `trailingSlash` export needs and what
+       Vercel does. `serve` was used before and its directory handling
+       changed between versions. */
+    command: "python3 -m http.server 4173 --directory ../out --bind 127.0.0.1",
     url: "http://127.0.0.1:4173/number.json",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
