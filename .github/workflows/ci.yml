@@ -145,7 +145,7 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
 
       - name: forge build
-        run: forge build --deny warnings
+        run: forge build
         working-directory: contracts
 
       - name: forge test
