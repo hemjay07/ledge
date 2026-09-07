@@ -33,16 +33,59 @@ import {
 import { pairClassOf } from "./buckets";
 import { loadPairTokens } from "./numberFile";
 
+/** One minute of chain. The cron is `* * * * *` and Robinhood Chain runs at
+    about 0.1 s a block, so this is both how far a tick advances and how far
+    back a cold cursor starts -- one quantity, one constant. */
+export const BLOCKS_PER_TICK = 600;
+/** Where a cold cursor starts: one minute of chain behind the head. */
+export const COLD_START_BLOCKS = BLOCKS_PER_TICK;
 /** Blocks re-read on every tick so a short reorg cannot drop a launch.
-    ~0.1 s a block, so 200 blocks is about 20 seconds of chain. */
-export const REORG_OVERLAP_BLOCKS = 200;
+
+    It was 200 -- a third of one tick's own advance, which is not an overlap
+    at all: a reorg reaching back further than the blocks this pass happened
+    to re-read was invisible to it. Two ticks' advance is the floor: whatever
+    the previous pass wrote is inside the range the next pass re-reads and
+    reconciles against the chain. */
+export const REORG_OVERLAP_BLOCKS = BLOCKS_PER_TICK * 2;
 /** A bounded catch-up: an outage must not produce a tick that blows the
     subrequest budget. What it does not reach, the next minute reaches. */
 export const MAX_CATCHUP_BLOCKS = 5000;
+/** How many `eth_getLogs` subrequests one tick may spend. The rest of the
+    Worker's allowance goes to block headers, the factory view and KV. */
+export const LOG_SUBREQUEST_BUDGET = 20;
 /** Seven days. ~133,000 launch rows, ~25 MB, against a 5 GB free limit. */
 export const RETENTION_SECONDS = 604_800;
-/** Where a cold cursor starts: one minute of chain behind the head. */
-export const COLD_START_BLOCKS = 600;
+
+/** What a range costs: one window per LOG_WINDOW_BLOCKS, two topics each. */
+export function logSubrequests(from: number, to: number): number {
+  if (to < from) return 0;
+  return Math.ceil((to - from + 1) / LOG_WINDOW_BLOCKS) * 2;
+}
+
+/** The widest `to` at or below the one asked for whose range fits the budget.
+
+    A range too wide to read is not a range to refuse: the blocks are still
+    there, and refusing means the next tick asks for exactly the same ones and
+    refuses again, for ever. Halving converges in a handful of steps, the tick
+    reads what it can, and the cursor advances to what it actually read -- so
+    every pass makes progress and the catch-up finishes. */
+export function fitWindow(from: number, to: number, budget = LOG_SUBREQUEST_BUDGET): number {
+  let end = to;
+  while (end > from && logSubrequests(from, end) > budget) {
+    end = from + Math.floor((end - from) / 2);
+  }
+  return end;
+}
+
+/** A block header that did not come back. It is not a log with no timestamp:
+    it is a pass that cannot be completed, because the whole dataset rests on
+    the header being the time a thing happened (METHOD.md "Source"). */
+export class MissingBlockHeader extends Error {
+  constructor(block: number) {
+    super(`no block header for block ${block}: the tick cannot timestamp what it read`);
+    this.name = "MissingBlockHeader";
+  }
+}
 
 export interface TickResult {
   ok: boolean;
@@ -125,6 +168,13 @@ async function fetchBlockTimestamps(rpc: RpcClient, blocks: number[]): Promise<M
     const result = results[i] as { timestamp?: string } | null;
     if (result?.timestamp) out.set(block, Number(BigInt(result.timestamp)));
   });
+  /* Every block that carried a log must have a header. Skipping the log and
+     advancing the cursor past its block loses it for ever, and reports ok
+     while doing it. Failing holds the cursor, and the next tick reads the
+     same blocks again. */
+  for (const block of distinct) {
+    if (!out.has(block)) throw new MissingBlockHeader(block);
+  }
   return out;
 }
 
@@ -192,10 +242,13 @@ export async function tick(
     }
 
     from = Math.max(0, cursor.last_indexed_block + 1 - REORG_OVERLAP_BLOCKS);
-    to = Math.min(head, cursor.last_indexed_block + MAX_CATCHUP_BLOCKS);
+    to = fitWindow(from, Math.min(head, cursor.last_indexed_block + MAX_CATCHUP_BLOCKS));
     if (to < from) {
       return { ok: true, from, to: cursor.last_indexed_block, launches: 0, graduations: 0 };
     }
+    /* The part of this range that was already indexed. Rows in it that the
+       fresh logs no longer carry were reorged out and must go with them. */
+    const overlapTo = Math.min(to, cursor.last_indexed_block);
 
     const { launches, graduations } = await fetchLogs(rpc, factory, from, to);
 
@@ -212,9 +265,32 @@ export async function tick(
     const pairTokens = await loadPairTokens(env, nowSeconds * 1000);
 
     const statements: D1PreparedStatement[] = [];
+
+    /* THE RE-READ IS RECONCILED, NOT MERELY RE-INSERTED (B6).
+
+       Re-reading the overlap and then only inserting what is new is a slower
+       way of writing once: a log the chain has since discarded stayed for its
+       full seven days, so /api/token answered `graduated: true` for a
+       graduation that never happened, and a re-mined launch kept the block
+       and timestamp of the fork that lost.
+
+       The range is therefore cleared and rewritten from the fresh logs, in
+       the same batch -- one D1 transaction, so no reader ever sees the gap.
+       A row whose (tx_hash, log_index) is still on chain is written back
+       unchanged; one that is not simply does not come back. D1 caps a
+       statement at 100 bound parameters, so an explicit NOT IN over the
+       fresh keys is not available at these volumes; clearing the range says
+       the same thing and says it in two statements. */
+    if (overlapTo >= from) {
+      statements.push(
+        db.prepare("DELETE FROM launch WHERE block BETWEEN ? AND ?").bind(from, overlapTo),
+        db.prepare("DELETE FROM graduation WHERE block BETWEEN ? AND ?").bind(from, overlapTo),
+      );
+    }
+
     for (const launch of launches) {
       const ts = timestamps.get(launch.block);
-      if (ts === undefined) continue; // no header, no timestamp, no row
+      if (ts === undefined) continue; // unreachable: a missing header threw above
       const config = configs.get(launch.token);
       const pairToken = config?.pairToken ?? launch.pairToken;
       statements.push(
@@ -267,11 +343,26 @@ export async function tick(
         )
         .bind(to, nowSeconds, nowSeconds),
     );
-    statements.push(
-      db.prepare("DELETE FROM launch WHERE ts < ?").bind(nowSeconds - RETENTION_SECONDS),
-    );
+    /* Retention, in this order and with this condition (W2).
+
+       Both tables held seven days keyed on their own timestamp, so a launch
+       that graduated five hours after it launched was evicted five hours
+       before its graduation was -- and for those five hours the graduation
+       had no launch to be a graduation OF: no time-to-graduation, and a
+       lookup that reported the token unindexed while still holding its
+       graduation. Graduations are pruned first, and a launch is kept as long
+       as any surviving graduation still references it. */
     statements.push(
       db.prepare("DELETE FROM graduation WHERE ts < ?").bind(nowSeconds - RETENTION_SECONDS),
+    );
+    statements.push(
+      db
+        .prepare(
+          `DELETE FROM launch
+             WHERE ts < ?
+               AND token NOT IN (SELECT token FROM graduation)`,
+        )
+        .bind(nowSeconds - RETENTION_SECONDS),
     );
     statements.push(
       db.prepare("DELETE FROM tg_usage WHERE hour_key < ?").bind(Math.floor((nowSeconds - 86_400) / 3600)),

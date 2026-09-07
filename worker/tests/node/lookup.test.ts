@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findPairTaxRow } from "../../src/lookup";
+import { LIVE_STALE_AFTER_SECONDS, findPairTaxRow } from "../../src/lookup";
 import { taxBucketOf, pairClassOf } from "../../src/buckets";
 import { fixtureNumber, makeBody, ADDRESS, NOW_SECONDS, LAUNCH, CURVE } from "./helpers";
 
@@ -127,5 +127,43 @@ describe("the assembled body", () => {
       cursor: { last_indexed_block: 1, last_success_at: NOW_SECONDS - 600, consecutive_failures: 4 },
     });
     expect(body.live.stale).toBe(true);
+  });
+});
+
+/* W1 — what "stale" means for the live layer.
+
+   METHOD.md: the flag reports that the run knew it was behind -- "it recorded
+   a failure since its last success (consecutiveFailures > 0 ...)". The Worker
+   read only the age of the last success, so a tick that had failed on its
+   last four passes still reported a fresh live layer for five minutes, which
+   is exactly the window in which a reader is most likely to be looking. */
+describe("the live layer's own staleness", () => {
+  it("is stale after a failure, however recent the last success was", () => {
+    const body = makeBody({
+      cursor: { last_indexed_block: 1, last_success_at: NOW_SECONDS - 10, consecutive_failures: 1 },
+    });
+    expect(body.live.stale).toBe(true);
+  });
+
+  it("is stale when the last success is older than the bound", () => {
+    const body = makeBody({
+      cursor: {
+        last_indexed_block: 1,
+        last_success_at: NOW_SECONDS - (LIVE_STALE_AFTER_SECONDS + 1),
+        consecutive_failures: 0,
+      },
+    });
+    expect(body.live.stale).toBe(true);
+  });
+
+  it("is fresh only when the last pass succeeded and was recent", () => {
+    const body = makeBody({
+      cursor: { last_indexed_block: 1, last_success_at: NOW_SECONDS - 10, consecutive_failures: 0 },
+    });
+    expect(body.live.stale).toBe(false);
+  });
+
+  it("is stale when there is no cursor at all", () => {
+    expect(makeBody({ cursor: null }).live.stale).toBe(true);
   });
 });

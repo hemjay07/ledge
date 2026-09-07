@@ -31,6 +31,10 @@ Three ordering consequences of that guarantee are load-bearing:
   - Rotation merges into an existing archive rather than replacing it: after
     an outage crossing midnight a day can have both `D.jsonl.gz` and a fresh
     `D.jsonl`.
+  - `lastIndexedAt` -- the block timestamp of `lastIndexedBlock`, and the
+    `crawledAt` the whole site keys on -- is read from a block header, moves
+    only when the cursor moves, and is never the run's wall clock. A
+    backwards backfill leaves the cursor alone and so leaves it alone too.
 """
 from __future__ import annotations
 
@@ -50,9 +54,9 @@ if __package__ in (None, ""):
 
 from pipeline import enrich as enrich_mod
 from pipeline.canonical import canonical_dumps
-from pipeline.recompute import load_partitions, resolve_pair_class
+from pipeline.recompute import crawled_at_for, load_partitions, resolve_pair_class
 from pipeline.rpc import TOPIC_POOL_GRADUATED, TOPIC_TOKEN_LAUNCHED, decode_pool_graduated, decode_token_launched
-from pipeline.stats import build_number
+from pipeline.stats import build_number, format_iso
 
 REORG_WINDOW = 3000
 MAX_WINDOW_BLOCKS = 1000
@@ -357,6 +361,16 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     if not new_launches and not new_grads and head_block == state["lastIndexedBlock"]:
         return {"committed": False}
 
+    # The measurement instant: the chain time of the block the cursor lands
+    # on, read from that block's header (METHOD.md "Freshness"). One extra
+    # header per run, and it is what `crawledAt` publishes -- never the run's
+    # wall clock, which runs ahead of the chain LEDGE has read and would
+    # close every window over minutes that were never scanned. A backwards
+    # backfill does not advance the cursor, so it does not move the instant.
+    last_indexed_at = None
+    if not backfilling_history:
+        last_indexed_at = format_iso(_fetch_block_timestamps(rpc_client, [head_block])[head_block])
+
     existing_launches = load_partitions(data_dir / "launches")
     existing_grads = load_partitions(data_dir / "graduations")
 
@@ -391,8 +405,12 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
         new_state["firstIndexedBlock"] = start_block
     else:
         new_state["lastIndexedBlock"] = head_block
+        new_state["lastIndexedAt"] = last_indexed_at
         if new_state.get("firstIndexedBlock") is None:
             new_state["firstIndexedBlock"] = start_block
+    # lastRunAt / lastSuccessAt stay wall-clock: they answer whether this run
+    # knew it was behind (`stale`), and nothing else. The published instant
+    # is lastIndexedAt.
     now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     new_state["lastRunAt"] = now_iso
     new_state["lastSuccessAt"] = now_iso
@@ -409,7 +427,8 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
         "enrichmentFailures": enrichment_failures,
     }
 
-    number_payload = canonical_dumps(build_number(all_launches, all_grads, new_state, now_iso)).encode()
+    crawled_at = crawled_at_for(new_state, all_launches)
+    number_payload = canonical_dumps(build_number(all_launches, all_grads, new_state, crawled_at)).encode()
     state_payload = (json.dumps(new_state, sort_keys=True, indent=2) + "\n").encode()
 
     # --- commit point: nothing above this line touched the data dir -------

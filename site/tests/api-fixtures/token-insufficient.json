@@ -28,7 +28,7 @@
     "indexed": true
   },
   "cohort": {
-    "crawledAt": "2026-09-06T18:00:36Z",
+    "crawledAt": "2025-11-07T17:20:15Z",
     "definitionsVersion": "2026-09-06",
     "key": {
       "pairClass": "eth",
@@ -36,7 +36,7 @@
     },
     "h24": {
       "window": "24h",
-      "crawledAt": "2026-09-06T18:00:36Z",
+      "crawledAt": "2025-11-07T17:20:15Z",
       "launches": 12,
       "graduations": 0,
       "rate": null,
@@ -51,7 +51,7 @@
     },
     "allTime": {
       "window": "allTime",
-      "crawledAt": "2026-09-06T18:00:36Z",
+      "crawledAt": "2025-11-07T17:20:15Z",
       "launches": 12,
       "graduations": 0,
       "rate": null,
@@ -65,8 +65,14 @@
       }
     }
   },
+  "freshness": {
+    "crawledAt": "2025-11-07T17:20:15Z",
+    "ageSeconds": 26182432,
+    "staleAfterSeconds": 7200,
+    "stale": true
+  },
   "placement": {
-    "crawledAt": "2026-09-06T18:00:36Z",
+    "crawledAt": "2025-11-07T17:20:15Z",
     "window": "allTime",
     "elapsedSeconds": 811,
     "rung": null,
@@ -84,5 +90,5 @@
     "method": "https://ledge.tools/method",
     "numberJson": "https://ledge.tools/number.json"
   },
-  "text": "0x23fe54b3…f98fe2 · Pons\nETH · 2–3% · on the bonding curve\nminute 13 · on the curve · cohort not enough data (n=12) · ETH · 2–3%\nLaunches configured this way, all time: not enough data (n=12).\nIn the last 24 hours: not enough data (n=12).\nNot enough graduations to place this launch (n=12).\nCurve fill: 1.7432 ETH of 4.2 ETH.\nMeasured 6 Sep 2026 · 18:00 UTC\nhttps://ledge.tools/method"
+  "text": "0x23fe54b3…f98fe2 · Pons\nETH · 2–3% · on the bonding curve\nminute 13 · on the curve · cohort not enough data (n=12) · ETH · 2–3%\nLaunches configured this way, all time: not enough data (n=12). These figures were measured 303 d ago — older than the 2 h freshness bound.\nIn the last 24 hours: not enough data (n=12). These figures were measured 303 d ago — older than the 2 h freshness bound.\nNot enough graduations to place this launch (n=12). These figures were measured 303 d ago — older than the 2 h freshness bound.\nCurve fill: 1.7432 ETH of 4.2 ETH.\nMeasured 7 Nov 2025 · 17:20 UTC\nhttps://ledge.tools/method"
 }

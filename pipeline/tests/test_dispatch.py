@@ -28,6 +28,7 @@ from pathlib import Path
 import pytest
 
 from pipeline import dispatch
+from pipeline.stats import format_iso
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "dispatch"
 
@@ -376,3 +377,72 @@ def test_the_fixture_number_file_parses_as_schema_v2():
     assert number["schemaVersion"] == 2
     assert set(number) >= {"h24", "allTime", "crawledAt", "firstIndexedAt"}
     assert "d7" not in number, "d7 stays internal to dispatch.py; see its docstring"
+
+
+# --- B4: the window is min(7 days, the indexed record) -----------------------
+# The email labelled a 29-hour record "last 7 days". The window can never be
+# longer than the record it is computed over, and every label says the span
+# it actually measured.
+SHORT_SPAN_SECONDS = 105_408  # 29 h 17 min, an exact number of the fixture's 432 s cadence
+
+
+@pytest.fixture(scope="module")
+def short_record():
+    """The same frozen fixture, cut back to a record 29 hours long: the
+    dispatch's window has to shrink to it and say so."""
+    number, launches, graduations = dispatch.load_inputs(FIXTURE_DIR)
+    until = dispatch.parse_iso(number["crawledAt"])
+    kept = [l for l in launches if l["ts"] >= until - SHORT_SPAN_SECONDS]
+    tokens = {l["token"] for l in kept}
+    kept_grads = [g for g in graduations if g["token"] in tokens]
+    number = dict(number, firstIndexedAt=format_iso(min(l["ts"] for l in kept)))
+    return dispatch.compose(number, kept, kept_grads)
+
+
+def test_the_window_is_capped_by_the_record_not_by_seven_days(short_record):
+    assert short_record["until"] - short_record["since"] == SHORT_SPAN_SECONDS
+    assert short_record["windowSeconds"] == SHORT_SPAN_SECONDS
+    assert short_record["full"] is False
+
+
+def test_a_short_record_names_its_real_span_in_the_heading(short_record):
+    assert short_record["heading"] == "LEDGE — the indexed record so far: 29 h to 6 Sep 2026"
+
+
+def test_a_full_window_still_says_seven_days_in_the_heading(composed):
+    assert composed["heading"] == "LEDGE — 7 days to 6 Sep 2026"
+    assert composed["full"] is True
+    assert composed["windowSeconds"] == 7 * 86400
+
+
+def test_a_short_record_names_its_real_span_in_the_subject(short_record):
+    assert short_record["subject"].startswith("LEDGE — the indexed record so far, 29 h: ")
+    assert "7 days" not in short_record["subject"]
+
+
+def test_every_figure_in_a_short_record_carries_the_real_span(short_record):
+    text = dispatch.render_text(short_record)
+    assert "7 days" not in text
+    assert "Pons, the indexed record so far, 29 h: " in text
+    assert "Two counts over the same 29 h, not a cause." in text
+
+
+def test_a_short_record_passes_the_banned_word_check(short_record):
+    assert BANNED_RE.findall(dispatch.render_text(short_record)) == []
+    assert BANNED_RE.findall(dispatch.render_html(short_record)) == []
+
+
+def test_a_short_record_still_carries_every_denominator(short_record):
+    for line in dispatch.render_text(short_record).splitlines():
+        if "%" not in line:
+            continue
+        assert " of " in line or "n=" in line, f"percentage without its n: {line}"
+
+
+def test_the_span_label_is_days_only_when_whole_days_were_measured():
+    assert dispatch.format_span(7 * 86400) == "7 days"
+    assert dispatch.format_span(2 * 86400) == "2 days"
+    assert dispatch.format_span(86400) == "1 day"
+    assert dispatch.format_span(105_408) == "29 h"
+    assert dispatch.format_span(3600) == "1 h"
+    assert dispatch.format_span(1800) == "30 min"

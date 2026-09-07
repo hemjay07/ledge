@@ -17,7 +17,7 @@ graduation), and `ARCHITECTURE.md` for how the pipeline and site are built.
 
 ```
 data/
-├── state.json                        # crawl cursor: headBlock, firstIndexedBlock, crawledAt
+├── state.json                        # crawl cursor: lastIndexedBlock, lastIndexedAt (the published crawledAt), firstIndexedBlock
 ├── pair-tokens.json                  # pair token address -> symbol -> pairClass mapping
 ├── number.json                       # the published, versioned figures (site reads only this file)
 ├── launches/YYYY-MM-DD.jsonl[.gz]    # one TokenLaunched event per line

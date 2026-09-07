@@ -230,7 +230,7 @@ describe("the tick", () => {
   });
 
   it("prunes rows past the retention window and keeps the rest", async () => {
-    await seedCursor(1000, NOW);
+    await seedCursor(500_000, NOW);
     await env.LEDGE_DB.prepare(
       `INSERT INTO launch VALUES ('0xold', '0xc', '0x0', 'eth', 0, 1, ?, '0xt', 0)`,
     )
@@ -241,7 +241,7 @@ describe("the tick", () => {
     )
       .bind(NOW - RETENTION_SECONDS + 60)
       .run();
-    const { client } = fakeChain({ head: 1100, launches: [], graduations: [] });
+    const { client } = fakeChain({ head: 500_100, launches: [], graduations: [] });
     await tick(env, NOW, client);
     const rows = await env.LEDGE_DB.prepare("SELECT token FROM launch ORDER BY token").all();
     expect(rows.results.map((r: any) => r.token)).toEqual(["0xkeep"]);
@@ -254,25 +254,223 @@ describe("the tick", () => {
     expect(result.to).toBe(1000 + 5000);
   }, 60_000);
 
-  it("writes no row for a block whose header did not come back", async () => {
-    await seedCursor(1000, NOW);
-    const client = new RpcClient("http://unused", async (payload) => {
+});
+
+/* B6 — the durable key.
+
+   ARCHITECTURE.md section 5 is binding on both indexers: "Dedupe is on
+   (txHash, logIndex) only -- never on token address, because a token can in
+   principle appear twice and because a reorg replay produces identical keys."
+   D1 keyed `launch` and `graduation` on `token`, which is a different claim:
+   that a token can be launched once and graduate once, for ever. Under a
+   reorg it is false, and INSERT OR IGNORE then silently kept the row the
+   chain had just discarded. */
+describe("the durable key is the log's own identity", () => {
+  beforeEach(async () => {
+    await reset();
+  });
+
+  it("holds two rows for one token seen in two different logs", async () => {
+    await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, 10, 100, '0xaa', 0)`,
+      ).bind(TOKEN_A),
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, 11, 101, '0xbb', 0)`,
+      ).bind(TOKEN_A),
+    ]);
+    const rows = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM launch").first<any>();
+    expect(rows.n).toBe(2);
+  });
+
+  it("refuses a second row for the same (tx_hash, log_index)", async () => {
+    await env.LEDGE_DB.prepare(
+      `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, 10, 100, '0xaa', 0)`,
+    )
+      .bind(TOKEN_A)
+      .run();
+    await expect(
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, 10, 100, '0xaa', 0)`,
+      )
+        .bind(TOKEN_B)
+        .run(),
+    ).rejects.toThrow();
+  });
+
+  it("keeps the same two claims for graduations", async () => {
+    await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(`INSERT INTO graduation VALUES (?, 10, 100, '1', '0xaa', 0)`).bind(TOKEN_A),
+      env.LEDGE_DB.prepare(`INSERT INTO graduation VALUES (?, 11, 101, '1', '0xbb', 0)`).bind(TOKEN_A),
+    ]);
+    const rows = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM graduation").first<any>();
+    expect(rows.n).toBe(2);
+  });
+});
+
+/* B6 — what the reorg overlap is FOR.
+
+   The tick re-reads the overlap on every pass and did nothing with the
+   answer beyond inserting what was new. A log that the chain has since
+   discarded stayed in the table for its full seven days, and /api/token
+   served `graduated: true` for a graduation that never happened. Re-reading
+   a range and then ignoring what the re-read no longer contains is not a
+   reorg defence; it is a slower way of writing once. */
+describe("a log the chain no longer has", () => {
+  beforeEach(async () => {
+    await reset();
+  });
+
+  it("deletes a graduation that was reorged out of the overlap", async () => {
+    await seedCursor(5000, NOW);
+    const graduation = graduationLog(TOKEN_B, 5050, 1, "0xtxg");
+    await tick(env, NOW, fakeChain({ head: 5100, launches: [], graduations: [graduation] }).client);
+    expect(
+      (await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM graduation").first<any>()).n,
+    ).toBe(1);
+
+    // the next pass re-reads the same range and the log is gone from it
+    await tick(env, NOW + 60, fakeChain({ head: 5160, launches: [], graduations: [] }).client);
+    expect(
+      (await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM graduation").first<any>()).n,
+    ).toBe(0);
+  });
+
+  it("re-mines a launch onto its new block rather than keeping the old one", async () => {
+    await seedCursor(5000, NOW);
+    await tick(
+      env,
+      NOW,
+      fakeChain({
+        head: 5100,
+        launches: [launchLog(TOKEN_A, 5050, 3, "0xtxold")],
+        graduations: [],
+        timestampOf: (block) => NOW - 10_000 + block,
+      }).client,
+    );
+    const before = await env.LEDGE_DB.prepare("SELECT * FROM launch").first<any>();
+    expect(before.block).toBe(5050);
+
+    await tick(
+      env,
+      NOW + 60,
+      fakeChain({
+        head: 5160,
+        launches: [launchLog(TOKEN_A, 5062, 0, "0xtxnew")],
+        graduations: [],
+        timestampOf: (block) => NOW - 10_000 + block,
+      }).client,
+    );
+    const rows = await env.LEDGE_DB.prepare("SELECT * FROM launch").all();
+    expect(rows.results).toHaveLength(1);
+    expect((rows.results[0] as any).block).toBe(5062);
+    expect((rows.results[0] as any).ts).toBe(NOW - 10_000 + 5062);
+    expect((rows.results[0] as any).tx_hash).toBe("0xtxnew");
+  });
+
+  it("leaves rows below the re-read range alone", async () => {
+    await seedCursor(5000, NOW);
+    await env.LEDGE_DB.prepare(
+      `INSERT INTO launch VALUES ('0xbefore', '0xc', '0x0', 'eth', 0, 10, ?, '0xt', 0)`,
+    )
+      .bind(NOW - 3600)
+      .run();
+    await tick(env, NOW, fakeChain({ head: 5100, launches: [], graduations: [] }).client);
+    const rows = await env.LEDGE_DB.prepare("SELECT token FROM launch").all();
+    expect(rows.results.map((r: any) => r.token)).toEqual(["0xbefore"]);
+  });
+});
+
+/* B8 — a block header that did not come back.
+
+   The tick skipped the log and advanced the cursor over its block, so the
+   log was lost for good and the pass returned ok. A missing header is not a
+   log with no timestamp; it is a pass that cannot be completed, and the whole
+   dataset rests on the header being the time a thing happened (METHOD.md
+   "Source"). */
+describe("a missing block header", () => {
+  beforeEach(async () => {
+    await reset();
+  });
+
+  function chainWithNoHeaders() {
+    return new RpcClient("http://unused", async (payload) => {
       const batch = payload as Array<{ id: number; method: string; params: any[] }>;
       return batch.map((request) => {
-        if (request.method === "eth_blockNumber") return { id: request.id, result: "0x44c" };
+        if (request.method === "eth_blockNumber") return { id: request.id, result: "0x1450" };
         if (request.method === "eth_getLogs") {
           return {
             id: request.id,
-            result: request.params[0].topics[0] === TOPIC_TOKEN_LAUNCHED
-              ? [launchLog(TOKEN_A, 1050, 3, "0xtx1")]
-              : [],
+            result:
+              request.params[0].topics[0] === TOPIC_TOKEN_LAUNCHED
+                ? [launchLog(TOKEN_A, 1050, 3, "0xtx1")]
+                : [],
           };
         }
         if (request.method === "eth_getBlockByNumber") return { id: request.id, result: null };
         return { id: request.id, result: null };
       });
     });
-    await tick(env, NOW, client);
+  }
+
+  it("fails the tick rather than dropping the log", async () => {
+    await seedCursor(1000, NOW);
+    const result = await tick(env, NOW, chainWithNoHeaders());
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/header/i);
+  });
+
+  it("holds the cursor so the next pass reads the same blocks again", async () => {
+    await seedCursor(1000, NOW);
+    await tick(env, NOW, chainWithNoHeaders());
+    const cursor = await env.LEDGE_DB.prepare("SELECT * FROM cursor").first<any>();
+    expect(cursor.last_indexed_block).toBe(1000);
+    expect(cursor.consecutive_failures).toBe(1);
+    expect(cursor.last_error).toBeTruthy();
+  });
+
+  it("writes nothing at all on that pass", async () => {
+    await seedCursor(1000, NOW);
+    await tick(env, NOW, chainWithNoHeaders());
+    const rows = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM launch").first<any>();
+    expect(rows.n).toBe(0);
+  });
+});
+
+/* W2 — retention against a launch's own graduation.
+
+   Seven days of launches, seven days of graduations, both keyed on their own
+   timestamp: a launch that graduated five hours after it launched was evicted
+   five hours before its graduation was, and for those five hours the
+   graduation had no launch to be a graduation OF. */
+describe("retention keeps a launch as long as its graduation", () => {
+  beforeEach(async () => {
+    await reset();
+  });
+
+  it("keeps a launch just past the cutoff whose graduation is still inside it", async () => {
+    await seedCursor(500_000, NOW);
+    await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES ('0xslow', '0xc', '0x0', 'eth', 0, 10, ?, '0xt1', 0)`,
+      ).bind(NOW - RETENTION_SECONDS - 3600),
+      env.LEDGE_DB.prepare(`INSERT INTO graduation VALUES ('0xslow', 20, ?, '1', '0xt2', 0)`).bind(
+        NOW - RETENTION_SECONDS + 3600,
+      ),
+    ]);
+    await tick(env, NOW, fakeChain({ head: 500_100, launches: [], graduations: [] }).client);
+    const rows = await env.LEDGE_DB.prepare("SELECT token FROM launch").all();
+    expect(rows.results.map((r: any) => r.token)).toEqual(["0xslow"]);
+  });
+
+  it("still evicts a launch past the cutoff that never graduated", async () => {
+    await seedCursor(500_000, NOW);
+    await env.LEDGE_DB.prepare(
+      `INSERT INTO launch VALUES ('0xgone', '0xc', '0x0', 'eth', 0, 10, ?, '0xt1', 0)`,
+    )
+      .bind(NOW - RETENTION_SECONDS - 3600)
+      .run();
+    await tick(env, NOW, fakeChain({ head: 500_100, launches: [], graduations: [] }).client);
     const rows = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM launch").first<any>();
     expect(rows.n).toBe(0);
   });

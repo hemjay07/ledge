@@ -218,6 +218,10 @@ def main() -> int:
         },
         "firstIndexedBlock": min(r["block"] for r in launches),
         "lastError": None,
+        # The measurement instant: chain time of the last indexed block, which
+        # is what recompute.py reads back as crawledAt. lastRunAt /
+        # lastSuccessAt are the run's wall clock and answer only `stale`.
+        "lastIndexedAt": crawled_at,
         "lastIndexedBlock": max(r["block"] for r in launches),
         "lastRunAt": crawled_at,
         "lastSuccessAt": crawled_at,

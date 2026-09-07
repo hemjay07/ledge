@@ -43,9 +43,9 @@ from pipeline.stats import (
     DEFINITIONS_VERSION,
     LADDER_EDGES,
     PAIR_BUCKETS,
-    _format_iso,
     _tax_bucket,
     build_number,
+    format_iso,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -120,7 +120,7 @@ def build_fixture_number() -> dict:
         launch["creatorTaxBps"] = _synthetic_tax_bps(index, launch["pairClass"], rank)
 
     until = max(r["ts"] for r in launches + graduations) + 1
-    crawled_at = _format_iso(until)
+    crawled_at = format_iso(until)
     state = {
         "consecutiveFailures": 0,
         "lastRunAt": crawled_at,

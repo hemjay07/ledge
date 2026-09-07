@@ -223,12 +223,26 @@ def _grad_log(token, block, tx_hash, log_index=0):
 
 class _StubRpc:
     """Serves canned logs, block timestamps and a well-formed 15-word
-    getLaunchedToken return."""
+    getLaunchedToken return.
 
-    def __init__(self, launch_logs=(), grad_logs=(), timestamps=None):
+    A run also asks for the header of the block its cursor lands on, because
+    that header's timestamp is the `crawledAt` it publishes. A block with no
+    canned timestamp is served `head_timestamp`, defaulting to a tick past
+    the newest canned record: chain time never runs backwards.
+    """
+
+    def __init__(self, launch_logs=(), grad_logs=(), timestamps=None, head_timestamp=None):
         self.launch_logs = list(launch_logs)
         self.grad_logs = list(grad_logs)
         self.timestamps = dict(timestamps or {})
+        self.head_timestamp = head_timestamp
+
+    def _timestamp(self, block):
+        if block in self.timestamps:
+            return self.timestamps[block]
+        if self.head_timestamp is not None:
+            return self.head_timestamp
+        return max(self.timestamps.values(), default=_iso_day_ts("2026-09-06")) + 1
 
     def get_logs(self, from_block, to_block, topic0):
         source = self.launch_logs if topic0 == _TOKEN_LAUNCHED_TOPIC0 else self.grad_logs
@@ -239,7 +253,7 @@ class _StubRpc:
         for request in requests:
             if request["method"] == "eth_getBlockByNumber":
                 block = int(request["params"][0], 16)
-                results.append({"timestamp": hex(self.timestamps[block])})
+                results.append({"timestamp": hex(self._timestamp(block))})
             else:
                 words = [0] * 15
                 words[8] = 300
@@ -439,3 +453,60 @@ def test_backfill_with_existing_history_crawls_backwards_from_first_indexed_bloc
     after = json.loads((committed_data_dir / "state.json").read_text())
     assert after["firstIndexedBlock"] == max(0, first - blocks_back)
     assert after["lastIndexedBlock"] == last, "a backfill does not move the forward cursor"
+
+
+# --- B1: crawledAt is chain time, and a backfill does not move it ------------
+def test_a_run_publishes_the_head_block_header_time_not_its_wall_clock(run_dir, monkeypatch):
+    """`crawledAt` is the block timestamp of `lastIndexedBlock` (METHOD.md
+    "Freshness"). The run's clock is hours ahead of the chain it just read;
+    publishing it closes every window over blocks that were never scanned."""
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    launch_ts = _iso_day_ts("2026-09-06", 10)
+    head_ts = launch_ts + 8
+    rpc = _StubRpc(
+        launch_logs=[_launch_log("0x" + "7" * 40, 1550, "0x" + "13" * 32)],
+        timestamps={1550: launch_ts},
+        head_timestamp=head_ts,
+    )
+
+    crawl.run(data_dir=run_dir, rpc_client=rpc, head_block=1600, now=_now("2026-09-06", 23))
+
+    state = json.loads((run_dir / "state.json").read_text())
+    number = json.loads((run_dir / "number.json").read_text())
+    assert state["lastIndexedAt"] == crawl.format_iso(head_ts)
+    assert number["crawledAt"] == crawl.format_iso(head_ts)
+    assert number["crawledAt"] != state["lastRunAt"]
+    assert number["h24"]["until"] == head_ts
+
+
+def test_a_backwards_backfill_does_not_move_the_measurement_instant(run_dir, monkeypatch):
+    """A backfill extends the record backwards and leaves the forward cursor
+    alone. It therefore measures nothing new, and must leave `crawledAt`
+    exactly where the last forward run put it."""
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    first_block = 100_000
+    indexed_at = crawl.format_iso(_iso_day_ts("2026-09-06", 10))
+    state = _state(first=first_block, last=first_block + 500)
+    state["lastIndexedAt"] = indexed_at
+    (run_dir / "state.json").write_text(json.dumps(state))
+
+    older_ts = _iso_day_ts("2026-09-05", 20)
+    rpc = _StubRpc(
+        launch_logs=[_launch_log("0x" + "8" * 40, first_block - 100, "0x" + "14" * 32)],
+        timestamps={first_block - 100: older_ts},
+    )
+
+    crawl.run(
+        data_dir=run_dir,
+        rpc_client=rpc,
+        head_block=first_block + 900,
+        now=_now("2026-09-06", 23),
+        backfill_hours=1,
+    )
+
+    after = json.loads((run_dir / "state.json").read_text())
+    number = json.loads((run_dir / "number.json").read_text())
+    assert after["lastIndexedBlock"] == state["lastIndexedBlock"]
+    assert after["lastIndexedAt"] == indexed_at
+    assert number["crawledAt"] == indexed_at
+    assert after["firstIndexedBlock"] < first_block  # the record did grow backwards

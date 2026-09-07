@@ -19,7 +19,7 @@ describe("the death card", () => {
     expect(text).toContain(ADDRESS.slice(0, 10));
     expect(text).toContain(`of ${body.cohort!.allTime!.launches.toLocaleString("en-US")} launches`);
     expect(text).toContain("LEDGE.TOOLS");
-    expect(text).toContain("Measured 6 Sep 2026");
+    expect(text).toContain("Measured 7 Nov 2025");
   });
 
   it("states the configuration the cohort is about", () => {
@@ -92,7 +92,7 @@ describe("the plate", () => {
   describe("every line stays on the plate", () => {
     for (const [name, overrides] of CASES) {
       it(name, () => {
-        for (const t of cardTree(makeBody(overrides), 7953).texts) {
+        for (const t of cardTree(makeBody(overrides), MAX).texts) {
           const width = widthOf(t.text, t.size, t.letterSpacing ?? 0);
           expect(width, `${t.text} (${Math.round(width)}px)`).toBeLessThanOrEqual(PLATE);
           // and set down only so far that it stays readable
@@ -106,7 +106,7 @@ describe("the plate", () => {
         makeBody({
           fill: { filledWei: "8090000000", thresholdWei: "8090000000", share: 1, note: FILL_GRADUATED },
         }),
-        7953,
+        MAX,
       );
       const fill = card.texts.find((t) => t.text.startsWith("Curve fill"))!;
       const address = card.texts.find((t) => t.text.includes("\u2026"))!;
@@ -115,5 +115,49 @@ describe("the plate", () => {
       const addressStarts = address.x - widthOf(address.text, address.size);
       expect(fillEnds, "the fill line runs into the address").toBeLessThan(addressStarts);
     });
+  });
+});
+
+/* B3 — the card carries the age too, and spends the one colour on it.
+
+   CONSTRAINTS #7: "Never let a stale number look fresh. Every figure shows
+   'updated N min ago'. If the latest successful crawl is older than 2 hours,
+   the page shows a stale banner and the OG card renders the age prominently."
+   The card is the copy that travels furthest from the page, so it is the one
+   that must not be able to look fresh. */
+describe("a card built on a measurement past the bound", () => {
+  function agedNumber(secondsOld: number) {
+    const file = fixtureNumber();
+    file.crawledAt = new Date((NOW_SECONDS - secondsOld) * 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, "Z");
+    return file;
+  }
+
+  const STALE_COLOUR = "#B3321C";
+
+  it("prints the age and names the bound it is past", () => {
+    const card = cardTree(makeBody({ numberFile: agedNumber(9 * 86_400) }), MAX);
+    expect(collectText(card)).toContain("measured 9 d ago — older than the 2 h freshness bound");
+  });
+
+  it("prints that age in the stale colour, which is the only colour on the card", () => {
+    const card = cardTree(makeBody({ numberFile: agedNumber(9 * 86_400) }), MAX);
+    const aged = card.texts.filter((t) => t.text.includes("measured 9 d ago"));
+    expect(aged.length).toBeGreaterThan(0);
+    for (const t of aged) expect(t.fill).toBe(STALE_COLOUR);
+  });
+
+  it("says nothing of the sort for a measurement inside the bound", () => {
+    const card = collectText(cardTree(makeBody({ numberFile: agedNumber(7199) }), MAX));
+    expect(card).not.toContain("freshness bound");
+  });
+
+  it("keeps every line on the plate with the age on it", () => {
+    for (const t of cardTree(makeBody({ numberFile: agedNumber(9 * 86_400) }), MAX).texts) {
+      expect(widthOf(t.text, t.size, t.letterSpacing ?? 0), t.text).toBeLessThanOrEqual(
+        CARD_WIDTH - 128,
+      );
+    }
   });
 });

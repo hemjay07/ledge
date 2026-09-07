@@ -124,13 +124,13 @@ describe("the sentences, taken back apart", () => {
   it("renders the API's sentences verbatim, never a rebuilt one", () => {
     const lines = splitLookupText(body(ok));
     expect(lines.headline).toBe(
-      "minute 13 · on the curve · cohort 1.62% (n=1,047) · ETH · 2–3%",
+      "minute 13 · on the curve · cohort 1.46% (n=2,324) · ETH · 2–3%",
     );
     expect(lines.cohort).toHaveLength(2);
     expect(lines.cohort[0]).toContain("Launches configured this way, all time:");
-    expect(lines.cohort[0]).toContain("of 1,047");
+    expect(lines.cohort[0]).toContain("of 2,324");
     expect(lines.placement).toBe(
-      "By 10 min, 73.8% of the 107 graduations measured in this window had already happened.",
+      "By 10 min, 76.4% of the 535 graduations measured in this window had already happened. These figures were measured 303 d ago — older than the 2 h freshness bound.",
     );
     expect(lines.fill).toContain("Curve fill:");
   });

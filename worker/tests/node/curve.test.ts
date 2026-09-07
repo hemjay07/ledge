@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   FILL_GRADUATED,
+  FILL_OVER_THRESHOLD,
   FILL_UNAVAILABLE,
   SELECTOR_GRADUATED,
   SELECTOR_GRADUATION_THRESHOLD,
@@ -335,5 +336,115 @@ describe("how a fill reaches a reader", () => {
     const body = makeBody({ fill: null }) as any;
     body.state.fillNote = null;
     expect(tokenResponseSchema.safeParse({ ...body, text: "x" }).success).toBe(false);
+  });
+});
+
+/* B2 — a per-item RPC error in the fill batch.
+
+   The three reads travel in one batch, and a JSON-RPC batch can fail one item
+   and answer the other two. `indexBatchResponse` hands back `undefined` for
+   the failed item, which decoded to null, which for a GRADUATED token read as
+   "not graduated, holding zero" -- because the curve really does hold zero
+   once it has been drained. The sentence then said "0.0% of the threshold"
+   about a token that filled all the way. A share the reads do not support is
+   not a small error in a number; it is the opposite of what happened. */
+describe("a read that did not come back", () => {
+  const c = CURVES["graduated"]!;
+
+  /* The endpoint answering the batch, with one item carrying an `error`
+     rather than a `result` -- which is what a per-item RPC failure looks
+     like on the wire, and what indexBatchResponse turns into `undefined`.
+     It is not the same as a curve that answered nothing decodable: that one
+     still has its documented fallback, tested above. */
+  function faultyCurve(missing: string) {
+    const answers = answersFor(c);
+    const client = new RpcClient("http://unused", async (payload) => {
+      const batch = payload as Array<{ id: number; method: string; params: any[] }>;
+      return batch.map((request) => {
+        const data: string = request.params[0].data;
+        return data === missing
+          ? { id: request.id, error: { code: -32000, message: "execution reverted" } }
+          : { id: request.id, result: answers[data] ?? null };
+      });
+    });
+    return { client };
+  }
+
+  it("never renders a drained graduated curve as nothing", async () => {
+    const { client } = faultyCurve((SELECTOR_GRADUATED));
+    const fill = (await curveFill(client, c.curve, c.graduationThreshold))!;
+    expect(fill.share).toBeNull();
+    expect(fill.note).toBeTruthy();
+
+    const body = makeBody({ fill, pairDecimals: 6 });
+    expect(body.state.curveFilledShare).toBeNull();
+    const text = lookupText(body, null);
+    expect(text).not.toContain("0.0% of the threshold");
+    expect(text).not.toMatch(/\d+(\.\d+)?%\s+of the threshold/);
+  });
+
+  for (const [selector, words] of [
+    [SELECTOR_GRADUATED, "whether it had graduated"],
+    [SELECTOR_REAL_QUOTE_RESERVE, "the quote it has raised"],
+    [SELECTOR_GRADUATION_THRESHOLD, "the threshold it is measured against"],
+  ] as const) {
+    it(`says in words which read failed: ${words}`, async () => {
+      const { client } = faultyCurve((selector));
+      const fill = (await curveFill(client, c.curve, c.graduationThreshold))!;
+      expect(fill.share).toBeNull();
+      expect(fill.note).toContain(words);
+      expect(fill.note).not.toMatch(/\d/); // a note, never a number
+    });
+  }
+
+  it("carries the reason onto the page and the card, and no figure with it", async () => {
+    const { client } = faultyCurve((SELECTOR_REAL_QUOTE_RESERVE));
+    const fill = (await curveFill(client, c.curve, c.graduationThreshold))!;
+    const body = makeBody({ fill, pairDecimals: 6 });
+    expect(lookupText(body, null)).toContain("the quote it has raised");
+    expect(collectText(cardTree(body, null))).toContain("the quote it has raised");
+    expect(tokenResponseSchema.safeParse({ ...body, text: "x" }).success).toBe(true);
+  });
+
+  it("still reports nothing at all for an address that answers none of the three", async () => {
+    const { client } = fakeCurve({});
+    expect(await curveFill(client, "0xnotacurve", "4200000000000000000")).toBeNull();
+  });
+});
+
+/* B2 — a reserve above the threshold.
+
+   It is a real reading: the curve is read between the buy that crossed the
+   threshold and the graduation that empties it. A bare "104.8%" of a
+   threshold reads as a broken instrument, so the reading carries a word
+   saying what it is. */
+describe("a reserve above the threshold", () => {
+  async function overFilled() {
+    const { client } = fakeCurve({
+      [SELECTOR_GRADUATED]: word(0n),
+      [SELECTOR_REAL_QUOTE_RESERVE]: word(4_400_000_000_000_000_000n),
+      [SELECTOR_GRADUATION_THRESHOLD]: word(4_200_000_000_000_000_000n),
+    });
+    return (await curveFill(client, "0xcurve", "4200000000000000000"))!;
+  }
+
+  it("keeps the share and adds the word", async () => {
+    const fill = await overFilled();
+    expect(fill.share).toBeGreaterThan(1);
+    expect(fill.note).toBe(FILL_OVER_THRESHOLD);
+  });
+
+  it("never prints the percentage bare, on the page or on the card", async () => {
+    const fill = await overFilled();
+    const body = makeBody({ fill });
+    const line = lookupText(body, null)
+      .split("\n")
+      .find((l) => l.startsWith("Curve fill"))!;
+    expect(line).toContain("104.8%");
+    expect(line).toContain("above the threshold");
+
+    const card = collectText(cardTree(body, null));
+    expect(card).toContain("104.8%");
+    expect(card).toContain("above the threshold");
   });
 });

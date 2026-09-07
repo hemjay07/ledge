@@ -19,7 +19,11 @@ export function fixtureNumber(): NumberFile {
 export const ADDRESS = "0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2";
 /** This launch's own curve. There is no shared curve. */
 export const CURVE = "0xf6e86610771ee7838cabe2f9c376265ca25ef04c";
-export const NOW_SECONDS = 1788718447; // fixed clock: the tests must not drift
+/* A fixed clock, twelve minutes after the frozen fixture's own crawledAt
+   (2025-11-07T17:20:15Z). Twelve minutes because the freshness rule is now
+   rendered: the cohort figures have to read as measured recently unless a
+   test deliberately ages them past the published bound. */
+export const NOW_SECONDS = 1_762_536_735;
 
 export const ON_CHAIN: LaunchedToken = {
   exists: true,

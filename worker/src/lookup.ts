@@ -34,9 +34,24 @@ import { curveFill, FILL_UNAVAILABLE } from "./curve";
 import { placeOnLadder, type Placement } from "./ladder";
 import type { NumberFile, NumberWindow, PairTaxRow, WindowName } from "./numberFile";
 import type { CohortWindow, TokenResponse } from "./schema";
-import { toIso } from "./format";
+import { ageSeconds, toIso } from "./format";
 
 export const LIVE_STALE_AFTER_SECONDS = 300;
+
+/** Whether the live layer knows it is behind.
+
+    METHOD.md is binding on what the word means: a layer is stale when "it
+    recorded a failure since its last success (consecutiveFailures > 0, or
+    lastRunAt after lastSuccessAt, or no successful run yet)" -- OR when the
+    last success is simply too old. Only the second half was read here, so a
+    tick that had failed its last four passes still reported a fresh live
+    layer for five minutes: the window in which a reader is most likely to be
+    looking at it. Both halves, in one place, read by every surface. */
+export function liveStale(cursor: CursorRow | null, nowSeconds: number): boolean {
+  if (cursor === null) return true;
+  if (cursor.consecutive_failures > 0) return true;
+  return nowSeconds - cursor.last_success_at > LIVE_STALE_AFTER_SECONDS;
+}
 
 export interface LaunchRow {
   token: string;
@@ -127,8 +142,17 @@ export async function readIndex(
   address: string,
 ): Promise<{ launch: LaunchRow | null; graduation: GraduationRow | null; cursor: CursorRow | null }> {
   const [launch, graduation, cursor] = await db.batch([
-    db.prepare("SELECT token, curve, pair_token, pair_class, creator_tax_bps, block, ts FROM launch WHERE token = ?").bind(address),
-    db.prepare("SELECT token, block, ts FROM graduation WHERE token = ?").bind(address),
+    /* `token` is indexed but not unique -- the durable key is the log's own
+       identity -- so both reads name the row they want: the earliest, which
+       is the one that actually happened. */
+    db
+      .prepare(
+        "SELECT token, curve, pair_token, pair_class, creator_tax_bps, block, ts FROM launch WHERE token = ? ORDER BY block ASC LIMIT 1",
+      )
+      .bind(address),
+    db
+      .prepare("SELECT token, block, ts FROM graduation WHERE token = ? ORDER BY block ASC LIMIT 1")
+      .bind(address),
     db.prepare("SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1"),
   ]);
   return {
@@ -173,13 +197,26 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
 
   const observedAt = toIso(nowSeconds);
   const lastSuccessAt = cursor ? toIso(cursor.last_success_at) : null;
-  const staleLive = cursor === null || nowSeconds - cursor.last_success_at > LIVE_STALE_AFTER_SECONDS;
+  const staleLive = liveStale(cursor, nowSeconds);
 
   let cohort: TokenResponse["cohort"] = null;
+  let freshness: TokenResponse["freshness"] = null;
   let placement: Placement | null = null;
   if (numberFile) {
     const h24Row = findPairTaxRow(numberFile.h24, pairClass, taxBucket);
     const allTimeRow = findPairTaxRow(numberFile.allTime, pairClass, taxBucket);
+    /* The age of the measurement, computed here and now against the bound
+       number.json publishes (METHOD.md "Freshness"). It is not read off the
+       file's own `stale` flag, which says only that the run knew it was
+       behind: a successful run publishes stale:false however old the data
+       later becomes, so a file nine days old arrives claiming to be fresh. */
+    const cohortAge = ageSeconds(numberFile.crawledAt, nowSeconds * 1000);
+    freshness = {
+      crawledAt: numberFile.crawledAt,
+      ageSeconds: cohortAge,
+      staleAfterSeconds: numberFile.staleAfterSeconds,
+      stale: cohortAge >= numberFile.staleAfterSeconds,
+    };
     cohort = {
       crawledAt: numberFile.crawledAt,
       definitionsVersion: numberFile.definitionsVersion,
@@ -225,6 +262,7 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
       indexed,
     },
     cohort,
+    freshness,
     /* `reason` stays internal to ladder.ts: the pair (rung, insufficient) is
        already a complete encoding for a consumer -- a null rung with
        insufficient false is "younger than the first mark", and with

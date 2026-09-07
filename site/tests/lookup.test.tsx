@@ -84,7 +84,7 @@ describe("a full lookup", () => {
     await waitFor(() => expect(container.textContent).toContain("ETH · 2–3%"));
     const text = container.textContent ?? "";
     expect(text).toContain("on the bonding curve");
-    expect(text).toContain("of 1,047 graduated");
+    expect(text).toContain("of 2,324 graduated");
     expect(text).toContain("had already happened");
     expect(text).toContain("Curve fill:");
   });
@@ -124,7 +124,7 @@ describe("a partial", () => {
     const text = container.textContent ?? "";
     expect(text).toContain(notIndexed.message);
     expect(text).toContain("ETH · 2–3%");
-    expect(text).toContain("of 1,047 graduated");
+    expect(text).toContain("of 2,324 graduated");
     expect(text).toContain("is not placed on the table of graduation times");
   });
 });

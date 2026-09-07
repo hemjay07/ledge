@@ -89,6 +89,8 @@ Selector `0x3cf28b5a` (`getLaunchedToken(address)`), called on the factory, retu
 7. **Commit point.** Every output is computed into memory first: the appended partition payloads, the merged/rotated `.gz` archives, `data/pair-tokens.json`, `data/number.json` (from the staged in-memory record set, not by re-reading disk) and `data/state.json`. Only after the last of those returns successfully does the run write anything, and it then writes each payload to a sibling `.tmp` and `os.replace`s it into place, in the order partitions → rotations → pair-tokens → `number.json` → `state.json`. A failure at any earlier point — an RPC error, a missing block header, a stats bug — exits non-zero having written **nothing**: the data directory is byte-for-byte unchanged, `state.json` still points at the old `lastIndexedBlock`, no `.tmp` file survives, and the next run re-scans the same range.
 8. If no new records and `lastIndexedBlock` is unchanged, exit 0 with no file writes so the Action makes no commit (SPEC acceptance: two consecutive empty runs produce no commit). If `lastIndexedBlock` advanced but there were no events, `state.json` still changes and a commit is made — that is correct, it advances the resume point.
 
+`lastIndexedAt` is the block timestamp of `lastIndexedBlock`, read from that block's header (one extra `eth_getBlockByNumber` per run) and published unchanged as `number.json`'s `crawledAt` — the "measured at" instant every window closes on and every consumer ages. It is chain time, never the run's wall clock: a wall clock runs ahead of the blocks the run actually scanned and closes every window over minutes that were never indexed, understating the denominator with no way for `recompute.py --check` to see it. It moves only when the cursor moves, so a backwards backfill (which leaves `lastIndexedBlock` alone) leaves it alone. `lastRunAt` and `lastSuccessAt` stay wall-clock and feed only the `stale` flag (§7). A `state.json` written before this field existed has no `lastIndexedAt`; `recompute.py` then falls back to one second past the newest launch in the record — a block header too, and short of indexed chain time — and never to `lastSuccessAt`.
+
 Records are appended in block order and never rewritten, so each hourly commit is a small tail diff rather than an 8 MB rewrite.
 
 ### `data/state.json`
@@ -98,6 +100,7 @@ Records are appended in block order and never rewritten, so each hourly commit i
   "version": 1,
   "firstIndexedBlock": 55219400,
   "lastIndexedBlock": 55919382,
+  "lastIndexedAt": "2026-09-06T12:44:58Z",
   "reorgWindow": 3000,
   "lastRunAt": "2026-09-06T12:45:03Z",
   "lastSuccessAt": "2026-09-06T12:45:03Z",
@@ -301,7 +304,7 @@ The ladder above is abbreviated to four of its eleven rungs, and the cohort arra
 usage: recompute.py [--data-dir data] [--out data/number.json] [--check]
 ```
 
-No network imports; the module asserts at import time that `urllib.request` is never called (the RPC client lives in `pipeline/rpc.py` and `recompute.py` does not import it). It reads `state.json` for `headBlock`/`firstIndexedBlock`/`crawledAt` and every partition (plain and `.gz`), re-resolves `pairClass` from `pair-tokens.json`, and writes canonical JSON. `--check` diffs against the committed file and exits 1 on any difference, printing a unified diff.
+No network imports; the module asserts at import time that `urllib.request` is never called (the RPC client lives in `pipeline/rpc.py` and `recompute.py` does not import it). It reads `state.json` for `headBlock`/`firstIndexedBlock`/`lastIndexedAt` (published as `crawledAt`) and every partition (plain and `.gz`), re-resolves `pairClass` from `pair-tokens.json`, and writes canonical JSON. `--check` diffs against the committed file and exits 1 on any difference, printing a unified diff.
 
 ### Canonical serialization — `pipeline/canonical.py`
 

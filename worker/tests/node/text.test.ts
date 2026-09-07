@@ -101,7 +101,7 @@ describe("the lookup text", () => {
   });
 
   it("carries the measurement stamp and the method link", () => {
-    expect(text).toContain("Measured 6 Sep 2026");
+    expect(text).toContain("Measured 7 Nov 2025");
     expect(text).toContain("https://ledge.tools/method");
   });
 
@@ -161,5 +161,68 @@ describe("the /number reply", () => {
     const t = numberText(short, file.crawledAt, "3 min", "https://ledge.tools/method");
     expect(t).toContain("not enough data (n=12)");
     expect(t).not.toMatch(/\d\.\d%/);
+  });
+});
+
+/* B3 — the freshness bound, computed at render.
+
+   number.json carries `staleAfterSeconds` (7,200) and METHOD.md ("Freshness")
+   is explicit that the age is the consumer's computation: "Any consumer -- the
+   page, the card, a third party reading /number.json -- computes now − crawledAt
+   and compares it to the published staleAfterSeconds". Nothing read that field.
+   A nine-day-old file rendered exactly like a fresh one, and a cohort figure
+   measured nine days ago was stated as if it were measured now. */
+
+const STALE_BOUND = fixtureNumber().staleAfterSeconds;
+const FRESHNESS_NOTE_PATTERN = /measured .+ ago — older than the 2 h freshness bound/;
+
+/** The frozen file, aged: only the moment it was crawled moves. */
+function agedNumber(secondsOld: number) {
+  const file = fixtureNumber();
+  file.crawledAt = new Date((NOW_SECONDS - secondsOld) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+  return file;
+}
+
+describe("a measurement older than the published bound", () => {
+  const nineDays = lookupText(makeBody({ numberFile: agedNumber(9 * 86_400) }), MAX);
+
+  it("says so on every cohort sentence", () => {
+    const cohortLines = nineDays.split("\n").filter((l) => /graduated,/.test(l));
+    expect(cohortLines.length).toBeGreaterThan(0);
+    for (const line of cohortLines) {
+      expect(line).toMatch(FRESHNESS_NOTE_PATTERN);
+      expect(line).toContain("measured 9 d ago");
+    }
+  });
+
+  it("says so on the placement sentence", () => {
+    const placement = nineDays.split("\n").find((l) => l.includes("had already happened"))!;
+    expect(placement).toMatch(FRESHNESS_NOTE_PATTERN);
+  });
+
+  it("names the bound the file itself published, never a hard-coded one", () => {
+    expect(STALE_BOUND).toBe(7200);
+    expect(nineDays).toContain("older than the 2 h freshness bound");
+  });
+
+  it("prints no percentage anywhere without an n, aged or not", () => {
+    expect(percentagesWithoutAnN(nineDays)).toEqual([]);
+  });
+});
+
+describe("the bound itself, from both sides", () => {
+  it("is fresh one second inside it", () => {
+    const text = lookupText(makeBody({ numberFile: agedNumber(STALE_BOUND - 1) }), MAX);
+    expect(text).not.toMatch(FRESHNESS_NOTE_PATTERN);
+    expect(text).not.toContain("freshness bound");
+  });
+
+  it("is stale exactly on it", () => {
+    const text = lookupText(makeBody({ numberFile: agedNumber(STALE_BOUND) }), MAX);
+    expect(text).toMatch(FRESHNESS_NOTE_PATTERN);
+  });
+
+  it("leaves a recently measured file unmarked", () => {
+    expect(lookupText(makeBody(), MAX)).not.toContain("freshness bound");
   });
 });

@@ -62,6 +62,16 @@ export interface PairTaxRow {
   excludingFast: ExcludingFast;
 }
 
+/** The two figures METHOD binds to the ladder's 60 s and 300 s rungs: "the
+    ladder and those two figures cannot disagree". Read by the fixture
+    invariant test, never by a renderer -- a share is printed from the rung. */
+export interface FastShares {
+  n: number;
+  under300Share: number | null;
+  under60Share: number | null;
+  insufficient: boolean;
+}
+
 export interface NumberWindow {
   since: number | null;
   until: number;
@@ -71,6 +81,7 @@ export interface NumberWindow {
   insufficient: boolean;
   lowerBound: boolean;
   excludingFast: ExcludingFast;
+  fastShares?: FastShares;
   ttg: Ttg;
   cohorts: {
     pair: Array<{ bucket: string; launches: number; graduations: number; rate: number | null; insufficient: boolean }>;

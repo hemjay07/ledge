@@ -48,27 +48,68 @@ export const SELECTOR_GRADUATION_THRESHOLD = "0x8b0bc501";
 
 export interface CurveFill {
   /** Quote raised so far, net of fees and creator tax, in the pair token's
-      smallest unit. Equal to the threshold once graduated. */
-  filledWei: string;
+      smallest unit. Equal to the threshold once graduated. Null when the read
+      that would have supplied it did not come back. */
+  filledWei: string | null;
   /** The threshold it is measured against, same unit, read from the curve. */
-  thresholdWei: string;
+  thresholdWei: string | null;
   /** filledWei over thresholdWei, to six places. A Class B ratio of two
       observed quantities against one constant, not a sample statistic — it is
       rendered as a bar with both figures beside it, never as a lone
-      percentage. */
-  share: number;
-  /** Non-null when the reading needs a word to be honest — currently only the
-      graduated case, where the curve holds nothing and the figure is the
-      threshold it filled to rather than a live balance. */
+      percentage.
+
+      NULL WHENEVER ANY OF THE THREE READS FAILED. A batch can fail one item
+      and answer the other two, and the drained-curve case makes that silence
+      dangerous: a graduated curve holds nothing, so a failed graduated() with
+      an answered reserve of zero produced 0.0%, which is the opposite of what
+      happened. A share the reads do not support is not published at all, and
+      `note` says which read is missing. */
+  share: number | null;
+  /** Non-null whenever the reading needs a word to be honest: the graduated
+      case, where the curve holds nothing and the figure is the threshold it
+      filled to; a reserve standing above the threshold; and a read that did
+      not come back. */
   note: string | null;
 }
 
 export const FILL_UNAVAILABLE = "fill not available";
+/** What each of the three reads would have told us, in words. A note names
+    the missing fact, never the selector: a reader is owed the fact. */
+export const READ_WORDS: Record<string, string> = {
+  [SELECTOR_GRADUATED]: "whether it had graduated",
+  [SELECTOR_REAL_QUOTE_RESERVE]: "the quote it has raised",
+  [SELECTOR_GRADUATION_THRESHOLD]: "the threshold it is measured against",
+};
+/** "the curve did not answer whether it had graduated, so the fill is not
+    known". No figure travels with it, because none of them is supported. */
+export function fillReadFailed(missing: readonly string[]): string {
+  const words = missing.map((selector) => READ_WORDS[selector] ?? selector);
+  const listed =
+    words.length === 1
+      ? (words[0] as string)
+      : `${words.slice(0, -1).join(", ")} or ${words[words.length - 1]}`;
+  return `the curve did not answer ${listed}, so the fill is not known`;
+}
+/** A real reading, taken between the buy that crossed the threshold and the
+    graduation that empties the curve. It is above 100% and must never be
+    printed as a bare percentage: the word is what stops it reading as a
+    broken instrument. */
+export const FILL_OVER_THRESHOLD =
+  "the reserve stands above the threshold; the curve had not been emptied when it was read";
+export const FILL_OVER_THRESHOLD_CARD = "reserve above the threshold when read";
 export const FILL_GRADUATED =
   "the curve was emptied at graduation; this is the threshold it filled to, not a live balance";
 /** The same fact, short enough for the card's one line. Kept beside the long
     form so a reviewer reads them together and neither drifts. */
 export const FILL_GRADUATED_CARD = "filled to the threshold at graduation";
+
+/** A note in the form the card has room for. Every note reaches the card:
+    a figure whose word was dropped in the layout is a bare figure. */
+export function fillNoteShort(note: string): string {
+  if (note === FILL_GRADUATED) return FILL_GRADUATED_CARD;
+  if (note === FILL_OVER_THRESHOLD) return FILL_OVER_THRESHOLD_CARD;
+  return note;
+}
 
 function decodeUint(result: unknown): bigint | null {
   if (typeof result !== "string" || result.length < 66) return null;
@@ -100,11 +141,21 @@ export async function curveFill(
   eventThresholdWei: string,
 ): Promise<CurveFill | null> {
   // One batch, one round trip, same envelope as everything else.
-  const results = await rpc.callBatch([
-    { method: "eth_call", params: [{ to: curve, data: SELECTOR_GRADUATED }, "latest"] },
-    { method: "eth_call", params: [{ to: curve, data: SELECTOR_REAL_QUOTE_RESERVE }, "latest"] },
-    { method: "eth_call", params: [{ to: curve, data: SELECTOR_GRADUATION_THRESHOLD }, "latest"] },
-  ]);
+  const selectors = [
+    SELECTOR_GRADUATED,
+    SELECTOR_REAL_QUOTE_RESERVE,
+    SELECTOR_GRADUATION_THRESHOLD,
+  ];
+  const results = await rpc.callBatch(
+    selectors.map((data) => ({ method: "eth_call", params: [{ to: curve, data }, "latest"] })),
+  );
+
+  /* A batch item that failed carries no `result` at all, and
+     indexBatchResponse hands back `undefined` for it. That is a different
+     thing from a curve that answered something undecodable, which is a
+     silence we have documented fallbacks for -- so the two are not
+     conflated. */
+  const missing = selectors.filter((_, i) => results[i] === undefined);
 
   const graduatedWord = decodeUint(results[0]);
   const filled = decodeUint(results[1]);
@@ -123,6 +174,19 @@ export async function curveFill(
       threshold = null;
     }
   }
+
+  /* No share, and a word saying which fact is missing. The quantities that
+     DID come back still travel: they are observations, and one of them being
+     unreadable does not make the other untrue. */
+  if (missing.length > 0) {
+    return {
+      filledWei: filled === null ? null : filled.toString(),
+      thresholdWei: threshold === null ? null : threshold.toString(),
+      share: null,
+      note: fillReadFailed(missing),
+    };
+  }
+
   if (threshold === null) return null;
 
   // graduated() first: the curve drains on graduation, so the live balance
@@ -136,12 +200,19 @@ export async function curveFill(
     };
   }
 
-  if (filled === null) return null;
+  if (filled === null) {
+    return {
+      filledWei: null,
+      thresholdWei: threshold.toString(),
+      share: null,
+      note: fillReadFailed([SELECTOR_REAL_QUOTE_RESERVE]),
+    };
+  }
 
   return {
     filledWei: filled.toString(),
     thresholdWei: threshold.toString(),
     share: shareOf(filled, threshold),
-    note: null,
+    note: filled > threshold ? FILL_OVER_THRESHOLD : null,
   };
 }

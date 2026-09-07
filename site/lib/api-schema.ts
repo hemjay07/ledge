@@ -67,6 +67,29 @@ const cohortWindow = cohortWindowShape.superRefine((w, ctx) => {
   }
 });
 
+/* METHOD.md "Freshness": "Age is the consumer's computation, not a field."
+   number.json is static and cannot age its own contents, so every consumer
+   computes now − crawledAt at render and compares it with the published
+   staleAfterSeconds. This object is that computation, carried in the response
+   so the card, the shell, the bot and the site all read one answer rather than
+   each doing the subtraction differently -- or, as they did, not at all. */
+const freshness = z
+  .object({
+    crawledAt: z.string(),
+    ageSeconds: z.number().int().nonnegative(),
+    staleAfterSeconds: z.number().int().positive(),
+    stale: z.boolean(),
+  })
+  .superRefine((f, ctx) => {
+    if (f.stale !== f.ageSeconds >= f.staleAfterSeconds) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["stale"],
+        message: "stale must be the age against the published bound, nothing else",
+      });
+    }
+  });
+
 const cohort = z.object({
   crawledAt: z.string(),
   definitionsVersion: z.string(),
@@ -154,6 +177,10 @@ export const tokenResponseSchema = z
     config,
     state,
     cohort: cohort.nullable(),
+    /* Beside the cohort rather than inside it: the cohort object is a verbatim
+       copy of number.json rows, and the age is this response's own reading of
+       the clock against the file's published bound. */
+    freshness: freshness.nullable(),
     placement: placement.nullable(),
     live,
     text: z.string(),

@@ -20,9 +20,14 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from pipeline.canonical import canonical_dumps
-from pipeline.stats import build_number
+from pipeline.stats import build_number, format_iso
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+# Before anything is indexed there is no block to take chain time from. The
+# epoch is a deterministic, reproducible placeholder that renders as
+# "not enough data" everywhere rather than crashing.
+EPOCH_ISO = "1970-01-01T00:00:00Z"
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -58,6 +63,36 @@ def resolve_pair_class(launch: dict, pair_tokens: dict) -> str:
     return entry.get("class", "other") if entry else "other"
 
 
+def crawled_at_for(state: dict, launches: list) -> str:
+    """The instant the whole site keys on: the chain time of the last block
+    LEDGE indexed, as an ISO-8601 Z string.
+
+    METHOD.md "Freshness": `crawledAt` is a block timestamp, never the wall
+    clock of the run that wrote the file. A window closing at a wall clock
+    reaches past the chain LEDGE has actually read -- minutes that hold no
+    launches because they were never scanned -- and understates every
+    denominator computed over it.
+
+    `state.json` carries it as `lastIndexedAt`, written from the header of
+    `lastIndexedBlock` by the crawl. A state file written before that field
+    existed falls back to a second past the newest launch in the record: a
+    block header too, and short of indexed chain time. `lastSuccessAt` is a
+    wall clock and is never consulted here -- it answers whether the
+    generating run knew it was behind (`stale`), and nothing else.
+    """
+    last_indexed_at = state.get("lastIndexedAt")
+    if last_indexed_at:
+        return last_indexed_at
+    if launches:
+        # One second past the newest launch, so the half-open window closes
+        # after it rather than on it -- the same convention pipeline/vectors.py
+        # uses to anchor a window on a finished record. The cursor is always
+        # further on than the newest record's block, so this is still short of
+        # indexed chain time.
+        return format_iso(max(l["ts"] for l in launches) + 1)
+    return EPOCH_ISO
+
+
 def recompute(data_dir) -> dict:
     data_dir = Path(data_dir)
     state = json.loads((data_dir / "state.json").read_text())
@@ -70,13 +105,7 @@ def recompute(data_dir) -> dict:
     for launch in launches:
         launch["pairClass"] = resolve_pair_class(launch, pair_tokens)
 
-    # Before the first successful crawl, lastSuccessAt is null (see
-    # data/state.json's seed schema). build_number still needs a concrete
-    # crawledAt to anchor the 24h window; the epoch is a deterministic,
-    # reproducible placeholder that renders as "insufficient data"
-    # everywhere rather than crashing.
-    crawled_at = state.get("lastSuccessAt") or "1970-01-01T00:00:00Z"
-    return build_number(launches, graduations, state, crawled_at)
+    return build_number(launches, graduations, state, crawled_at_for(state, launches))
 
 
 def _unified_diff(committed: str, recomputed: str) -> str:

@@ -33,7 +33,7 @@
       "indexed": false
     },
     "cohort": {
-      "crawledAt": "2026-09-06T18:00:36Z",
+      "crawledAt": "2025-11-07T17:20:15Z",
       "definitionsVersion": "2026-09-06",
       "key": {
         "pairClass": "eth",
@@ -41,34 +41,40 @@
       },
       "h24": {
         "window": "24h",
-        "crawledAt": "2026-09-06T18:00:36Z",
-        "launches": 1047,
-        "graduations": 17,
-        "rate": 0.016237,
+        "crawledAt": "2025-11-07T17:20:15Z",
+        "launches": 2324,
+        "graduations": 34,
+        "rate": 0.01463,
         "insufficient": false,
         "excludingFast": {
           "cutoffSeconds": 300,
-          "graduations": 8,
-          "rate": 0.007641,
-          "oneIn": 131,
+          "graduations": 17,
+          "rate": 0.007315,
+          "oneIn": 137,
           "insufficient": false
         }
       },
       "allTime": {
         "window": "allTime",
-        "crawledAt": "2026-09-06T18:00:36Z",
-        "launches": 1047,
-        "graduations": 17,
-        "rate": 0.016237,
+        "crawledAt": "2025-11-07T17:20:15Z",
+        "launches": 2324,
+        "graduations": 34,
+        "rate": 0.01463,
         "insufficient": false,
         "excludingFast": {
           "cutoffSeconds": 300,
-          "graduations": 8,
-          "rate": 0.007641,
-          "oneIn": 131,
+          "graduations": 17,
+          "rate": 0.007315,
+          "oneIn": 137,
           "insufficient": false
         }
       }
+    },
+    "freshness": {
+      "crawledAt": "2025-11-07T17:20:15Z",
+      "ageSeconds": 26182432,
+      "staleAfterSeconds": 7200,
+      "stale": true
     },
     "placement": null,
     "live": {
@@ -81,6 +87,6 @@
       "method": "https://ledge.tools/method",
       "numberJson": "https://ledge.tools/number.json"
     },
-    "text": "0x23fe54b3…f98fe2 · Pons\nETH · 2–3% · on the bonding curve\nlaunch time not indexed · on the curve · cohort 1.62% (n=1,047) · ETH · 2–3%\nLaunched more than 7 days ago, or LEDGE has not reached this block yet. The launch time is not known, so the elapsed time and the placement are absent; everything else is read from the chain now.\nLaunches configured this way, all time: 17 of 1,047 graduated, 1.62%. Excluding launches that graduated inside 5 min: 8 of 1,047, 0.76% (1 in 131).\nIn the last 24 hours: 17 of 1,047 graduated, 1.62%. Excluding launches that graduated inside 5 min: 8 of 1,047, 0.76% (1 in 131).\nThe launch time is not indexed, so this launch is not placed on the table of graduation times.\nCurve fill: 1.7432 ETH of 4.2 ETH (41.5% of the threshold).\nMeasured 6 Sep 2026 · 18:00 UTC\nhttps://ledge.tools/method"
+    "text": "0x23fe54b3…f98fe2 · Pons\nETH · 2–3% · on the bonding curve\nlaunch time not indexed · on the curve · cohort 1.46% (n=2,324) · ETH · 2–3%\nLaunched more than 7 days ago, or LEDGE has not reached this block yet. The launch time is not known, so the elapsed time and the placement are absent; everything else is read from the chain now.\nLaunches configured this way, all time: 34 of 2,324 graduated, 1.46%. Excluding launches that graduated inside 5 min: 17 of 2,324, 0.73% (1 in 137). These figures were measured 303 d ago — older than the 2 h freshness bound.\nIn the last 24 hours: 34 of 2,324 graduated, 1.46%. Excluding launches that graduated inside 5 min: 17 of 2,324, 0.73% (1 in 137). These figures were measured 303 d ago — older than the 2 h freshness bound.\nThe launch time is not indexed, so this launch is not placed on the table of graduation times.\nCurve fill: 1.7432 ETH of 4.2 ETH (41.5% of the threshold).\nMeasured 7 Nov 2025 · 17:20 UTC\nhttps://ledge.tools/method"
   }
 }

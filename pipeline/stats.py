@@ -370,7 +370,10 @@ def deployers(w: dict) -> dict:
     }
 
 
-def _format_iso(ts: int) -> str:
+def format_iso(ts: int) -> str:
+    """A unix timestamp as the ISO-8601 Z string every published instant
+    uses. Public because `crawledAt` is now a block timestamp and both the
+    crawl and the recompute have to spell it the same way."""
     return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -383,7 +386,7 @@ def first_indexed_at(launches: list) -> Optional[str]:
     """
     if not launches:
         return None
-    return _format_iso(min(l["ts"] for l in launches))
+    return format_iso(min(l["ts"] for l in launches))
 
 
 def _parse_iso(value: str) -> int:
@@ -435,6 +438,10 @@ def _window_block(launches: list, graduations: list, since: Optional[int], until
 
 
 def build_number(launches: list, graduations: list, state: dict, crawled_at: str) -> dict:
+    # `crawled_at` is chain time: the block timestamp of the last indexed
+    # block, passed in by the caller (METHOD.md "Freshness"). Every window
+    # closes on it, so a wall clock here would close windows over blocks that
+    # were never scanned. This module reads no clock of its own.
     until = _parse_iso(crawled_at)
     since_24h = until - 86400
 

@@ -13,6 +13,14 @@ printing rules are imported from `pipeline/vectors.py`, which already holds
 the Python port of the Worker's `format.ts`, so the dispatch, the site, the
 API and the bot cannot disagree about when a number may be printed.
 
+THE WINDOW IS min(7 days, the indexed record). LEDGE's record starts at its
+first indexed launch, so a dispatch sent before seven days are indexed
+measures the record, not seven days. The window is clamped to it and every
+label -- subject, heading, the number line, the cohort lines -- names the
+span that was actually measured ("the indexed record so far: 29 h to
+6 Sep 2026"), because a figure labelled with a window nobody measured is a
+figure without its window (CONSTRAINTS.md #3).
+
 WHY THE 7-DAY WINDOW IS NOT IN number.json. `stats.window` takes an
 arbitrary `[since, until)` and `stats._window_block` assembles the same
 object the file publishes for `h24` and `allTime`, so a `d7` key would be a
@@ -84,6 +92,35 @@ INSIGHT_RUNG_SECONDS = 60
 
 MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
+# What a window shorter than the cap is called. The record LEDGE holds starts
+# at its first indexed launch, so until seven days have been indexed the
+# window is the record, and every label in the message says which it is and
+# how long it ran. A message that says "last 7 days" over 29 hours of record
+# states a window that was never measured.
+SHORT_WINDOW_LEAD = "the indexed record so far"
+
+
+def format_span(seconds: int) -> str:
+    """The measured span, in the largest unit it fills exactly.
+
+    Whole days print as days ("7 days"); anything else prints as the hours
+    it completed ("29 h"), then minutes. Hours are floored, not rounded: the
+    label names a span the window covers, never one it does not.
+    """
+    if seconds >= 86400 and seconds % 86400 == 0:
+        days = seconds // 86400
+        return f"{days} day" if days == 1 else f"{days} days"
+    if seconds >= 3600:
+        return f"{seconds // 3600} h"
+    return f"{max(1, seconds // 60)} min"
+
+
+def window_phrase(seconds: int, full: bool) -> str:
+    """The window as a figure's own label: "last 7 days", or the record's
+    real span when the record is shorter than the cap."""
+    span = format_span(seconds)
+    return f"last {span}" if full else f"{SHORT_WINDOW_LEAD}, {span}"
+
 
 class DispatchError(RuntimeError):
     """A delivery attempt that Resend refused, or a transport that failed."""
@@ -153,11 +190,11 @@ def _rung(ladder: list[dict], at_seconds: int) -> dict | None:
 
 
 # --- composition -------------------------------------------------------------
-def _number_lines(d7: dict) -> list[str]:
+def _number_lines(d7: dict, phrase: str) -> list[str]:
     n = d7["launches"]
     plain = rate_text(d7["rate"], n, d7["insufficient"])
     lines = [
-        f"Pons, last {WINDOW_DAYS} days: {format_count(d7['graduations'])} of "
+        f"Pons, {phrase}: {format_count(d7['graduations'])} of "
         f"{format_count(n)} launches graduated, {plain}."
     ]
 
@@ -173,7 +210,7 @@ def _number_lines(d7: dict) -> list[str]:
     return lines
 
 
-def _cohort_line(rows: list[dict], lead: str, label) -> str:
+def _cohort_line(rows: list[dict], lead: str, label, span: str) -> str:
     pair = furthest_apart(rows)
     if pair is None:
         return f"{lead}: not enough data (n={_cohort_n(rows)})."
@@ -186,7 +223,7 @@ def _cohort_line(rows: list[dict], lead: str, label) -> str:
         f"{label(low['bucket'])} {format_count(low['graduations'])} of "
         f"{format_count(low['launches'])}, "
         f"{rate_text(low['rate'], low['launches'], low['insufficient'])}. "
-        f"Two counts over the same {WINDOW_DAYS} days, not a cause."
+        f"Two counts over the same {span}, not a cause."
     )
 
 
@@ -220,13 +257,14 @@ def _insight_line(ttg: dict) -> str | None:
     )
 
 
-def _subject(d7: dict) -> str:
+def _subject(d7: dict, seconds: int, full: bool) -> str:
+    lead = format_span(seconds) if full else f"{SHORT_WINDOW_LEAD}, {format_span(seconds)}"
     ef = d7["excludingFast"]
     n = d7["launches"]
     if is_insufficient(ef["rate"], n, ef["insufficient"]) or ef["oneIn"] is None:
-        return f"LEDGE — {WINDOW_DAYS} days: not enough data (n={n})"
+        return f"LEDGE — {lead}: not enough data (n={n})"
     return (
-        f"LEDGE — {WINDOW_DAYS} days: 1 in {format_count(ef['oneIn'])}, "
+        f"LEDGE — {lead}: 1 in {format_count(ef['oneIn'])}, "
         f"excluding graduations inside {format_duration(ef['cutoffSeconds'])}"
     )
 
@@ -236,20 +274,30 @@ def compose(number: dict, launches: list, graduations: list) -> dict:
     finished sentences. Both renderings read this and neither writes a
     sentence of its own, so the plain text and the HTML cannot diverge."""
     until = parse_iso(number["crawledAt"])
+    # min(7 days, the indexed record). The record begins at its first indexed
+    # launch, so before seven days are indexed the window is the record, and
+    # every label below says so with the span it actually covers.
     since = until - WINDOW_SECONDS
+    first_indexed_at = number.get("firstIndexedAt")
+    if first_indexed_at:
+        since = max(since, parse_iso(first_indexed_at))
+    window_seconds = until - since
+    full = window_seconds >= WINDOW_SECONDS
+    phrase = window_phrase(window_seconds, full)
+    span = format_span(window_seconds)
 
-    # The same assembly `recompute.py` runs for h24 and allTime, over a
-    # 7-day interval. lowerBound is true for the same reason it is true of
-    # h24: a launch near the end of the window may still graduate.
+    # The same assembly `recompute.py` runs for h24 and allTime, over that
+    # interval. lowerBound is true for the same reason it is true of h24: a
+    # launch near the end of the window may still graduate.
     d7 = stats._window_block(launches, graduations, since, until, lower_bound=True)
 
     blocks = [
-        {"id": "number", "lines": _number_lines(d7)},
+        {"id": "number", "lines": _number_lines(d7, phrase)},
         {
             "id": "cohorts",
             "lines": [
-                _cohort_line(d7["cohorts"]["pair"], "Pair token", pair_label),
-                _cohort_line(d7["cohorts"]["tax"], "Creator tax", tax_label),
+                _cohort_line(d7["cohorts"]["pair"], "Pair token", pair_label, span),
+                _cohort_line(d7["cohorts"]["tax"], "Creator tax", tax_label, span),
             ],
         },
         {"id": "ttg", "lines": [_ttg_line(d7["ttg"])]},
@@ -259,14 +307,18 @@ def compose(number: dict, launches: list, graduations: list) -> dict:
         blocks.append({"id": "insight", "lines": [insight]})
 
     stamp = format_stamp(number["crawledAt"])
+    measured_on = stamp.removeprefix("Measured ").split(" · ")[0]
+    heading_lead = span if full else f"{SHORT_WINDOW_LEAD}: {span}"
     return {
         "crawledAt": number["crawledAt"],
         "definitionsVersion": number.get("definitionsVersion"),
         "windowDays": WINDOW_DAYS,
+        "windowSeconds": window_seconds,
+        "full": full,
         "since": since,
         "until": until,
-        "subject": _subject(d7),
-        "heading": f"LEDGE — {WINDOW_DAYS} days to {stamp.removeprefix('Measured ').split(' · ')[0]}",
+        "subject": _subject(d7, window_seconds, full),
+        "heading": f"LEDGE — {heading_lead} to {measured_on}",
         "blocks": blocks,
         "footer": [
             f"{stamp}.",

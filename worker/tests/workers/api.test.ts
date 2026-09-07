@@ -244,12 +244,31 @@ describe("GET /api/live", () => {
     expect(body.lastIndexedBlock).toBe(56_172_588);
   });
 
+  /* W1 — the board reports the same staleness the lookup does. */
+  it("declares itself stale when the tick has failed since its last success", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await env.LEDGE_DB.prepare(
+      `INSERT OR REPLACE INTO cursor VALUES (1, 56172588, ?, ?, 2, 'an outage')`,
+    )
+      .bind(now, now - 10)
+      .run();
+    const body = (await (await get("/api/live")).json()) as any;
+    expect(body.live.stale).toBe(true);
+  });
+
   it("never returns more than 200 rows", async () => {
     const now = Math.floor(Date.now() / 1000);
     const statements = Array.from({ length: 210 }, (_, i) =>
+      /* One row per LOG, so each carries its own (tx_hash, log_index): the
+         durable key is the log's identity, not the token's. */
       env.LEDGE_DB.prepare(
-        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, ?, ?, '0xt', 0)`,
-      ).bind(`0x${i.toString(16).padStart(40, "0")}`, i, now - i),
+        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, ?, ?, ?, 0)`,
+      ).bind(
+        `0x${i.toString(16).padStart(40, "0")}`,
+        i,
+        now - i,
+        `0xt${i.toString(16)}`,
+      ),
     );
     await env.LEDGE_DB.batch(statements);
     const body = (await (await get("/api/live")).json()) as any;

@@ -19,6 +19,7 @@
    ========================================================================= */
 
 import {
+  formatAge,
   formatAmount,
   formatCount,
   formatDuration,
@@ -109,14 +110,35 @@ export function placementText(placement: TokenResponse["placement"]): string | n
   );
 }
 
+/* METHOD.md "Freshness": the age is the consumer's computation, and a figure
+   older than the published bound may not be stated as if it had just been
+   measured. The clause goes on the sentence itself rather than on a banner at
+   the top, because the sentence is what gets quoted, screenshotted and read
+   aloud on its own. */
+export function freshnessNote(freshness: Omit<TokenResponse, "text">["freshness"]): string {
+  if (!freshness || !freshness.stale) return "";
+  const age = formatAge(freshness.ageSeconds);
+  const bound = formatDuration(freshness.staleAfterSeconds);
+  return ` These figures were measured ${age} ago — older than the ${bound} freshness bound.`;
+}
+
+/** The same clause, without its sentence, for a card line. */
+export function freshnessLine(freshness: Omit<TokenResponse, "text">["freshness"]): string | null {
+  if (!freshness || !freshness.stale) return null;
+  const age = formatAge(freshness.ageSeconds);
+  const bound = formatDuration(freshness.staleAfterSeconds);
+  return `measured ${age} ago — older than the ${bound} freshness bound`;
+}
+
 function cohortSentence(
   window: NonNullable<TokenResponse["cohort"]>["allTime"],
   lead: string,
+  note = "",
 ): string | null {
   if (!window) return null;
   const fact = { rate: window.rate, n: window.launches, insufficient: window.insufficient };
   if (isInsufficient(fact)) {
-    return `${lead}: ${rateText(fact)}.`;
+    return `${lead}: ${rateText(fact)}.${note}`;
   }
   const cutoff = formatDuration(window.excludingFast.cutoffSeconds);
   const ef = {
@@ -131,7 +153,7 @@ function cohortSentence(
   return (
     `${lead}: ${formatCount(window.graduations)} of ${formatCount(window.launches)} graduated, ` +
     `${rateText(fact)}. Excluding launches that graduated inside ${cutoff}: ` +
-    `${formatCount(window.excludingFast.graduations)} of ${formatCount(window.launches)}, ${rateText(ef)}${oneIn}.`
+    `${formatCount(window.excludingFast.graduations)} of ${formatCount(window.launches)}, ${rateText(ef)}${oneIn}.${note}`
   );
 }
 
@@ -140,7 +162,7 @@ function cohortSentence(
    indexed being told it is not. The cause decides the wording. */
 function placementSentence(body: Omit<TokenResponse, "text">): string | null {
   const line = placementText(body.placement);
-  if (line !== null) return line;
+  if (line !== null) return `${line}${freshnessNote(body.freshness)}`;
   if (!body.state.indexed) {
     return "The launch time is not indexed, so this launch is not placed on the table of graduation times.";
   }
@@ -230,8 +252,13 @@ export function lookupText(
 
   if (body.notice) lines.push(body.notice);
 
-  const allTime = cohortSentence(body.cohort?.allTime ?? null, "Launches configured this way, all time");
-  const h24 = cohortSentence(body.cohort?.h24 ?? null, "In the last 24 hours");
+  const aged = freshnessNote(body.freshness);
+  const allTime = cohortSentence(
+    body.cohort?.allTime ?? null,
+    "Launches configured this way, all time",
+    aged,
+  );
+  const h24 = cohortSentence(body.cohort?.h24 ?? null, "In the last 24 hours", aged);
   if (allTime) lines.push(allTime);
   if (h24) lines.push(h24);
   if (!allTime && !h24) {

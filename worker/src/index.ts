@@ -14,7 +14,7 @@ import { numberText } from "./text";
 import { tokenResponseSchema, liveResponseSchema, SCHEMA_VERSION, type ErrorCode } from "./schema";
 import { loadNumber, KV_NUMBER } from "./numberFile";
 import { taxBucketOf } from "./buckets";
-import { LIVE_STALE_AFTER_SECONDS, type CursorRow } from "./lookup";
+import { liveStale, type CursorRow } from "./lookup";
 import { ageSeconds, formatAge, normaliseAddress, toIso } from "./format";
 import {
   classify,
@@ -127,9 +127,12 @@ async function handleLive(env: Env, nowMs: number): Promise<Response> {
   const nowSeconds = Math.floor(nowMs / 1000);
   const [rowsResult, cursorResult] = await env.LEDGE_DB.batch([
     env.LEDGE_DB.prepare(
+      /* EXISTS, not a join: a token may hold more than one graduation row
+         while a reorg is being reconciled, and a join would then print one
+         launch twice on the board. */
       `SELECT l.pair_class, l.creator_tax_bps, l.ts,
-              CASE WHEN g.token IS NULL THEN 0 ELSE 1 END AS graduated
-         FROM launch l LEFT JOIN graduation g ON g.token = l.token
+              EXISTS (SELECT 1 FROM graduation g WHERE g.token = l.token) AS graduated
+         FROM launch l
         ORDER BY l.block DESC LIMIT 200`,
     ),
     env.LEDGE_DB.prepare(
@@ -151,7 +154,7 @@ async function handleLive(env: Env, nowMs: number): Promise<Response> {
     count: rows.length,
     rows,
     live: {
-      stale: cursor === null || nowSeconds - cursor.last_success_at > LIVE_STALE_AFTER_SECONDS,
+      stale: liveStale(cursor, nowSeconds),
       lastSuccessAt: cursor ? toIso(cursor.last_success_at) : null,
       lastIndexedBlock: cursor ? cursor.last_indexed_block : null,
     },

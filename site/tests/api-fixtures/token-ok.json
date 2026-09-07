@@ -28,7 +28,7 @@
     "indexed": true
   },
   "cohort": {
-    "crawledAt": "2026-09-06T18:00:36Z",
+    "crawledAt": "2025-11-07T17:20:15Z",
     "definitionsVersion": "2026-09-06",
     "key": {
       "pairClass": "eth",
@@ -36,45 +36,51 @@
     },
     "h24": {
       "window": "24h",
-      "crawledAt": "2026-09-06T18:00:36Z",
-      "launches": 1047,
-      "graduations": 17,
-      "rate": 0.016237,
+      "crawledAt": "2025-11-07T17:20:15Z",
+      "launches": 2324,
+      "graduations": 34,
+      "rate": 0.01463,
       "insufficient": false,
       "excludingFast": {
         "cutoffSeconds": 300,
-        "graduations": 8,
-        "rate": 0.007641,
-        "oneIn": 131,
+        "graduations": 17,
+        "rate": 0.007315,
+        "oneIn": 137,
         "insufficient": false
       }
     },
     "allTime": {
       "window": "allTime",
-      "crawledAt": "2026-09-06T18:00:36Z",
-      "launches": 1047,
-      "graduations": 17,
-      "rate": 0.016237,
+      "crawledAt": "2025-11-07T17:20:15Z",
+      "launches": 2324,
+      "graduations": 34,
+      "rate": 0.01463,
       "insufficient": false,
       "excludingFast": {
         "cutoffSeconds": 300,
-        "graduations": 8,
-        "rate": 0.007641,
-        "oneIn": 131,
+        "graduations": 17,
+        "rate": 0.007315,
+        "oneIn": 137,
         "insufficient": false
       }
     }
   },
+  "freshness": {
+    "crawledAt": "2025-11-07T17:20:15Z",
+    "ageSeconds": 26182432,
+    "staleAfterSeconds": 7200,
+    "stale": true
+  },
   "placement": {
-    "crawledAt": "2026-09-06T18:00:36Z",
+    "crawledAt": "2025-11-07T17:20:15Z",
     "window": "allTime",
     "elapsedSeconds": 811,
     "rung": {
       "atSeconds": 600,
-      "cumulative": 79,
-      "cumulativeShare": 0.738318
+      "cumulative": 409,
+      "cumulativeShare": 0.764486
     },
-    "n": 107,
+    "n": 535,
     "insufficient": false,
     "reason": "ok"
   },
@@ -88,5 +94,5 @@
     "method": "https://ledge.tools/method",
     "numberJson": "https://ledge.tools/number.json"
   },
-  "text": "0x23fe54b3…f98fe2 · Pons\nETH · 2–3% · on the bonding curve\nminute 13 · on the curve · cohort 1.62% (n=1,047) · ETH · 2–3%\nLaunches configured this way, all time: 17 of 1,047 graduated, 1.62%. Excluding launches that graduated inside 5 min: 8 of 1,047, 0.76% (1 in 131).\nIn the last 24 hours: 17 of 1,047 graduated, 1.62%. Excluding launches that graduated inside 5 min: 8 of 1,047, 0.76% (1 in 131).\nBy 10 min, 73.8% of the 107 graduations measured in this window had already happened.\nCurve fill: 1.7432 ETH of 4.2 ETH (41.5% of the threshold).\nMeasured 6 Sep 2026 · 18:00 UTC\nhttps://ledge.tools/method"
+  "text": "0x23fe54b3…f98fe2 · Pons\nETH · 2–3% · on the bonding curve\nminute 13 · on the curve · cohort 1.46% (n=2,324) · ETH · 2–3%\nLaunches configured this way, all time: 34 of 2,324 graduated, 1.46%. Excluding launches that graduated inside 5 min: 17 of 2,324, 0.73% (1 in 137). These figures were measured 303 d ago — older than the 2 h freshness bound.\nIn the last 24 hours: 34 of 2,324 graduated, 1.46%. Excluding launches that graduated inside 5 min: 17 of 2,324, 0.73% (1 in 137). These figures were measured 303 d ago — older than the 2 h freshness bound.\nBy 10 min, 76.4% of the 535 graduations measured in this window had already happened. These figures were measured 303 d ago — older than the 2 h freshness bound.\nCurve fill: 1.7432 ETH of 4.2 ETH (41.5% of the threshold).\nMeasured 7 Nov 2025 · 17:20 UTC\nhttps://ledge.tools/method"
 }

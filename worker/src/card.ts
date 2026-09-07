@@ -28,8 +28,8 @@ import {
   rateText,
   shortAddress,
 } from "./format";
-import { FILL_GRADUATED, FILL_GRADUATED_CARD } from "./curve";
-import { cohortSuppressed, headline } from "./text";
+import { FILL_GRADUATED, FILL_GRADUATED_CARD, fillNoteShort } from "./curve";
+import { cohortSuppressed, freshnessLine, headline } from "./text";
 import { pairLabel, taxLabel } from "./buckets";
 import type { TokenResponse } from "./schema";
 
@@ -132,14 +132,19 @@ function fillLine(
   if (state.fillNote === FILL_GRADUATED) {
     return `Curve fill: ${FILL_GRADUATED_CARD}, ${threshold ?? state.graduationThresholdWei}`;
   }
+  /* Every other note reaches the card too. A reserve standing above its
+     threshold prints "104.8%", and without the word beside it that figure
+     reads as a broken instrument rather than as a curve read a moment before
+     it was drained. */
+  const note = state.fillNote === null ? "" : ` — ${fillNoteShort(state.fillNote)}`;
   const filled =
     decimals === null ? null : formatAmount(state.curveFilledWei ?? "0", decimals, config.pairSymbol);
   if (filled === null || threshold === null) {
-    return `Curve fill: ${state.curveFilledWei} of ${state.graduationThresholdWei} (units not known)`;
+    return `Curve fill: ${state.curveFilledWei} of ${state.graduationThresholdWei} (units not known)${note}`;
   }
-  if (suppressed) return `Curve fill: ${filled} of ${threshold}`;
+  if (suppressed) return `Curve fill: ${filled} of ${threshold}${note}`;
   const holdsSomething = state.curveFilledWei !== null && state.curveFilledWei !== "0";
-  return `Curve fill: ${filled} of ${threshold} (${formatShareOfOne(state.curveFilledShare, holdsSomething)})`;
+  return `Curve fill: ${filled} of ${threshold} (${formatShareOfOne(state.curveFilledShare, holdsSomething)})${note}`;
 }
 
 /** The card, as positioned text. Exported so a test can read every string the
@@ -191,6 +196,11 @@ export function cardTree(
     },
   ];
 
+  /* CONSTRAINTS #7: a stale figure may not look fresh, and the card is the
+     copy that travels furthest from the page. So the age goes on the plate in
+     the one colour this design spends, and the colophon stamp turns with it —
+     cropped to the strip, the card still says how old the measurement is. */
+  const aged = freshnessLine(body.freshness);
   const stamp = body.cohort ? formatStamp(body.cohort.crawledAt) : "not measured";
 
   wrap(gloss, 58).forEach((line, i) => {
@@ -204,6 +214,18 @@ export function cardTree(
       anchor: "start",
     });
   });
+
+  if (aged !== null) {
+    texts.push({
+      text: aged,
+      x: PAD,
+      y: 466,
+      size: fit(aged, 26, plate),
+      weight: 600,
+      fill: STALE,
+      anchor: "start",
+    });
+  }
 
   texts.push({
     /* The card gets the short form of the graduated note: the long one runs
@@ -248,7 +270,7 @@ export function cardTree(
       y: 578,
       size: 22,
       weight: 400,
-      fill: body.live.stale ? STALE : INK_3,
+      fill: body.live.stale || aged !== null ? STALE : INK_3,
       anchor: "end",
     },
   );

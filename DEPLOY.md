@@ -50,7 +50,9 @@ Security → WAF → Rate limiting rule: 60 requests per minute per IP on paths 
 
 Check: `https://api.ledge.tools/api/health`, then `/api/token/<any address from data/launches>`.
 
-Keeping the Worker's copy of `number.json` current: until the KV-push job exists (not built yet), the Worker falls back to fetching `https://ledge.tools/number.json`, which is always current after each Vercel deploy. Nothing to do.
+Keeping the Worker's copy of `number.json` current: the `kv` job in `crawl.yml` pushes `number.json` and `pair-tokens.json` into KV after every data commit, so the API answers from Cloudflare alone. To turn it on, set the repo variable `LEDGE_KV_NAMESPACE_ID` to the id `wrangler kv namespace create` printed above, and the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The job skips itself while any of the three is unset.
+
+The commands above seed KV by hand for the first deploy; after that the job keeps it current. If the push is failing, the Worker falls back to fetching `https://ledge.tools/number.json` and keeps answering with correct figures — but it is then depending on the site being up, which is the coupling KV exists to remove, so a red `kv` job is worth fixing rather than tolerating.
 
 ### Telegram (optional)
 
@@ -77,6 +79,30 @@ Repo secrets `RESEND_API_KEY` and `RESEND_AUDIENCE_ID`. Subscribers are managed 
 - Name `LEDGE`, ticker `LEDGE`, creator tax 3%, pair ETH
 - Description (≤ 200 chars): see `LAUNCH.md`
 - Website: `https://ledge.tools`
+
+## Repo secrets and variables, in one place
+
+Settings → Secrets and variables → Actions. Every job that needs one of these
+**skips itself while it is unset**, so a partial setup is safe: nothing fails
+because a credential you have not created yet is missing.
+
+| Kind | Name | Used by | Without it |
+|---|---|---|---|
+| variable | `RPC_URL` | `crawl`, `backfill` | falls back to the endpoint in the code |
+| secret | `CLOUDFLARE_API_TOKEN` | `crawl` → `kv`, `reconcile` | KV push and reconciliation skip |
+| secret | `CLOUDFLARE_ACCOUNT_ID` | `crawl` → `kv`, `reconcile` | same |
+| variable | `LEDGE_KV_NAMESPACE_ID` | `crawl` → `kv` | the Worker reads `number.json` over HTTP instead |
+| variable | `LEDGE_D1_NAME` | `reconcile` | no nightly D1-vs-repo check |
+| secret | `LEDGE_ORACLE_KEY` | `crawl` → `oracle` | nothing is published on-chain |
+| variable | `LEDGE_ORACLE_ADDRESS` | `crawl` → `oracle` | same |
+| variable | `LEDGE_ORACLE_EVERY_RUN` | `crawl` → `oracle` | publishes 6-hourly instead of hourly |
+| secret | `RESEND_API_KEY` | `dispatch` | no weekly send |
+| secret | `RESEND_AUDIENCE_ID` | `dispatch` | same |
+| variable | `RESEND_FROM` | `dispatch` | same |
+
+The Cloudflare API token needs **Workers KV Storage: Edit** (for the KV push)
+and **D1: Read** (for the reconciliation). It does not need deploy rights: the
+Worker is deployed from your machine with `wrangler`, never from CI.
 
 ## Checks after everything is up
 
