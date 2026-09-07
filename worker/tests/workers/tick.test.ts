@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { RpcClient } from "../../src/rpc";
-import { REORG_OVERLAP_BLOCKS, RETENTION_SECONDS, dedupeLogs, logWindows, tick } from "../../src/tick";
+import { MAX_CATCHUP_BLOCKS, REORG_OVERLAP_BLOCKS, RETENTION_SECONDS, dedupeLogs, logWindows, tick } from "../../src/tick";
 import { TOPIC_TOKEN_LAUNCHED, TOPIC_POOL_GRADUATED } from "../../src/pons";
 import { reset, seedCursor } from "./setup";
 
@@ -251,7 +251,7 @@ describe("the tick", () => {
     await seedCursor(1000, NOW);
     const { client } = fakeChain({ head: 900_000, launches: [], graduations: [] });
     const result = await tick(env, NOW, client);
-    expect(result.to).toBe(1000 + 5000);
+    expect(result.to).toBe(1000 + MAX_CATCHUP_BLOCKS);
   }, 60_000);
 
 });
