@@ -48,8 +48,15 @@ export const COLD_START_BLOCKS = BLOCKS_PER_TICK;
     reconciles against the chain. */
 export const REORG_OVERLAP_BLOCKS = BLOCKS_PER_TICK * 2;
 /** A bounded catch-up: an outage must not produce a tick that blows the
-    subrequest budget. What it does not reach, the next minute reaches. */
-export const MAX_CATCHUP_BLOCKS = 5000;
+    subrequest budget. What it does not reach, the next minute reaches.
+
+    Sized for the free plan's 50 subrequests per invocation, measured live:
+    5,000 blocks (~1,200 launches) needed 10 log calls plus ~48 header and
+    factory-view batches and died with "Too many subrequests". 1,800 blocks
+    is three ticks of chain: 4 log calls, ~8 header batches, ~8 factory
+    batches, one KV read -- about 21, leaving room for the fallback endpoint
+    to double a failed call. Catching up from an hour behind takes ~20 ticks. */
+export const MAX_CATCHUP_BLOCKS = BLOCKS_PER_TICK * 3;
 /** How many `eth_getLogs` subrequests one tick may spend. The rest of the
     Worker's allowance goes to block headers, the factory view and KV. */
 export const LOG_SUBREQUEST_BUDGET = 20;
