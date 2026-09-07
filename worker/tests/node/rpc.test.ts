@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MalformedBatchResponse, RpcClient, USER_AGENT, indexBatchResponse, isRateLimited } from "../../src/rpc";
 
 /* The envelope pipeline/rpc.py proved. Anything here that changes changes the
@@ -51,4 +51,34 @@ describe("the RPC envelope", () => {
     expect(sizes).toEqual([50, 50, 20]);
     expect(results).toHaveLength(120);
   }, 20_000);
+});
+
+
+describe("fallback endpoint", () => {
+  it("answers from the fallback after the primary gives up on 429", async () => {
+    const { RpcClient } = await import("../../src/rpc");
+    const primary = async () => ({ code: 429, message: "HTTP 429" });
+    const fallback = async (payload: unknown[]) =>
+      (payload as { id: number }[]).map((r) => ({ jsonrpc: "2.0", id: r.id, result: "0x10" }));
+    const client = new RpcClient("https://primary.invalid", primary, "https://fallback.invalid", fallback);
+    vi.useFakeTimers();
+    try {
+      const pending = client.getHeadBlock();
+      await vi.runAllTimersAsync();
+      expect(await pending).toBe(16);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(client.rateLimitSeen).toBe(true);
+  });
+
+  it("does not consult a fallback for a non-retryable fault", async () => {
+    const { RpcClient, RpcUnavailable } = await import("../../src/rpc");
+    let fallbackCalls = 0;
+    const primary = async () => { throw new RpcUnavailable("rpc: HTTP 403"); };
+    const fallback = async () => { fallbackCalls++; return []; };
+    const client = new RpcClient("https://primary.invalid", primary, "https://fallback.invalid", fallback);
+    await expect(client.getHeadBlock()).rejects.toBeInstanceOf(RpcUnavailable);
+    expect(fallbackCalls).toBe(1);
+  });
 });

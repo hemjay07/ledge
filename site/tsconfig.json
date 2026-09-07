@@ -39,8 +39,9 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
+    ".next",
+    "e2e",
     "node_modules",
-    "out",
-    ".next"
+    "out"
   ]
 }

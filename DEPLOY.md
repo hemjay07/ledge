@@ -24,6 +24,8 @@ Run the crawl once by hand: Actions → `crawl` → Run workflow. It should comm
 
 ## 2. Site (Vercel)
 
+Status 2026-09-07: deployed and git-connected at https://ledge-alpha.vercel.app (project `ledge`, repo root, `vercel.json` at the root builds `site/`). When `ledge.tools` exists, add the domain in Vercel and replace the alias in `worker/wrangler.toml` (`NUMBER_JSON_URL`, `SITE_ORIGIN`) and the rewrites in `vercel.json` (`api.ledge.tools`).
+
 1. Import the repo. Root directory `site/`. Build command `npm run build` (prebuild copies `number.json` and renders the card). Output `out/`.
 2. Settings → Git → Ignored Build Step: leave empty. Data-only commits must rebuild.
 3. Domains: `ledge.tools` and `www.ledge.tools`.
@@ -32,6 +34,8 @@ Run the crawl once by hand: Actions → `crawl` → Run workflow. It should comm
 `site/vercel.json` already rewrites `/api/*`, `/t/*`, `/og/t/*` to `https://api.ledge.tools`. Until the Worker exists those routes 502; the rest of the site is unaffected.
 
 ## 3. Worker (Cloudflare)
+
+Status 2026-09-07: deployed at https://ledge-api.ledge-worker.workers.dev with D1 `ledge` and KV `LEDGE_KV`; cron every minute. The official RPC rate-limits Cloudflare's egress hard, so `RPC_URL_FALLBACK` is `https://rpc.ordofi.network` (from chainlist; serves factory logs). The site's rewrites point at the workers.dev host until `api.ledge.tools` exists.
 
 ```bash
 cd worker

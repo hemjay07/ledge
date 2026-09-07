@@ -70,7 +70,6 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: hashFiles('site/e2e/**') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -108,7 +107,6 @@ jobs:
   worker:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: hashFiles('worker/package.json') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -139,7 +137,6 @@ jobs:
   contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: hashFiles('contracts/foundry.toml') != ''
     steps:
       - uses: actions/checkout@v4
         with:

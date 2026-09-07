@@ -14,7 +14,7 @@ CHAIN_ID = "4663"
 RPC_URL = "https://rpc.mainnet.chain.robinhood.com"
 # Fallback used only when RPC_URL answers with a transport fault. Left equal to
 # RPC_URL until a second endpoint exists (risk register, "two indexers").
-RPC_URL_FALLBACK = "https://rpc.mainnet.chain.robinhood.com"
+RPC_URL_FALLBACK = "https://rpc.ordofi.network"
 NUMBER_JSON_URL = "https://ledge.tools/number.json"
 SITE_ORIGIN = "https://ledge.tools"
 
@@ -22,12 +22,12 @@ SITE_ORIGIN = "https://ledge.tools"
 binding = "LEDGE_DB"
 database_name = "ledge"
 # Replaced with the real id by `wrangler d1 create ledge` before the first deploy.
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "ef285d4f-4b56-4771-9d5b-c73ef1df7809"
 
 [[kv_namespaces]]
 binding = "LEDGE_KV"
 # Replaced with the real id by `wrangler kv namespace create LEDGE_KV`.
-id = "0000000000000000000000000000000f"
+id = "2907c9f2a1a94fb9a13fbb4eca8fdd3d"
 
 # The two faces the death card is set in, inlined as bytes at build time.
 [[rules]]

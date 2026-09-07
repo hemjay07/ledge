@@ -23,7 +23,7 @@ export async function lookupToken(
 ): Promise<LookupOutcome> {
   const nowSeconds = Math.floor(nowMs / 1000);
   const factory = env.FACTORY_ADDRESS.toLowerCase();
-  const rpc = new RpcClient(env.RPC_URL);
+  const rpc = new RpcClient(env.RPC_URL, undefined, env.RPC_URL_FALLBACK);
 
   let onChain;
   try {

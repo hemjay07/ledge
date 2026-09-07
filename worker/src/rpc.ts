@@ -132,17 +132,36 @@ export class RpcClient {
       it to decide whether to hold the cursor rather than record a failure. */
   rateLimitSeen = false;
 
-  constructor(url: string, transport?: Transport) {
+  /** A second endpoint tried only after the first has given up. The
+      official RPC rate-limits Cloudflare's shared egress addresses hard;
+      a fallback keeps a lookup honest-but-answered instead of rpc_down. */
+  private readonly fallback: Transport | null;
+
+  constructor(url: string, transport?: Transport, fallbackUrl?: string, fallbackTransport?: Transport) {
     this.transport = transport ?? httpTransport(url);
+    this.fallback = fallbackTransport ?? (fallbackUrl && fallbackUrl !== url ? httpTransport(fallbackUrl) : null);
   }
 
   private async sendWithRetry(
     payload: unknown[],
     validate?: (response: unknown) => unknown[],
   ): Promise<unknown> {
+    try {
+      return await this.sendVia(this.transport, payload, validate);
+    } catch (error) {
+      if (!(error instanceof RpcUnavailable) || this.fallback === null) throw error;
+      return await this.sendVia(this.fallback, payload, validate);
+    }
+  }
+
+  private async sendVia(
+    transport: Transport,
+    payload: unknown[],
+    validate?: (response: unknown) => unknown[],
+  ): Promise<unknown> {
     let delay = BACKOFF_BASE_MS;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      const response = await this.transport(payload);
+      const response = await transport(payload);
       if (isFault(response)) {
         if (response.code === 429) this.rateLimitSeen = true;
         if (attempt === MAX_RETRIES - 1) {

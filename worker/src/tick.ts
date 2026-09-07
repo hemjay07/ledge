@@ -221,7 +221,7 @@ export async function tick(
 ): Promise<TickResult> {
   const db = env.LEDGE_DB;
   const factory = env.FACTORY_ADDRESS.toLowerCase();
-  const rpc = client ?? new RpcClient(env.RPC_URL);
+  const rpc = client ?? new RpcClient(env.RPC_URL, undefined, env.RPC_URL_FALLBACK);
 
   let from = 0;
   let to = 0;
