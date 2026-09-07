@@ -69,7 +69,9 @@ jobs:
     if: needs.crawl.outputs.committed == 'true' && vars.LEDGE_ORACLE_ADDRESS != '' && (vars.LEDGE_ORACLE_EVERY_RUN == '1' || contains('00 06 12 18', needs.crawl.outputs.hour))
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+    # The data commit happens in the crawl job; this job runs after it, so a
+    # failed publish is visible as a red run without ever blocking the data.
+    continue-on-error: false
     env:
       LEDGE_ORACLE_KEY: ${{ secrets.LEDGE_ORACLE_KEY }}
       LEDGE_ORACLE_ADDRESS: ${{ vars.LEDGE_ORACLE_ADDRESS }}

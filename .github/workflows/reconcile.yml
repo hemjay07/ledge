@@ -1,0 +1,104 @@
+name: reconcile
+
+# Gate 7, ARCHITECTURE-PHASE2-4.md section 9. The Worker's minute indexer is
+# the one component whose output nobody checks: it computes no statistic, so a
+# silently wrong index would surface only as wrong facts on shared links. This
+# job is the detector.
+#
+# It takes a dump of D1 rather than calling the Worker, because the Worker
+# exposes no bulk export route and should not grow one for an internal check:
+# /api/live is capped at ~200 rows and strips the token address by design
+# (CONSTRAINTS section 2). wrangler reads the database directly instead.
+#
+# The whole job is skipped unless the Cloudflare credentials and the D1 id are
+# configured, so it is inert until the Worker is actually deployed.
+
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ledge-reconcile
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: are the credentials configured?
+        id: gate
+        run: |
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] && [ -n "${{ vars.LEDGE_D1_NAME }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "CLOUDFLARE_API_TOKEN or LEDGE_D1_NAME is unset — the Worker is not deployed yet."
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          node-version: "22"
+
+      # Only the five columns the reconciliation reads. The token address is
+      # never printed to the log — the rows go to a file, and the file is not
+      # uploaded anywhere.
+      - name: dump D1
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1: ${{ vars.LEDGE_D1_NAME }}
+        run: |
+          set -euo pipefail
+          cd worker
+          npx --yes wrangler@4 d1 execute "$D1" --remote --json \
+            --command "SELECT token, block, ts, tx_hash, log_index FROM launch" \
+            > "$RUNNER_TEMP/launch.json"
+          npx --yes wrangler@4 d1 execute "$D1" --remote --json \
+            --command "SELECT token, block, ts, tx_hash, log_index FROM graduation" \
+            > "$RUNNER_TEMP/graduation.json"
+          echo "launch rows:     $(grep -o '"ts"' "$RUNNER_TEMP/launch.json" | wc -l)"
+          echo "graduation rows: $(grep -o '"ts"' "$RUNNER_TEMP/graduation.json" | wc -l)"
+
+      - name: reconcile against the committed partitions
+        if: steps.gate.outputs.ready == 'true'
+        id: check
+        run: |
+          python pipeline/reconcile.py \
+            --d1-launches "$RUNNER_TEMP/launch.json" \
+            --d1-graduations "$RUNNER_TEMP/graduation.json" \
+            --summary-out "$RUNNER_TEMP/summary.txt" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # The architecture asks for an issue, not only a red run: a divergence
+      # is investigated, and a failed scheduled job on a repo nobody is
+      # watching is not an investigation.
+      - name: open an issue on divergence
+        if: failure() && steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          body="$(cat "$RUNNER_TEMP/summary.txt" 2>/dev/null || echo 'The reconciliation failed before it could write a summary.')"
+          title="reconcile: D1 and the repo disagree ($(date -u +%Y-%m-%d))"
+          existing="$(gh issue list --state open --label reconcile --limit 1 --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh label create reconcile --description "D1 vs repo divergence" --color B60205 2>/dev/null || true
+            gh issue create --title "$title" --label reconcile --body "$body"
+          fi

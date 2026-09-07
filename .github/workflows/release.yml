@@ -1,0 +1,137 @@
+name: release
+
+# Phase 3b, the dataset mirror. ARCHITECTURE-PHASE2-4.md section 11 decided
+# GitHub Releases over R2 and Arweave: zero cost, zero new credentials,
+# versioned and checksummed, and it doubles as the Phase 1 section 14 escape
+# hatch for partitions older than 90 days.
+#
+# Arweave was rejected for a reason that matters here: a permanent copy is a
+# one-way commitment to whatever definitions were current that day, and this
+# project's changelog exists precisely because definitions move. A dated,
+# replaceable release says what it is — a snapshot, under the definitions
+# named inside it.
+#
+# The tarball is DETERMINISTIC: same data in, byte-identical archive out. A
+# mirror whose checksum changes nightly for no reason cannot be used to prove
+# anything, which is the only thing a mirror is for.
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "build and check the archive, publish nothing"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ledge-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # A mirror of numbers nobody can reproduce is worth nothing. If the
+      # committed number.json does not fall out of the committed partitions,
+      # the snapshot is not published at all.
+      - name: recompute (byte-for-byte gate)
+        run: python pipeline/recompute.py --check
+
+      - name: build the archive
+        id: build
+        run: |
+          set -euo pipefail
+          DATE="$(date -u +%Y-%m-%d)"
+          TAG="data-$DATE"
+          NAME="ledge-data-$DATE.tar.gz"
+          echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+          # Deterministic: entries sorted, no mtimes, no uid/gid, no name
+          # or timestamp in the gzip header (-n). The same data always
+          # produces the same bytes and therefore the same checksum.
+          tar --sort=name \
+              --mtime='UTC 1970-01-01' \
+              --owner=0 --group=0 --numeric-owner \
+              --format=gnu \
+              -cf - data | gzip -n -9 > "$NAME"
+
+          sha256sum "$NAME" > SHA256SUMS
+          cat SHA256SUMS
+
+          # Built twice, compared: the determinism is asserted, not assumed.
+          tar --sort=name \
+              --mtime='UTC 1970-01-01' \
+              --owner=0 --group=0 --numeric-owner \
+              --format=gnu \
+              -cf - data | gzip -n -9 > /tmp/again.tar.gz
+          cmp "$NAME" /tmp/again.tar.gz
+          echo "archive is reproducible"
+
+      - name: describe what is inside
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          state = json.loads(pathlib.Path("data/state.json").read_text())
+          number = json.loads(pathlib.Path("data/number.json").read_text())
+          launches = sorted(p.name for p in pathlib.Path("data/launches").glob("*.jsonl*"))
+          grads = sorted(p.name for p in pathlib.Path("data/graduations").glob("*.jsonl*"))
+          print("## dataset snapshot\n")
+          print(f"- definitions: `{number['definitionsVersion']}`, schema `{number['schemaVersion']}`")
+          print(f"- measured: `{number['crawledAt']}`")
+          print(f"- blocks: {number['firstIndexedBlock']:,} to {number['headBlock']:,}")
+          print(f"- launches: {state['counts']['launches']:,}, graduations: {state['counts']['graduations']:,}")
+          print(f"- partitions: {len(launches)} launch, {len(grads)} graduation")
+          PY
+
+      - name: publish
+        if: github.event.inputs.dry-run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.build.outputs.tag }}
+          NAME: ${{ steps.build.outputs.name }}
+        run: |
+          set -euo pipefail
+          NOTES="$(python - <<'PY'
+          import json, pathlib
+          n = json.loads(pathlib.Path("data/number.json").read_text())
+          s = json.loads(pathlib.Path("data/state.json").read_text())
+          print(f"Every launch and graduation LEDGE has indexed, as of {n['crawledAt']}.")
+          print()
+          print(f"- definitions `{n['definitionsVersion']}` — see /method for what each field means")
+          print(f"- schemaVersion `{n['schemaVersion']}`")
+          print(f"- blocks {n['firstIndexedBlock']:,} to {n['headBlock']:,}")
+          print(f"- {s['counts']['launches']:,} launches, {s['counts']['graduations']:,} graduations")
+          print()
+          print("`number.json` is reproducible from the partitions in this archive:")
+          print()
+          print("```")
+          print("tar xzf ledge-data-*.tar.gz")
+          print("python pipeline/recompute.py --data-dir data --check")
+          print("```")
+          print()
+          print("The figures were computed under the definitions current on the date in the tag.")
+          print("Definitions move, and when they do the changelog on /method records it, so a")
+          print("figure from an older snapshot is read against that date's definitions, not today's.")
+          PY
+          )"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$NAME" SHA256SUMS --clobber
+          else
+            gh release create "$TAG" "$NAME" SHA256SUMS \
+              --title "Dataset — $TAG" \
+              --notes "$NOTES"
+          fi
