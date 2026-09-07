@@ -119,7 +119,7 @@ describe("GET /api/token/{address}", () => {
     // R1: the fill, read from this launch's OWN curve
     expect(body.config.pairSymbol).toBe("ETH");
     expect(body.config.pairDecimals).toBe(18);
-    expect(body.text).toContain("Curve fill: 2.245 ETH of 4.2 ETH.");
+    expect(body.text).toContain("Curve fill: 2.245 ETH of 4.2 ETH (53.5% of the threshold).");
     expect(body.state.curveFilledShare).toBe(LIVE_CURVE.expected.share);
     expect(body.state.curveFilledWei).toBe(LIVE_CURVE.expected.filledWei);
     expect(body.state.graduationThresholdWei).toBe(LIVE_CURVE.expected.thresholdWei);
@@ -405,7 +405,7 @@ describe("the units a fill is denominated in", () => {
     expect(partial.config.pairDecimals).toBe(6);
     expect(partial.config.pairSymbol).toBe("USDG");
     // 4045000000 of 8090000000 at six decimals is 4,045 USDG of 8,090
-    expect(partial.text).toContain("Curve fill: 4045 USDG of 8090 USDG.");
+    expect(partial.text).toContain("Curve fill: 4045 USDG of 8090 USDG (50.0% of the threshold).");
     expect(partial.text).not.toContain("4045000000 of");
     expect(await env.LEDGE_KV.get(kvDecimalsKey(USDG), "text")).toBe("6");
   });

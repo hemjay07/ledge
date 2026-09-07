@@ -201,6 +201,41 @@ next block onward. The writer holds gas and nothing else: it can call `publish`
 and no other function, and `publish` can only move `crawledAt` forward.
 
 
+## Weekly dispatch
+
+`pipeline/dispatch.py` composes one email a week from the committed record:
+the trailing 7-day figure and the excluding-fast figure as "1 in N", the two
+furthest-apart rows of the pair-token and creator-tax cohorts, the p50 and p90
+time to graduation, and one fact drawn from the published ladder. Every figure
+is a count or a rate that came out of `pipeline/stats.py`, with its n and its
+window; the module formats and selects, and computes nothing.
+
+The 7-day window is deliberately **not** a key in `data/number.json`. It could
+be — `stats.window` takes any interval and the site's Zod schema is not
+`.strict()` — but that file is covered byte-for-byte by `recompute.py --check`
+and frozen again in `tests/vectors/`, and the dispatch is not reason enough to
+move a file other consumers are pinned to. If a second consumer ever needs the
+window it belongs in `number.json`, with a dated `/method` entry.
+
+```bash
+python pipeline/dispatch.py --dry-run   # writes dispatch/preview.{txt,html}, opens no socket
+python pipeline/dispatch.py             # sends, given RESEND_API_KEY and RESEND_AUDIENCE_ID
+```
+
+`.github/workflows/dispatch.yml` runs it on Monday at 09:00 UTC, uploads the
+preview as an artifact on every path, and sends only when both secrets exist.
+
+### Mailing list
+
+There is no sign-up form on the site, and there will not be one until it can be
+built without breaking CONSTRAINTS §8 — nothing on `ledge.tools` may require an
+email to see a number. A sign-up endpoint in the Worker is a follow-up and is
+not implemented. Until it lands, Resend's own hosted sign-up page against the
+same audience is the whole mechanism: the list lives in Resend, this repo never
+holds an address, and `dispatch.py` addresses the audience by id and never
+enumerates it. Every message carries Resend's per-recipient opt-out link.
+
+
 ## Method
 
 Full definitions — what counts as a launch and a graduation, the five-minute

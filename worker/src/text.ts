@@ -26,6 +26,7 @@ import {
   formatStamp,
   isInsufficient,
   minuteOf,
+  formatShareOfOne,
   rateText,
   shortAddress,
 } from "./format";
@@ -155,13 +156,17 @@ function placementSentence(body: Omit<TokenResponse, "text">): string | null {
    and the only one a reader can act on; the conversion is a unit change on one
    observed quantity, done in format.ts, not a statistic.
 
-   The share is NOT appended, though it would satisfy CONSTRAINTS 3 on its own
-   terms (x of y, both shown). The reason is placement: this line sits three
-   lines below a cohort line that may read "not enough data (n=12)", and a
-   percentage printed inches beneath a suppressed one invites exactly the
-   misreading the suppression exists to prevent. The share travels as
-   `curveFilledShare`, which is where the bar is drawn from, and the bar has
-   both quantities beside it.
+   The share follows the quantities as "(53.5% of the threshold)". That is x of
+   y with both terms present, which is what CONSTRAINTS 3 asks for -- it is
+   never the whole sentence.
+
+   With one exception, and it is about placement rather than about the share.
+   This line sits three lines below a cohort line that may read "not enough
+   data (n=12)". A percentage printed inches beneath a suppressed one invites
+   exactly the misreading the suppression exists to prevent, so where the
+   cohort is suppressed the share clause is dropped and only the two
+   quantities are printed. The share still travels as `curveFilledShare`,
+   which is where the bar is drawn from.
 
    Where the decimals are unknown the integer is printed unchanged and the
    sentence says the units are not known. An assumed exponent would move the
@@ -169,6 +174,7 @@ function placementSentence(body: Omit<TokenResponse, "text">): string | null {
 export function fillSentence(
   state: TokenResponse["state"],
   config: TokenResponse["config"],
+  cohortSuppressed = false,
 ): string {
   if (state.curveFilledShare === null) {
     return `Curve fill: ${state.fillNote ?? "not available"}.`;
@@ -191,7 +197,23 @@ export function fillSentence(
       `in the pair token's smallest unit; its decimals are not known${note}.`
     );
   }
-  return `Curve fill: ${filled} of ${threshold}${note}.`;
+  if (cohortSuppressed) return `Curve fill: ${filled} of ${threshold}${note}.`;
+
+  // A string comparison, not a test on the rounded share: at six places a
+  // curve holding one unit and a curve holding nothing look the same.
+  const holdsSomething = state.curveFilledWei !== null && state.curveFilledWei !== "0";
+  const share = formatShareOfOne(state.curveFilledShare, holdsSomething);
+  return `Curve fill: ${filled} of ${threshold} (${share} of the threshold)${note}.`;
+}
+
+/** True when the cohort figure this entry leads with is not printable as a
+    percentage -- no cohort at all, or one the sample does not support. The
+    window is the one the headline reads, so the two lines agree about what is
+    being withheld. */
+export function cohortSuppressed(body: Omit<TokenResponse, "text">): boolean {
+  const w = body.cohort?.allTime ?? body.cohort?.h24 ?? null;
+  if (w === null) return true;
+  return isInsufficient({ rate: w.rate, n: w.launches, insufficient: w.insufficient });
 }
 
 /** The lookup, as plain text. Rendered by the API, the /t noscript block and
@@ -219,7 +241,7 @@ export function lookupText(
   const placement = placementSentence(body);
   if (placement) lines.push(placement);
 
-  lines.push(fillSentence(body.state, body.config));
+  lines.push(fillSentence(body.state, body.config, cohortSuppressed(body)));
 
   if (body.cohort) lines.push(formatStamp(body.cohort.crawledAt));
   if (body.live.stale) {

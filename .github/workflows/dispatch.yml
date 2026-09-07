@@ -1,0 +1,75 @@
+name: dispatch
+
+# The weekly dispatch (ARCHITECTURE-PHASE2-4.md §11, day 9). Composed from
+# the committed record by pipeline/dispatch.py, which computes nothing: every
+# figure comes out of pipeline/stats.py over a 7-day window.
+#
+# Read-only. This job never writes to the repo — it reads the record main
+# already holds and sends one email. `data/` is written by crawl.yml alone.
+
+on:
+  schedule:
+    # Monday 09:00 UTC.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Compose and upload the preview, send nothing"
+        type: boolean
+        required: false
+        default: true
+
+concurrency:
+  group: ledge-dispatch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # A scheduled run sends; a manual run sends only when dry_run is
+      # unticked. `inputs.dry_run` is empty on a schedule, hence the default.
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_AUDIENCE_ID: ${{ secrets.RESEND_AUDIENCE_ID }}
+      RESEND_FROM: ${{ vars.RESEND_FROM }}
+    steps:
+      # The record to send is the one on main, not the SHA that scheduled
+      # the run: a crawl may have committed since.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Composition is the same code path either way. --dry-run writes the
+      # previews and opens no socket; without it the same previews are
+      # written first and then sent, so the artifact matches what went out.
+      - name: compose (dry run)
+        if: env.DRY_RUN == 'true' || env.RESEND_API_KEY == '' || env.RESEND_AUDIENCE_ID == ''
+        run: python pipeline/dispatch.py --dry-run
+
+      - name: compose and send
+        if: env.DRY_RUN != 'true' && env.RESEND_API_KEY != '' && env.RESEND_AUDIENCE_ID != ''
+        run: python pipeline/dispatch.py
+
+      - name: report a missing secret
+        if: env.DRY_RUN != 'true' && (env.RESEND_API_KEY == '' || env.RESEND_AUDIENCE_ID == '')
+        run: echo "RESEND_API_KEY or RESEND_AUDIENCE_ID is not set; composed the preview and sent nothing"
+
+      # Uploaded on every path, including a failed send, so the message can
+      # always be read after the fact.
+      - name: upload the preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dispatch-preview
+          path: dispatch/
+          if-no-files-found: error
+          retention-days: 30

@@ -204,30 +204,54 @@ describe("how a fill reaches a reader", () => {
   it("prints both quantities in the pair token's own units", () => {
     const text = lookupText(makeBody({ fill }), null);
     // 2245000707691451167 wei is 2.245 ETH, and 4200000000000000000 is 4.2 ETH
-    expect(text).toContain("Curve fill: 2.245 ETH of 4.2 ETH.");
+    expect(text).toContain("Curve fill: 2.245 ETH of 4.2 ETH (53.5% of the threshold).");
     expect(text).not.toContain("2245000707691451167");
     expect(text).not.toContain("smallest unit");
   });
 
-  /* The share travels as a field, not as a sentence. This line sits three
-     lines below a cohort line that may read "not enough data (n=12)", and a
-     percentage printed under a suppressed one invites the misreading the
-     suppression exists to prevent. */
-  it("keeps the share out of the sentence and in the field", () => {
+  it("never lets the share travel without both quantities beside it", () => {
     const body = makeBody({ fill });
     const line = lookupText(body, null)
       .split("\n")
       .find((l) => l.startsWith("Curve fill"))!;
-    expect(line).toBe("Curve fill: 2.245 ETH of 4.2 ETH.");
-    expect(line).not.toMatch(/%/);
+    expect(line).toBe("Curve fill: 2.245 ETH of 4.2 ETH (53.5% of the threshold).");
     expect(body.state.curveFilledShare).toBe(0.534524);
   });
 
-  it("prints no percentage in an entry whose cohort is under-sampled", () => {
-    const file = fixtureNumberInsufficient();
-    const text = lookupText(makeBody({ fill, numberFile: file }), null);
+  /* The one case where the share is dropped, and it is about where the line
+     sits rather than about the share: three lines under a cohort figure the
+     sample cannot support, a percentage invites the misreading the suppression
+     exists to prevent. The quantities stay -- they are observations about one
+     curve and nothing about them is under-sampled. */
+  it("drops the share clause when the cohort's own percentage is suppressed", () => {
+    const text = lookupText(makeBody({ fill, numberFile: fixtureNumberInsufficient() }), null);
     expect(text).toContain("not enough data (n=12)");
+    expect(text).toContain("Curve fill: 2.245 ETH of 4.2 ETH.");
+    expect(text).not.toContain("of the threshold");
     expect(text).not.toMatch(/\d+\.\d+\s*%/);
+  });
+
+  it("drops it on the card for the same reason", () => {
+    const card = collectText(
+      cardTree(makeBody({ fill, numberFile: fixtureNumberInsufficient() }), null),
+    );
+    expect(card).toContain("Curve fill: 2.245 ETH of 4.2 ETH");
+    expect(card).not.toMatch(/\d+\.\d+\s*%/);
+  });
+
+  it("keeps the share when the cohort has one of its own to print", () => {
+    const card = collectText(cardTree(makeBody({ fill }), null));
+    expect(card).toContain("Curve fill: 2.245 ETH of 4.2 ETH (53.5%)");
+  });
+
+  /* The share is a Class B ratio and does not go through the sample gate, so
+     it must not be suppressed by anything except the placement rule above. */
+  it("keeps the share when the cohort is absent but the fill is not", () => {
+    const line = lookupText(makeBody({ fill, numberFile: null }), null)
+      .split("\n")
+      .find((l) => l.startsWith("Curve fill"))!;
+    // no cohort at all is still a suppressed cohort: nothing to sit beneath
+    expect(line).toBe("Curve fill: 2.245 ETH of 4.2 ETH.");
   });
 
   it("uses the pair token's decimals, not ETH's", () => {
@@ -247,8 +271,12 @@ describe("how a fill reaches a reader", () => {
       }),
       null,
     );
-    // 8090000000 at six decimals is 8,090 USDG, not 8.09e-9 ETH
+    // 8090000000 at six decimals is 8,090 USDG, not 8.09e-9 ETH.
+    // The share clause is absent because this configuration's cohort cell
+    // holds n=29 and its own percentage is suppressed — the rule above,
+    // firing on a case that was not written to exercise it.
     expect(text).toContain("Curve fill: 8090 USDG of 8090 USDG.");
+    expect(text).toContain("not enough data (n=29)");
   });
 
   it("prints the raw integer and says the units are unknown rather than assuming 18", () => {
@@ -267,8 +295,12 @@ describe("how a fill reaches a reader", () => {
     );
     // one unit of an 8,090-unit threshold: the quantity is shown exactly, and
     // the share says "<0.1%" rather than the "0.0%" six places would give
-    expect(text).toContain("Curve fill: 0.000001 ETH of 8090 ETH.");
+    // one unit against an 8,090-unit threshold: the quantity is printed
+    // exactly, and the share reads "<0.1%" rather than the "0.0%" that six
+    // places would give -- a curve holding something must not read as empty
+    expect(text).toContain("Curve fill: 0.000001 ETH of 8090 ETH (<0.1% of the threshold).");
     expect(text).not.toContain("Curve fill: 0 ETH");
+    expect(text).not.toContain("(0.0% of the threshold)");
   });
 
   it("carries the graduated note onto the page and the card", () => {

@@ -22,13 +22,14 @@
 import {
   formatAmount,
   formatCount,
+  formatShareOfOne,
   formatStamp,
   isInsufficient,
   rateText,
   shortAddress,
 } from "./format";
 import { FILL_GRADUATED, FILL_GRADUATED_CARD } from "./curve";
-import { headline } from "./text";
+import { cohortSuppressed, headline } from "./text";
 import { pairLabel, taxLabel } from "./buckets";
 import type { TokenResponse } from "./schema";
 
@@ -119,6 +120,7 @@ function wrap(line: string, maxChars: number): string[] {
 function fillLine(
   state: Omit<TokenResponse, "text">["state"],
   config: Omit<TokenResponse, "text">["config"],
+  suppressed: boolean,
 ): string {
   if (state.curveFilledShare === null) {
     return `Curve fill: ${state.fillNote ?? "not available"}`;
@@ -135,7 +137,9 @@ function fillLine(
   if (filled === null || threshold === null) {
     return `Curve fill: ${state.curveFilledWei} of ${state.graduationThresholdWei} (units not known)`;
   }
-  return `Curve fill: ${filled} of ${threshold}`;
+  if (suppressed) return `Curve fill: ${filled} of ${threshold}`;
+  const holdsSomething = state.curveFilledWei !== null && state.curveFilledWei !== "0";
+  return `Curve fill: ${filled} of ${threshold} (${formatShareOfOne(state.curveFilledShare, holdsSomething)})`;
 }
 
 /** The card, as positioned text. Exported so a test can read every string the
@@ -163,7 +167,7 @@ export function cardTree(
   /* The fill line shares its row with the address, so it may only have the
      plate minus that column and a gutter. */
   const fillColumn = plate - widthOf(address, 24) - 40;
-  const fill = fillLine(body.state, body.config);
+  const fill = fillLine(body.state, body.config, cohortSuppressed(body));
 
   const texts: CardText[] = [
     {
