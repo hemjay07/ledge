@@ -241,8 +241,20 @@ def _bucket_list(key: str) -> list[str]:
     }[key]
 
 
-def cohort(w: dict, key: str) -> list[dict]:
+def cohort(w: dict, key: str, cutoff: int = FAST_CUTOFF) -> list[dict]:
+    """One row per bucket, each carrying its raw rate and its own
+    excluding-fast rate.
+
+    Both, because the page leads with the excluding-fast figure: a row that
+    published only the raw rate invited a comparison across buckets on the
+    number the headline calls contaminated. Measured on the record of
+    2026-09-07, the pair-token buckets read 1.64% / 2.37% / 3.17% raw and
+    0.71% / 0.71% / 0.73% once graduations inside the cutoff are removed --
+    one ordering is a finding about pair tokens, the other is a finding
+    about who fills their own curve.
+    """
     buckets = _bucket_list(key)
+    launch_ts = {l["token"]: l["ts"] for l in w["launches"]}
     launches_by_bucket: dict[str, list[dict]] = {b: [] for b in buckets}
     for l in w["launches"]:
         bucket = _bucket_key(l, key)
@@ -253,19 +265,32 @@ def cohort(w: dict, key: str) -> list[dict]:
     for bucket in buckets:
         members = launches_by_bucket[bucket]
         n = len(members)
-        graduations = sum(1 for l in members if l["token"] in w["grads_by_token"])
-        if n < MIN_N:
-            rows.append({"bucket": bucket, "launches": n, "graduations": graduations, "rate": None, "insufficient": True})
-        else:
-            rows.append(
-                {
-                    "bucket": bucket,
-                    "launches": n,
-                    "graduations": graduations,
-                    "rate": round(graduations / n, 6),
-                    "insufficient": False,
-                }
-            )
+        deltas = [
+            w["grads_by_token"][l["token"]]["ts"] - launch_ts[l["token"]]
+            for l in members
+            if l["token"] in w["grads_by_token"]
+        ]
+        graduations = len(deltas)
+        slow = sum(1 for d in deltas if d >= cutoff)
+        insufficient = n < MIN_N
+        rate = None if insufficient else round(graduations / n, 6)
+        slow_rate = None if insufficient else round(slow / n, 6)
+        rows.append(
+            {
+                "bucket": bucket,
+                "launches": n,
+                "graduations": graduations,
+                "rate": rate,
+                "insufficient": insufficient,
+                "excludingFast": {
+                    "cutoffSeconds": cutoff,
+                    "graduations": slow,
+                    "rate": slow_rate,
+                    "oneIn": _one_in(slow, slow_rate),
+                    "insufficient": insufficient,
+                },
+            }
+        )
     return rows
 
 

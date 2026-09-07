@@ -84,3 +84,19 @@ export function insufficientFile(): NumberFile {
 export const numberFile: NumberFile = numberSchema.parse(raw);
 export const h24 = numberFile.h24;
 export { raw };
+
+/* Derived from the frozen fixture, not typed out beside it.
+
+   Every literal here used to be a hand-written percentage, and every refresh
+   of the fixture broke a handful of assertions that were testing arithmetic
+   nobody doubted rather than the behaviour under test. These read the same
+   file the code reads, through the same formatters. */
+export const F = {
+  n: numberFile.h24.launches,
+  graduations: numberFile.h24.graduations,
+  rate: numberFile.h24.rate as number,
+  efRate: numberFile.h24.excludingFast.rate as number,
+  efGraduations: numberFile.h24.excludingFast.graduations,
+  oneIn: numberFile.h24.excludingFast.oneIn as number,
+  crawledAt: numberFile.crawledAt,
+} as const;

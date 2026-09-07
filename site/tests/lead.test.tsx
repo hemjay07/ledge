@@ -1,6 +1,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { insufficientFile, insufficientRaw, numberFile, raw } from "./fixtures";
+import { insufficientFile, insufficientRaw, numberFile, raw , F } from "./fixtures";
+import { formatCount, formatRate, formatStamp } from "../lib/format";
 import type { Lead } from "../lib/lead-core.mjs";
 
 afterEach(cleanup);
@@ -63,19 +64,21 @@ describe.each(LEADS)("the fold, leading with %s", (lead) => {
     const second = text(container.querySelector(".second .figure-2"));
 
     if (lead === "raw") {
-      expect(poster).toBe("1.81%");
-      expect(second).toBe("0.53%");
-      expect(container.textContent).toContain("1 in 190");
+      expect(poster).toBe(formatRate(F.rate, F.n));
+      expect(second).toBe(formatRate(F.efRate, F.n));
+      expect(container.textContent).toContain(`1 in ${F.oneIn}`);
       expect(container.textContent).not.toContain("counting every graduation");
     } else {
-      expect(poster).toBe("1 in 190");
+      expect(poster).toBe(`1 in ${F.oneIn}`);
       // the rate the restatement restates is set beside the poster
-      expect(text(container.querySelector(".one-in .figure-2"))).toBe("0.53%");
-      expect(second).toBe("1.81%");
+      expect(text(container.querySelector(".one-in .figure-2"))).toBe(formatRate(F.efRate, F.n));
+      expect(second).toBe(formatRate(F.rate, F.n));
       expect(container.textContent).toContain(
         "graduated, excluding launches that graduated inside 5 minutes",
       );
-      expect(container.textContent).toContain("counting every graduation · 107 of 5,900");
+      expect(container.textContent).toContain(
+        `counting every graduation · ${formatCount(F.graduations)} of ${formatCount(F.n)}`,
+      );
     }
   });
 
@@ -98,15 +101,15 @@ describe.each(LEADS)("the fold, leading with %s", (lead) => {
     const second = secondarySentence(h24, cutoff, true);
     const summary = shareSummary(h24, cutoff);
 
-    expect(poster).toContain("Measured 6 Sep 2026");
+    expect(poster).toContain(formatStamp(F.crawledAt));
     if (lead === "raw") {
-      expect(poster.startsWith("1.81%")).toBe(true);
-      expect(second.startsWith("0.53%")).toBe(true);
-      expect(summary.startsWith("1.81%")).toBe(true);
+      expect(poster.startsWith(formatRate(F.rate, F.n))).toBe(true);
+      expect(second.startsWith(formatRate(F.efRate, F.n))).toBe(true);
+      expect(summary.startsWith(formatRate(F.rate, F.n))).toBe(true);
     } else {
-      expect(poster.startsWith("0.53% excluding launches")).toBe(true);
-      expect(second.startsWith("1.81%")).toBe(true);
-      expect(summary.startsWith("0.53%")).toBe(true);
+      expect(poster.startsWith(`${formatRate(F.efRate, F.n)} excluding launches`)).toBe(true);
+      expect(second.startsWith(formatRate(F.rate, F.n))).toBe(true);
+      expect(summary.startsWith(formatRate(F.efRate, F.n))).toBe(true);
     }
 
     const none = shareSummary(insufficient, cutoff);
@@ -119,16 +122,18 @@ describe.each(LEADS)("the fold, leading with %s", (lead) => {
     const card = cardText(cardTree(raw, AT_CRAWL)).join(" | ");
 
     if (lead === "raw") {
-      expect(card).toContain("1.81%");
-      expect(card).toContain("excluding under 5 min · 1 in 190");
-      expect(card).toContain("n = 5,900 · 107 graduations · updated");
+      expect(card).toContain(formatRate(F.rate, F.n));
+      expect(card).toContain(`excluding under 5 min · 1 in ${F.oneIn}`);
+      expect(card).toContain(`n = ${formatCount(F.n)} · ${formatCount(F.graduations)} graduations · updated`);
       expect(card).not.toContain("counting every graduation");
     } else {
-      expect(card).toContain("1 in 190");
-      expect(card).toContain("0.53%");
+      expect(card).toContain(`1 in ${F.oneIn}`);
+      expect(card).toContain(formatRate(F.efRate, F.n));
       expect(card).toContain("graduated, excluding under 5 min");
-      expect(card).toContain("n = 5,900 · 31 graduations · updated");
-      expect(card).toContain("1.81% counting every graduation · 107 of 5,900");
+      expect(card).toContain(`n = ${formatCount(F.n)} · ${formatCount(F.efGraduations)} graduations · updated`);
+      expect(card).toContain(
+        `${formatRate(F.rate, F.n)} counting every graduation · ${formatCount(F.graduations)} of ${formatCount(F.n)}`,
+      );
     }
 
     const empty = cardText(cardTree(insufficientRaw(), AT_CRAWL)).join(" | ");

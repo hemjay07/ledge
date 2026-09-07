@@ -16,6 +16,7 @@ describe("a cohort with no graduations", () => {
     graduations: 0,
     rate: 0,
     insufficient: false,
+    excludingFast: { cutoffSeconds: 300, graduations: 0, rate: 0, oneIn: null, insufficient: false },
     ...over,
   });
 

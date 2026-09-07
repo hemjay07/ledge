@@ -40,6 +40,7 @@ function pairRow(w: WindowData, bucket: string): CohortRow {
       graduations: 0,
       rate: null,
       insufficient: true,
+      excludingFast: { cutoffSeconds: 300, graduations: 0, rate: null, oneIn: null, insufficient: true },
     }
   );
 }
@@ -65,6 +66,23 @@ export default function Home(): ReactElement {
       window={window}
       updatedAt={crawledAt}
       insufficient={row.insufficient}
+    />
+  );
+
+  /* the same slot for the row's excluding-fast rate. The finding below is a
+     comparison BETWEEN buckets, and the page's headline says the raw rate is
+     contaminated by graduations the deployer arranged -- so a comparison
+     printed on the raw rate would invite exactly the reading the headline
+     spends its whole fold refusing. */
+  const pairSlowRate = (row: CohortRow, name: string, window: string) => (
+    <Stat
+      className="mono"
+      name={name}
+      value={row.excludingFast.rate}
+      n={row.launches}
+      window={window}
+      updatedAt={crawledAt}
+      insufficient={row.excludingFast.insufficient}
     />
   );
 
@@ -165,17 +183,17 @@ export default function Home(): ReactElement {
           headingNote={`· 24 h · n = ${formatCount(h24.launches)} launches`}
         >
           <p className="lede">
-            Launches paired with a stablecoin graduated at {pairRate(stable, "pair-stable", "24h")}{" "}
-            ({counts(stable)}); paired with ETH, {pairRate(eth, "pair-eth", "24h")} ({counts(eth)}).
-            Two counts over the same window, not a cause.
+            Excluding launches that graduated inside {cutoffWords}, the pair token makes no
+            difference: stablecoin {pairSlowRate(stableAll, "pair-stable-slow", "all-time")},
+            ETH {pairSlowRate(ethAll, "pair-eth-slow", "all-time")}, over{" "}
+            {counts(stableAll)} and {counts(ethAll)}.
           </p>
-          {allTimeIsSameMeasurement ? null : (
-            <p className="note">
-              Over the indexed record: stablecoin{" "}
-              {pairRate(stableAll, "pair-stable-all-time", "all-time")} ({counts(stableAll)}), ETH{" "}
-              {pairRate(ethAll, "pair-eth-all-time", "all-time")} ({counts(ethAll)}).
-            </p>
-          )}
+          <p className="note">
+            Counting every graduation the same buckets read{" "}
+            {pairRate(stableAll, "pair-stable-all-time", "all-time")} and{" "}
+            {pairRate(ethAll, "pair-eth-all-time", "all-time")}. The whole of that difference is
+            graduations that completed inside {cutoffWords}.
+          </p>
           <Register
             ariaLabel="Graduation rate by pair token"
             caption="Graduations of launches, by the token the pool is paired against."

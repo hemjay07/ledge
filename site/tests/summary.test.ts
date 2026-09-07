@@ -4,8 +4,8 @@ import {
   ponsNumberSentence,
   shareSummary,
 } from "../lib/summary";
-import { formatDurationLong, rateText, shareText } from "../lib/format";
-import { insufficientFile, h24 } from "./fixtures";
+import { formatCount, formatRate, formatDurationLong, rateText, shareText } from "../lib/format";
+import { insufficientFile, h24 , F } from "./fixtures";
 
 const CUTOFF = formatDurationLong(300);
 
@@ -48,15 +48,17 @@ describe("the sentences that carry a rate off the page", () => {
 
   it("prints the rate, unchanged, when the sample supports one", () => {
     expect(ponsNumberSentence(h24, "2026-09-06T15:58:32Z")).toBe(
-      "1.81%: 107 of 5,900 Pons launches in the last 24 hours graduated. Measured 6 Sep 2026 · 15:58 UTC.",
+      `${formatRate(F.rate, F.n)}: ${formatCount(F.graduations)} of ${formatCount(F.n)} ` +
+        "Pons launches in the last 24 hours graduated. Measured 6 Sep 2026 · 15:58 UTC.",
     );
     expect(excludingFastSentence(h24, CUTOFF, true)).toBe(
-      `0.53% excluding launches that graduated inside ${CUTOFF}: 31 of 5,900.`,
+      `${formatRate(F.efRate, F.n)} excluding launches that graduated inside ${CUTOFF}: ` +
+        `${formatCount(F.efGraduations)} of ${formatCount(F.n)}.`,
     );
     // Order follows LEAD (excludingFast first); tests/lead.test.tsx covers both.
     expect(shareSummary(h24, CUTOFF)).toBe(
-      `0.53% excluding launches that graduated inside ${CUTOFF}. ` +
-        "1.81% of 5,900 Pons launches in the last 24 hours graduated.",
+      `${formatRate(F.efRate, F.n)} excluding launches that graduated inside ${CUTOFF}. ` +
+        `${formatRate(F.rate, F.n)} of ${formatCount(F.n)} Pons launches in the last 24 hours graduated.`,
     );
     // the cutoff is set with a non-breaking space: "5 minutes" never wraps
     expect(CUTOFF).toBe("5\u00A0minutes");

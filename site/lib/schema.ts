@@ -4,26 +4,32 @@ import { INSUFFICIENT_BELOW } from "./format";
 /* The shape of data/number.json. A build fails here rather than shipping a
    figure whose denominator the pipeline forgot to write. */
 
+const excludingFastBlock = z.object({
+  cutoffSeconds: z.number().int().positive(),
+  graduations: z.number().int().nonnegative(),
+  rate: z.number().nullable(),
+  oneIn: z.number().int().nullable(),
+  insufficient: z.boolean(),
+});
+
+/* Every cohort row carries BOTH rates, and the block is required rather than
+   optional: the page leads with the excluding-fast figure, so a row able to
+   render without one would invite the cross-cohort comparison to be made on
+   the raw number the headline calls contaminated. */
 const cohortRow = z.object({
   bucket: z.string(),
   launches: z.number().int().nonnegative(),
   graduations: z.number().int().nonnegative(),
   rate: z.number().nullable(),
   insufficient: z.boolean(),
+  excludingFast: excludingFastBlock,
 });
 
 /* The cross cohort's cell: a cohort row cut on two keys at once, carrying the
-   key it was cut on and its own excluding-fast figure, gated on its own n. */
+   key it was cut on. */
 const pairTaxRow = cohortRow.extend({
   pairClass: z.string(),
   taxBucket: z.string(),
-  excludingFast: z.object({
-    cutoffSeconds: z.number().int().positive(),
-    graduations: z.number().int().nonnegative(),
-    rate: z.number().nullable(),
-    oneIn: z.number().int().nullable(),
-    insufficient: z.boolean(),
-  }),
 });
 
 /* One rung of the time-to-graduation ladder. `cumulative` is the raw count,

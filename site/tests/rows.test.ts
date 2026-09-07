@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { formatRate } from "../lib/format";
 import { cohortFooting, cohortRegisterRow, shareCell } from "../lib/rows";
 import { insufficientFile, h24 } from "./fixtures";
 
@@ -36,8 +37,9 @@ describe("a register row for an insufficient cohort", () => {
   });
 
   it("still prints a rate when the sample supports one", () => {
-    expect(cohortRegisterRow("ETH", h24.cohorts.pair[0]).cells[2]).toEqual({
-      text: "1.26%",
+    const eth = h24.cohorts.pair[0];
+    expect(cohortRegisterRow("ETH", eth).cells[2]).toEqual({
+      text: formatRate(eth.rate as number, eth.launches),
       kind: "fig",
     });
   });

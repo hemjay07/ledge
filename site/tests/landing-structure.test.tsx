@@ -91,7 +91,7 @@ describe("the registers that moved to /cohorts", () => {
     const { container } = render(<Home />);
     expect(registers(container).join(" | ")).toMatch(/by pair token/i);
     const entry = container.querySelector("#h-pair")?.closest(".entry");
-    expect(plain(entry)).toContain("Two counts over the same window, not a cause.");
+    expect(plain(entry)).toContain("the pair token makes no difference");
   });
 
   it("finds all three on /cohorts", () => {

@@ -127,10 +127,19 @@ describe("the register, renumbered", () => {
 });
 
 describe("the two moved findings", () => {
-  it("states the pair finding as two counts over one window", () => {
-    expect(PAIR_FINDING).toContain("Launches paired with a stablecoin graduated at");
-    expect(PAIR_FINDING).toContain("paired with ETH");
-    expect(PAIR_FINDING).toContain("Two counts over the same window, not a cause.");
+  /* The finding is stated on the excluding-fast rate, because the fold's
+     headline is that rate: a between-bucket comparison drawn on the raw one
+     would be a comparison on the number the page calls contaminated. */
+  it("states the pair finding on the rate the fold leads with", () => {
+    expect(PAIR_FINDING).toContain("the pair token makes no");
+    expect(PAIR_FINDING).toContain("Excluding launches that graduated inside");
+    expect(PAIR_FINDING).toContain("stablecoin");
+    expect(PAIR_FINDING).toContain("ETH");
+  });
+
+  it("says where the raw difference comes from rather than dropping it", () => {
+    expect(PAIR_FINDING).toContain("Counting every graduation");
+    expect(PAIR_FINDING).toContain("graduations that completed inside");
   });
 
   it("names what the cohorts page holds, in one line", () => {
