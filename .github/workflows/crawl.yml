@@ -48,8 +48,31 @@ jobs:
             exit 0
           fi
           git commit -m "data: crawl $(date -u +%Y-%m-%dT%H:%MZ)"
+          # A push race conflicts on data/number.json, and only ever there:
+          # the partitions are append-only so they merge, but number.json is a
+          # whole file rewritten every run. It is *generated*, so a conflict has
+          # one correct resolution — take the merged partitions and recompute —
+          # and merging its text would be wrong even when it succeeds.
+          #
+          # The previous loop left a failed rebase in place, so every retry died
+          # on "you have unmerged files" and the run lost the data it had just
+          # scanned. Each attempt now starts from a clean tree.
           for i in 1 2 3; do
-            if git pull --rebase --autostash && git push; then
+            git fetch -q origin main
+            if git rebase origin/main; then
+              :
+            elif [ -f data/number.json ]; then
+              git checkout --ours data/number.json && git add data/number.json
+              GIT_EDITOR=true git rebase --continue || { git rebase --abort || true; sleep 5; continue; }
+            else
+              git rebase --abort || true; sleep 5; continue
+            fi
+            # recompute against whatever partitions the rebase brought in, so the
+            # published figures always match the committed record
+            python pipeline/recompute.py
+            git add data/number.json
+            git diff --cached --quiet || git commit --amend --no-edit
+            if git push; then
               echo "hour=$(date -u +%H)" >> "$GITHUB_OUTPUT"
               echo "committed=true" >> "$GITHUB_OUTPUT"
               exit 0
