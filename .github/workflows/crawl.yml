@@ -20,7 +20,7 @@ jobs:
       committed: ${{ steps.commit.outputs.committed }}
       hour: ${{ steps.commit.outputs.hour }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -85,7 +85,7 @@ jobs:
     steps:
       # the branch tip, not the triggering SHA: the file to push is the one
       # the crawl job just committed.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.ref_name }}
 
@@ -128,7 +128,7 @@ jobs:
     steps:
       # the branch tip, not the triggering SHA: the reading to publish is the
       # one the crawl job just committed.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.ref_name }}
 
