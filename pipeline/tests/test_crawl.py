@@ -570,3 +570,42 @@ def test_a_run_within_the_cap_still_reaches_the_head(committed_data_dir, monkeyp
     assert max(t for _, t in seen) == head
     after = json.loads((committed_data_dir / "state.json").read_text())
     assert after["lastIndexedBlock"] == head
+
+
+def test_crawl_writes_the_same_number_file_recompute_would(committed_data_dir):
+    """The two writers of number.json must agree, byte for byte.
+
+    They diverged on 2026-09-08: a `samples` block was added to recompute.py
+    and not to crawl.py, so every scheduled run crawled successfully, wrote a
+    number.json missing the block, and was then failed by its own
+    reproducibility gate. The gate was right; the file had two authors.
+    """
+    from pipeline import recompute as recompute_mod
+    from pipeline.canonical import canonical_dumps
+
+    class _EmptyRpcClient:
+        def get_logs(self, *a, **k):
+            return []
+
+        def call_batch(self, requests):
+            return [{"timestamp": hex(1_788_000_000)} for _ in requests]
+
+    # A sample must exist for this test to bite: with an empty samples/ the
+    # two writers agree trivially and the test proves nothing. This is the
+    # shape of the file that actually broke production.
+    samples_dir = committed_data_dir / "samples"
+    samples_dir.mkdir(exist_ok=True)
+    (samples_dir / "raised-nothing-2026-09-08.json").write_text(
+        json.dumps({"measuredAt": "2026-09-08", "sampled": 200, "count": 187, "share": 0.935})
+    )
+
+    state = json.loads((committed_data_dir / "state.json").read_text())
+    crawl.run(
+        data_dir=committed_data_dir,
+        rpc_client=_EmptyRpcClient(),
+        head_block=state["lastIndexedBlock"] + 500,
+    )
+    written = (committed_data_dir / "number.json").read_text()
+    expected = canonical_dumps(recompute_mod.recompute(committed_data_dir))
+    assert "raisedNothing" in written, "the crawl dropped the sample block"
+    assert written == expected

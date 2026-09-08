@@ -54,7 +54,7 @@ if __package__ in (None, ""):
 
 from pipeline import enrich as enrich_mod
 from pipeline.canonical import canonical_dumps
-from pipeline.recompute import crawled_at_for, load_partitions, resolve_pair_class
+from pipeline.recompute import crawled_at_for, load_partitions, load_samples, resolve_pair_class
 from pipeline.rpc import TOPIC_POOL_GRADUATED, TOPIC_TOKEN_LAUNCHED, decode_pool_graduated, decode_token_launched
 from pipeline.stats import build_number, format_iso
 
@@ -438,7 +438,18 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     }
 
     crawled_at = crawled_at_for(new_state, all_launches)
-    number_payload = canonical_dumps(build_number(all_launches, all_grads, new_state, crawled_at)).encode()
+    # `samples=` is not optional here. recompute.py passes it, so a crawl that
+    # omitted it wrote a number.json that recompute.py would not reproduce --
+    # and the byte-for-byte gate then failed every scheduled run, which is
+    # exactly what happened on 2026-09-08. There is one published file, so
+    # there must be one way of building it; test_crawl_matches_recompute pins
+    # the two writers together.
+    number_payload = canonical_dumps(
+        build_number(
+            all_launches, all_grads, new_state, crawled_at,
+            samples=load_samples(data_dir / "samples"),
+        )
+    ).encode()
     state_payload = (json.dumps(new_state, sort_keys=True, indent=2) + "\n").encode()
 
     # --- commit point: nothing above this line touched the data dir -------
