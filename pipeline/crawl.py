@@ -61,6 +61,16 @@ from pipeline.stats import build_number, format_iso
 REORG_WINDOW = 3000
 MAX_WINDOW_BLOCKS = 1000
 LOG_PACING_SECONDS = 0.9
+# The furthest one forward run will reach. A backlog must never produce a run
+# that cannot finish inside the job's timeout: this crawl is all-or-nothing, so
+# a run that is killed commits nothing, and the next hour starts an hour
+# further behind. That is what happened on 2026-09-07 -- 21 hours of backlog,
+# ~750,000 blocks per attempt, every run cancelled at 20 minutes, no progress
+# ever committed. Capped, each run commits what it reached and the next one
+# continues from there, so a backlog drains instead of compounding.
+# 200,000 blocks is ~5.6 hours of chain and measured ~15 minutes of work
+# (log windows, block headers, and the factory read for each new launch).
+MAX_FORWARD_BLOCKS = 200_000
 
 
 def _log(msg: str) -> None:
@@ -320,7 +330,7 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
         to_block = head_block
     else:
         start_block = resume_start_block(state)
-        to_block = head_block
+        to_block = min(head_block, start_block + MAX_FORWARD_BLOCKS - 1)
 
     windows = plan_windows(start_block, to_block)
 
@@ -358,7 +368,7 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     new_launches = dedupe_records(scanned, _load_existing_keys(data_dir, "launches", days_to_check))
     new_grads = dedupe_records(raw_grads, _load_existing_keys(data_dir, "graduations", days_to_check))
 
-    if not new_launches and not new_grads and head_block == state["lastIndexedBlock"]:
+    if not new_launches and not new_grads and to_block == state["lastIndexedBlock"]:
         return {"committed": False}
 
     # The measurement instant: the chain time of the block the cursor lands
@@ -369,7 +379,7 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     # backfill does not advance the cursor, so it does not move the instant.
     last_indexed_at = None
     if not backfilling_history:
-        last_indexed_at = format_iso(_fetch_block_timestamps(rpc_client, [head_block])[head_block])
+        last_indexed_at = format_iso(_fetch_block_timestamps(rpc_client, [to_block])[to_block])
 
     existing_launches = load_partitions(data_dir / "launches")
     existing_grads = load_partitions(data_dir / "graduations")
@@ -404,7 +414,7 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     if backfilling_history:
         new_state["firstIndexedBlock"] = start_block
     else:
-        new_state["lastIndexedBlock"] = head_block
+        new_state["lastIndexedBlock"] = to_block
         new_state["lastIndexedAt"] = last_indexed_at
         if new_state.get("firstIndexedBlock") is None:
             new_state["firstIndexedBlock"] = start_block

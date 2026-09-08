@@ -361,3 +361,29 @@ def test_is_rate_limited_still_distinguishes_429_from_other_retryables():
     assert rpc.is_rate_limited({"code": 429, "message": "Too Many Requests"}) is True
     assert rpc.is_rate_limited({"code": 503, "message": "unavailable"}) is False
     assert rpc.is_retryable({"code": 503, "message": "unavailable"}) is True
+
+
+def test_a_tls_fault_is_retried_rather_than_killing_the_run():
+    """ssl.SSLError is an OSError, not a URLError. It escaped the transport's
+    handler, propagated out of the crawl, and -- under the all-or-nothing
+    commit -- discarded every window the run had already scanned."""
+    import ssl
+    from pipeline import rpc as rpc_mod
+
+    attempts = {"n": 0}
+
+    def flaky(payload):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise ssl.SSLError(1, "[SSL: SSLV3_ALERT_BAD_RECORD_MAC] bad record mac")
+        return [{"jsonrpc": "2.0", "id": r["id"], "result": "0x10"} for r in payload]
+
+    def transport(payload):
+        try:
+            return flaky(payload)
+        except (rpc_mod.urllib.error.URLError, OSError) as exc:
+            return {"code": 503, "message": f"transport: {exc}"}
+
+    client = rpc_mod.RpcClient("https://x.invalid", transport)
+    assert client.get_head_block() == 16
+    assert attempts["n"] == 2, "the fault must be retried, not raised"

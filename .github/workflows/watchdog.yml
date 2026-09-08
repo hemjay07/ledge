@@ -1,0 +1,38 @@
+# The number going quietly stale is the one failure the whole project exists to
+# prevent, and on 2026-09-07 it happened for 22 hours without anyone noticing:
+# the crawl was being killed by its own timeout, so it committed nothing, and a
+# job that commits nothing looks exactly like a job with nothing to do.
+# This watchdog only reads what was published and shouts. It shares no code with
+# the crawl, so a crawl that cannot run cannot silence it.
+name: watchdog
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: the published number must not be older than three hours
+        run: |
+          python3 - <<'PY'
+          import json, sys, datetime
+          n = json.load(open("data/number.json"))
+          crawled = datetime.datetime.strptime(n["crawledAt"], "%Y-%m-%dT%H:%M:%SZ").replace(
+              tzinfo=datetime.timezone.utc)
+          age = (datetime.datetime.now(datetime.timezone.utc) - crawled).total_seconds()
+          bound = n.get("staleAfterSeconds", 7200)
+          print(f"crawledAt {n['crawledAt']}  age {age/3600:.1f} h  published bound {bound/3600:.1f} h")
+          # The alarm sits above the published bound: the site is entitled to be
+          # up to `staleAfterSeconds` old and say so. Past 3 h the crawl is broken.
+          if age > 3 * 3600:
+              sys.exit(f"the published number is {age/3600:.1f} h old — the crawl is not committing")
+          PY

@@ -15,7 +15,7 @@ permissions:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     outputs:
       committed: ${{ steps.commit.outputs.committed }}
       hour: ${{ steps.commit.outputs.hour }}

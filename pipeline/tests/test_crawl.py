@@ -510,3 +510,63 @@ def test_a_backwards_backfill_does_not_move_the_measurement_instant(run_dir, mon
     assert after["lastIndexedAt"] == indexed_at
     assert number["crawledAt"] == indexed_at
     assert after["firstIndexedBlock"] < first_block  # the record did grow backwards
+
+
+# --- a backlog must never exceed the run's own timeout ------------------------
+def test_a_forward_run_scans_at_most_one_capped_range(committed_data_dir, monkeypatch):
+    """The failure this guards: on 2026-09-07 the hourly job fell 21 hours
+    behind, so every run tried to scan ~750,000 blocks, exceeded its 20-minute
+    timeout, was cancelled, committed nothing under the all-or-nothing rule,
+    and fell an hour further behind on every attempt. A run that cannot finish
+    makes no progress at all, so the backlog was unrecoverable.
+
+    A capped range makes a backlog self-healing: each run commits what it
+    reached and the next one continues from there."""
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    seen = []
+
+    class _RecordingRpcClient:
+        """Answers header requests, because a forward run stamps its cursor
+        with the timestamp of the block it reached."""
+
+        def get_logs(self, frm, to, topic0):
+            seen.append((frm, to))
+            return []
+
+        def call_batch(self, requests):
+            return [{"timestamp": hex(1_788_000_000)} for _ in requests]
+
+    state = json.loads((committed_data_dir / "state.json").read_text())
+    last = state["lastIndexedBlock"]
+    head = last + crawl.MAX_FORWARD_BLOCKS * 5  # a deep backlog
+
+    crawl.run(data_dir=committed_data_dir, rpc_client=_RecordingRpcClient(), head_block=head)
+
+    scanned_to = max(t for _, t in seen)
+    scanned_from = min(f for f, _ in seen)
+    assert scanned_to - scanned_from + 1 <= crawl.MAX_FORWARD_BLOCKS + crawl.REORG_WINDOW
+    assert scanned_to < head, "a backlogged run must not try to reach the head in one pass"
+
+    after = json.loads((committed_data_dir / "state.json").read_text())
+    assert after["lastIndexedBlock"] == scanned_to, "the cursor advances to what was reached"
+    assert after["lastIndexedBlock"] > last, "progress is made rather than abandoned"
+
+
+def test_a_run_within_the_cap_still_reaches_the_head(committed_data_dir, monkeypatch):
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    seen = []
+
+    class _RecordingRpcClient:
+        def get_logs(self, frm, to, topic0):
+            seen.append((frm, to))
+            return []
+
+        def call_batch(self, requests):
+            return [{"timestamp": hex(1_788_000_000)} for _ in requests]
+
+    state = json.loads((committed_data_dir / "state.json").read_text())
+    head = state["lastIndexedBlock"] + 5_000
+    crawl.run(data_dir=committed_data_dir, rpc_client=_RecordingRpcClient(), head_block=head)
+    assert max(t for _, t in seen) == head
+    after = json.loads((committed_data_dir / "state.json").read_text())
+    assert after["lastIndexedBlock"] == head

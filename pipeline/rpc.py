@@ -138,7 +138,13 @@ def _urllib_transport(url: str) -> Transport:
             if exc.code in RETRYABLE_HTTP:
                 return {"code": exc.code, "message": str(exc)}
             raise
-        except (urllib.error.URLError, socket.timeout, TimeoutError) as exc:
+        except (urllib.error.URLError, OSError) as exc:
+            # OSError, not just URLError: ssl.SSLError (BAD_RECORD_MAC on a
+            # dropped TLS record), ConnectionReset and friends are OSErrors and
+            # are NOT URLErrors, so they escaped this handler and killed the
+            # run. Under the all-or-nothing commit that discarded every window
+            # the run had already scanned -- one flaky TLS record cost an hour
+            # of catch-up. They are transport faults like any other: retry.
             return {"code": 503, "message": f"transport: {exc}"}
 
     return send
