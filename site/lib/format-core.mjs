@@ -124,3 +124,54 @@ export function formatUtcTime(iso) {
   const p = parts(iso);
   return `${p.hh}:${p.mm} UTC`;
 }
+
+/* ---- dated samples ------------------------------------------------------ */
+
+/** "8 September 2026" — a measurement date with no time on it. A sample is
+    read on a day, not at an instant, so it is not stamped like a crawl. */
+export function formatDayLong(iso) {
+  const p = parts(iso);
+  return `${p.day} ${MONTHS[p.month]} ${p.year}`;
+}
+
+/* The one sentence the raised-nothing sample is published as, and the one
+   provenance line under it. Both live here because the fold, the card page and
+   the OG image all set them, and three copies of a sentence are three chances
+   for the card to say something the sheet does not. */
+
+/** The clause the share governs. The figure is never in this string. */
+export const SAMPLE_CLAUSE = "of Pons launches never take a single buy.";
+
+/** How the sample was taken, in the length a fine-print line holds. The full
+    method stays in the file, under `method`. */
+export const SAMPLE_METHOD_SHORT = "read from each launch's own bonding curve";
+
+/** The sample as a rate fact: its share over the number it sampled. A sample
+    with no `sampled` count has no denominator and therefore no printable
+    share, which is the same gate every other rate on the site passes. */
+export function sampleFact(sample) {
+  return { rate: sample?.share ?? null, n: sample?.sampled ?? 0 };
+}
+
+/** "93.5% of Pons launches never take a single buy." — or, below the gate,
+    "not enough data (n=…) of Pons launches never take a single buy." */
+export function sampleSentence(sample) {
+  return `${rateText(sampleFact(sample))} ${SAMPLE_CLAUSE}`;
+}
+
+/** "187 of 200 sampled · 8 September 2026 · read from each launch's own
+    bonding curve" — the count, the denominator, the date, the method. */
+export function sampleProvenance(sample) {
+  return (
+    `${formatCount(sample.count)} of ${formatCount(sample.sampled)} sampled` +
+    ` · ${formatDayLong(sample.measuredAt)} · ${SAMPLE_METHOD_SHORT}`
+  );
+}
+
+/** The sample a surface may render: one that carries its own denominator.
+    Without `sampled` there is nothing to divide by and nothing to print, so
+    the block does not appear at all rather than appearing without its n. */
+export function renderableSample(samples, name) {
+  const sample = samples?.[name];
+  return sample && typeof sample.sampled === "number" ? sample : null;
+}

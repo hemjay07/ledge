@@ -28,3 +28,25 @@ export function formatAge(seconds: number): string;
 export function formatStamp(iso: string): string;
 export function formatUtcLong(iso: string): string;
 export function formatUtcTime(iso: string): string;
+
+/** A dated reading with its own denominator, as data/samples/*.json holds it. */
+export interface Sample {
+  measuredAt: string;
+  sampled?: number;
+  count: number;
+  share?: number | null;
+  method: string;
+}
+
+export function formatDayLong(iso: string): string;
+
+export const SAMPLE_CLAUSE: string;
+export const SAMPLE_METHOD_SHORT: string;
+
+export function sampleFact(sample: Sample | null | undefined): RateFact;
+export function sampleSentence(sample: Sample | null | undefined): string;
+export function sampleProvenance(sample: Sample & { sampled: number }): string;
+export function renderableSample(
+  samples: Record<string, Sample> | undefined,
+  name: string,
+): (Sample & { sampled: number }) | null;

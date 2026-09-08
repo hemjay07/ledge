@@ -6,10 +6,13 @@ import { Footer } from "../../components/Footer";
 import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { h24, numberFile, SITE_URL } from "../../lib/number";
-import { formatDurationLong, formatStamp } from "../../lib/format";
+import { formatDurationLong, formatStamp, renderableSample } from "../../lib/format";
 import { shareSummary } from "../../lib/summary";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
+
+/* The card page carries the sample too: this page is the one that travels. */
+const raisedNothing = renderableSample(numberFile.samples, "raisedNothing");
 
 const exFast = h24.excludingFast;
 const cutoffWords = formatDurationLong(exFast.cutoffSeconds);
@@ -50,7 +53,12 @@ export default function NumberCard(): ReactElement {
         <SheetNav current="card" />
         <RunningHead mark="LEDGE" win="Trailing 24 hours · 01" />
 
-        <Fold w={h24} crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
+        <Fold
+          w={h24}
+          crawledAt={crawledAt}
+          staleAfterSeconds={staleAfterSeconds}
+          sample={raisedNothing}
+        />
         <ColophonStrip stamp={formatStamp(crawledAt)} />
 
         <div className="card-note">

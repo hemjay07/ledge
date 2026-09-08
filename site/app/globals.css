@@ -152,6 +152,7 @@ th,
    of interrupting it. Figures in the register are untouched — a column wants
    the full advance. */
 .lede .mono,
+.sample-line .mono,
 .note .mono,
 .finding .mono,
 .caption .mono,
@@ -248,6 +249,17 @@ a:focus-visible,
    data one. */
 .age .mono {
   word-spacing: -0.32em;
+  /* The caption's age is the one figure on the sheet that moves while a reader
+     is looking at it: useFreshness re-reads the clock every 30 seconds. In a
+     proportional slot, "89 s" becoming "2 min" reflows the rest of the line
+     under the eye. The age keeps the mono face's tabular advance and a slot
+     wide enough for the longest form formatAge prints ("89 min"), set flush
+     right against "ago", so a tick changes the digits and moves nothing. */
+  display: inline-block;
+  min-width: 6ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 /* ================= THE FOLD ================= */
@@ -353,6 +365,31 @@ a:focus-visible,
   margin: var(--s-4) 0 0;
   text-wrap: pretty;
 }
+/* The dated sample, above the poster figure and indented with it. One line of
+   the body face at lede size — it is a sentence, not a figure — with its
+   provenance in the fold's fine print immediately beneath. */
+.sample-line {
+  font-family: var(--font-body);
+  font-size: var(--fs-lede);
+  line-height: 1.35;
+  color: var(--ink);
+  max-width: 44ch;
+  margin: 0 0 var(--s-1);
+  margin-left: 6%;
+  text-wrap: pretty;
+}
+.sample-fine {
+  max-width: 52ch;
+  margin: 0 0 var(--s-4);
+  margin-left: 6%;
+}
+@media (min-width: 48rem) {
+  .sample-line,
+  .sample-fine {
+    margin-left: 12%;
+  }
+}
+
 .figure-block {
   margin-left: 6%;
 }

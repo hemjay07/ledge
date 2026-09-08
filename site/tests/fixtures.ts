@@ -1,5 +1,5 @@
 import raw from "./fixture-number.json";
-import { numberSchema, type NumberFile } from "../lib/schema";
+import { numberSchema, type NumberFile, type Sample } from "../lib/schema";
 
 /* An insufficient measurement, built from the committed one so it stays the
    same shape: a window whose sample is under 30, whose every rate is null and
@@ -70,6 +70,21 @@ export function insufficientRaw(): Record<string, unknown> {
     };
   }
 
+  /* The samples go under the same gate. A sample is its own measurement with
+     its own n, so an insufficient window does not make it insufficient — but
+     this fixture's contract is that NOTHING in it may be printed as a
+     percentage, so its samples are thinned to a sample size below the gate
+     and a share that was never computed. */
+  for (const name of Object.keys((file.samples ?? {}) as Record<string, unknown>)) {
+    const sample = (file.samples as Record<string, any>)[name];
+    (file.samples as Record<string, any>)[name] = {
+      ...sample,
+      sampled: 12,
+      count: 11,
+      share: null,
+    };
+  }
+
   return file;
 }
 
@@ -100,3 +115,14 @@ export const F = {
   oneIn: numberFile.h24.excludingFast.oneIn as number,
   crawledAt: numberFile.crawledAt,
 } as const;
+
+/* The raised-nothing sample, read out of the same frozen file. Nothing about
+   it is typed here: re-sampling rewrites data/samples/, the fixture is rebuilt
+   from it by pipeline/vectors.py, and every assertion moves with it. */
+export const S: Sample & { sampled: number } = (() => {
+  const sample = numberFile.samples?.raisedNothing;
+  if (!sample || typeof sample.sampled !== "number") {
+    throw new Error("LEDGE: the frozen fixture carries no raisedNothing sample with an n");
+  }
+  return { ...sample, sampled: sample.sampled };
+})();

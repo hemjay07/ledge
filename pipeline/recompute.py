@@ -11,6 +11,7 @@ import argparse
 import difflib
 import gzip
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -51,6 +52,45 @@ def load_partitions(dir_path: Path) -> list[dict]:
         if path.name.endswith(".jsonl") or path.name.endswith(".jsonl.gz"):
             records.extend(_read_jsonl(path))
     return records
+
+
+DATE_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
+
+
+def sample_key(filename: str) -> str:
+    """The name a sample is published under: its filename, without the date it
+    was measured on and without the extension, in camelCase.
+
+    `raised-nothing-2026-09-08.json` -> `raisedNothing`. The date stays in the
+    filename because a sample is a dated reading and the next one of the same
+    measurement is a new file beside it, never an overwrite; it stays out of
+    the key because the key names the measurement, not the reading. The date
+    is published inside the file as `measuredAt` either way, which is the copy
+    every renderer reads.
+    """
+    stem = filename[: -len(".json")] if filename.endswith(".json") else filename
+    stem = DATE_SUFFIX.sub("", stem)
+    head, *rest = stem.split("-")
+    return head + "".join(word[:1].upper() + word[1:] for word in rest)
+
+
+def load_samples(dir_path) -> dict:
+    """Every .json file in data/samples/, keyed by sample_key.
+
+    A sample is a dated measurement with its own n, read from the chain once
+    and not recomputable from the JSONL partitions -- so it is carried through
+    verbatim rather than derived. An absent or empty directory is a legal
+    state and yields {}: a file written before samples existed still parses,
+    and a site reading one prints nothing rather than inventing a figure.
+    """
+    dir_path = Path(dir_path)
+    if not dir_path.exists():
+        return {}
+    samples = {}
+    for path in sorted(dir_path.iterdir()):
+        if path.is_file() and path.name.endswith(".json"):
+            samples[sample_key(path.name)] = json.loads(path.read_text())
+    return samples
 
 
 def resolve_pair_class(launch: dict, pair_tokens: dict) -> str:
@@ -105,7 +145,11 @@ def recompute(data_dir) -> dict:
     for launch in launches:
         launch["pairClass"] = resolve_pair_class(launch, pair_tokens)
 
-    return build_number(launches, graduations, state, crawled_at_for(state, launches))
+    samples = load_samples(data_dir / "samples")
+
+    return build_number(
+        launches, graduations, state, crawled_at_for(state, launches), samples=samples
+    )
 
 
 def _unified_diff(committed: str, recomputed: str) -> str:

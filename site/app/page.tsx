@@ -19,12 +19,18 @@ import {
   formatDurationLong,
   formatStamp,
   pairLabel,
+  renderableSample,
 } from "../lib/format";
 import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow } from "../lib/rows";
 import { fastShareFacts } from "../lib/summary";
 import { sameMeasurement } from "../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
+
+/* The dated sample the fold leads with. Null when the file carries none, and
+   null when the one it carries has no denominator: the fold prints nothing
+   rather than a share with nothing under it. */
+const raisedNothing = renderableSample(numberFile.samples, "raisedNothing");
 
 /* keyed off the data: while all-time holds exactly what the trailing 24 hours
    holds, the second pair sentence would restate one measurement as two */
@@ -105,6 +111,7 @@ export default function Home(): ReactElement {
           w={h24}
           crawledAt={crawledAt}
           staleAfterSeconds={staleAfterSeconds}
+          sample={raisedNothing}
           secondaryCounts
           dek={
             <p className="dek">

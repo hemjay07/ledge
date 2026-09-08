@@ -2,9 +2,17 @@ import type { ReactElement, ReactNode } from "react";
 import { Age } from "./Age";
 import { Figure } from "./Figure";
 import { OneInFigure } from "./OneInFigure";
-import { formatCount, formatDurationLong, formatOneIn } from "../lib/format";
+import { Stat } from "./Stat";
+import {
+  SAMPLE_CLAUSE,
+  SAMPLE_METHOD_SHORT,
+  formatCount,
+  formatDayLong,
+  formatDurationLong,
+  formatOneIn,
+} from "../lib/format";
 import { LEAD } from "../lib/lead";
-import type { WindowData } from "../lib/schema";
+import type { Sample, WindowData } from "../lib/schema";
 import { posterSentence, secondarySentence } from "../lib/summary";
 
 export interface FoldProps {
@@ -19,6 +27,10 @@ export interface FoldProps {
   finding?: ReactNode;
   /** the fold's fine print: what the window's counts do not yet contain */
   fine?: ReactNode;
+  /** a dated sample, set above the poster figure. It carries its own n and
+      its own measurement date, and it renders only when it carries the
+      denominator its share was taken over. */
+  sample?: (Sample & { sampled: number }) | null;
 }
 
 /* The fold: kicker, poster figure, the denominator hanging beneath it as a
@@ -40,6 +52,7 @@ export function Fold({
   secondaryCounts = false,
   finding = null,
   fine = null,
+  sample = null,
 }: FoldProps): ReactElement {
   const exFast = w.excludingFast;
   const cutoffWords = formatDurationLong(exFast.cutoffSeconds);
@@ -53,6 +66,33 @@ export function Fold({
     <>
       <div className="fold">
         <h1 className="kicker">The Pons Number</h1>
+        {/* The sample stands above the poster figure: it is a dated reading
+            over its own n, not a live window, and the line beneath it says so
+            before the eye reaches the 24-hour number. The share goes through
+            Stat like every other rate, so it cannot be printed without its
+            denominator and it falls to "not enough data (n=…)" under the same
+            gate. */}
+        {sample ? (
+          <>
+            <p className="sample-line">
+              <Stat
+                className="mono"
+                name="raised-nothing"
+                value={sample.share ?? null}
+                n={sample.sampled}
+                window={`sample ${sample.measuredAt}`}
+                updatedAt={sample.measuredAt}
+              />{" "}
+              {SAMPLE_CLAUSE}
+            </p>
+            <p className="note note--fine sample-fine">
+              <span className="mono">
+                {formatCount(sample.count)} of {formatCount(sample.sampled)}
+              </span>{" "}
+              sampled · {formatDayLong(sample.measuredAt)} · {SAMPLE_METHOD_SHORT}
+            </p>
+          </>
+        ) : null}
         <div className="figure-block">
           {leadsRaw ? (
             <Figure

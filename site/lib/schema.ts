@@ -42,6 +42,42 @@ const ladderRung = z.object({
   cumulativeShare: z.number().nullable(),
 });
 
+/* A dated sample: a reading taken once, by hand, with its own n and its own
+   measurement date. It is not a window and it is not recomputed by the crawl —
+   `recompute.py` carries every file in `data/samples/` through verbatim.
+
+   Only `sampled` is optional, and the refinement below is why: a sample may
+   report a bare count with no share, but a share is a rate and a rate does not
+   exist without the denominator it was taken over (CONSTRAINTS.md 3). The same
+   discipline the window blocks are held to, applied to a figure that arrives
+   from outside the pipeline. */
+const sampleShape = z.object({
+  measuredAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
+    message: "measuredAt is the day the sample was read, as YYYY-MM-DD",
+  }),
+  sampled: z.number().int().nonnegative().optional(),
+  count: z.number().int().nonnegative(),
+  share: z.number().nullable().optional(),
+  method: z.string().min(1),
+});
+
+const sampleSchema = sampleShape.superRefine((s, ctx) => {
+  if (s.share !== null && s.share !== undefined && s.sampled === undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["sampled"],
+      message: "a share cannot exist without the sampled count it was taken over",
+    });
+  }
+  if (s.sampled !== undefined && s.count > s.sampled) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["count"],
+      message: `a sample counted ${s.count} out of ${s.sampled}, which is more than it sampled`,
+    });
+  }
+});
+
 const histogramRow = z.object({
   bucket: z.string(),
   deployers: z.number().int().nonnegative(),
@@ -228,6 +264,10 @@ export const numberSchema = z.object({
     }),
   stale: z.boolean(),
   staleAfterSeconds: z.number().int().positive(),
+  /* Optional, and absent means {}: a number.json written before samples
+     existed is still a legal file, and a consumer that finds nothing here
+     prints nothing rather than inventing a figure. */
+  samples: z.record(z.string(), sampleSchema).optional(),
   h24: windowSchema,
   allTime: windowSchema,
 });
@@ -238,3 +278,4 @@ export type CohortRow = z.infer<typeof cohortRow>;
 export type PairTaxRow = z.infer<typeof pairTaxRow>;
 export type LadderRung = z.infer<typeof ladderRung>;
 export type HistogramRow = z.infer<typeof histogramRow>;
+export type Sample = z.infer<typeof sampleShape>;

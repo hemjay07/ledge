@@ -462,7 +462,13 @@ def _window_block(launches: list, graduations: list, since: Optional[int], until
     }
 
 
-def build_number(launches: list, graduations: list, state: dict, crawled_at: str) -> dict:
+def build_number(
+    launches: list,
+    graduations: list,
+    state: dict,
+    crawled_at: str,
+    samples: dict | None = None,
+) -> dict:
     # `crawled_at` is chain time: the block timestamp of the last indexed
     # block, passed in by the caller (METHOD.md "Freshness"). Every window
     # closes on it, so a wall clock here would close windows over blocks that
@@ -494,6 +500,11 @@ def build_number(launches: list, graduations: list, state: dict, crawled_at: str
         "firstIndexedAt": first_indexed_at(launches),
         "factory": FACTORY_ADDRESS,
         "chainId": CHAIN_ID,
+        # Dated readings that are not windows: each carries its own n and its
+        # own measurement date and is passed through by recompute.py exactly
+        # as it was committed. Absent samples publish {} rather than nothing,
+        # so a consumer never has to tell "no samples" from "old file".
+        "samples": dict(samples or {}),
         "h24": _window_block(launches, graduations, since_24h, until, lower_bound=True),
         "allTime": _window_block(launches, graduations, None, until, lower_bound=False),
     }

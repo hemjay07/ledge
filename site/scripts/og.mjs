@@ -20,6 +20,9 @@ import {
   formatStamp,
   isInsufficient,
   rateText,
+  renderableSample,
+  sampleProvenance,
+  sampleSentence,
 } from "../lib/format-core.mjs";
 import { LEAD } from "../lib/lead-core.mjs";
 
@@ -121,6 +124,38 @@ export function cardTree(data, nowMs = Date.now()) {
 
   const graduations = leadsRaw ? w.graduations : w.excludingFast.graduations;
 
+  /* The dated sample, set as the card's top line. The card is what travels, so
+     the strongest measurement leads it — with its own n and its own date on
+     the line beneath, because a share that arrives in a chat window without
+     its denominator is a share nobody can check. It goes through the same
+     rateText gate as everything else, and a file carrying no sample sets
+     nothing at all. */
+  const sample = renderableSample(data.samples, "raisedNothing");
+  const sampleBlock = sample
+    ? {
+        type: "div",
+        props: {
+          style: { display: "flex", flexDirection: "column", paddingBottom: 18 },
+          children: [
+            {
+              type: "div",
+              props: {
+                style: { fontSize: 34, lineHeight: 1.15, color: INK },
+                children: sampleSentence(sample),
+              },
+            },
+            {
+              type: "div",
+              props: {
+                style: { fontSize: 21, paddingTop: 8, color: INK_3 },
+                children: sampleProvenance(sample),
+              },
+            },
+          ],
+        },
+      }
+    : null;
+
   return {
     type: "div",
     props: {
@@ -148,6 +183,7 @@ export function cardTree(data, nowMs = Date.now()) {
           props: {
             style: { display: "flex", flexDirection: "column", paddingLeft: 40 },
             children: [
+              sampleBlock,
               {
                 type: "div",
                 props: {

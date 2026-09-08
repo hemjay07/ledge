@@ -39,6 +39,7 @@ if __package__ in (None, ""):
 from decimal import ROUND_HALF_UP, Decimal
 
 from pipeline.canonical import canonical_dumps
+from pipeline.recompute import load_samples
 from pipeline.stats import (
     DEFINITIONS_VERSION,
     LADDER_EDGES,
@@ -128,7 +129,14 @@ def build_fixture_number() -> dict:
         "firstIndexedBlock": min(r["block"] for r in launches),
         "lastIndexedBlock": raw["head"],
     }
-    return build_number(launches, graduations, state, crawled_at)
+    # The committed samples ride along. A sample is not derived from the
+    # partitions -- it is a dated reading with its own n, committed by hand --
+    # so the frozen fixture carries the same ones the live file does rather
+    # than a second copy of their figures typed out here. The site's tests
+    # derive every expectation from this fixture, and a percentage typed into
+    # a test is a percentage that can disagree with the data.
+    samples = load_samples(REPO_ROOT / "data" / "samples")
+    return build_number(launches, graduations, state, crawled_at, samples=samples)
 
 
 # --- the lookups the Worker must reproduce ----------------------------------
