@@ -69,3 +69,38 @@ export const COHORT_COLUMNS = (first: string): string[] => [
   "Graduations",
   "Rate",
 ];
+
+/* ---- the pair x tax grid ------------------------------------------------ */
+
+/** The order the 20 cells are printed in, fixed in the source: pair-major,
+    then creator tax ascending. It is deliberately not the file's order and
+    never the measured order — a table sorted by its own rate reads as a
+    ranking, and a ranking of configurations is advice. A bucket the pipeline
+    starts publishing that is not named here sorts to the end rather than
+    disappearing. */
+export const PAIR_ORDER = ["eth", "stable", "stock", "other"];
+export const TAX_ORDER = ["0%", "1%", "2-3%", "4-5%", "6-10%"];
+
+function rank(order: string[], bucket: string): number {
+  const i = order.indexOf(bucket);
+  return i === -1 ? order.length : i;
+}
+
+export function pairTaxOrder<T extends { pairClass: string; taxBucket: string }>(rows: T[]): T[] {
+  return [...rows].sort(
+    (a, b) =>
+      rank(PAIR_ORDER, a.pairClass) - rank(PAIR_ORDER, b.pairClass) ||
+      rank(TAX_ORDER, a.taxBucket) - rank(TAX_ORDER, b.taxBucket),
+  );
+}
+
+/** The grid's column heads. The sample-size column stands beside both rates,
+    which is what Register checks for before it builds. */
+export const PAIRTAX_COLUMNS = [
+  "Pair token",
+  "Creator tax",
+  "Launches (n)",
+  "Graduations",
+  "Rate",
+  "Excluding fast",
+];

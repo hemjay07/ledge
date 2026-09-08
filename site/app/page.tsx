@@ -270,6 +270,13 @@ export default function Home(): ReactElement {
           </p>
         </LedgerEntry>
 
+        <LedgerEntry folio="08" id="h-config" heading="Configurations">
+          <p className="note">
+            Pair token crossed with creator tax, all 20 cells in both windows, is on{" "}
+            <Link href="/cockpit">the configurations page</Link>.
+          </p>
+        </LedgerEntry>
+
         <Footer />
       </main>
     </>

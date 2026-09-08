@@ -716,6 +716,20 @@ td.thin {
   font-family: var(--font-body);
   white-space: normal;
 }
+/* The marked row. It takes the register's own alternating band and is closed
+   top and bottom by the ink hairline the register already draws for a
+   footing — rule weight and the band, which is the whole depth model. No
+   colour: colour is the stale state's and nothing else's. The mark says which
+   row a reader asked for; it does not say the row is good. */
+tbody tr[data-picked="true"] {
+  background: var(--ground-alt);
+}
+tbody tr[data-picked="true"] th,
+tbody tr[data-picked="true"] td {
+  border-top: var(--rw-hair) solid var(--rule-heavy);
+  border-bottom: var(--rw-hair) solid var(--rule-heavy);
+}
+
 tfoot th,
 tfoot td {
   border-bottom: 0;
@@ -1046,5 +1060,195 @@ footer {
     100% {
       opacity: 0.45;
     }
+  }
+}
+
+/* ---- the configuration picker ---- */
+/* Two fields written into the register the way the lookup line is: a rule
+   under each, nothing filled, nothing rounded. They mark a row and do nothing
+   else — no sort, no filter, no score — so nothing here is styled as a
+   control that acts on the table. */
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4) var(--s-8);
+  margin-top: var(--s-3);
+}
+.picker-field {
+  margin: 0;
+  min-width: 9rem;
+}
+.picker-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.picker-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+  border-bottom: var(--rw-mid) solid var(--rule-mid);
+}
+.picker-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: var(--s-2) 0;
+  color: var(--ink);
+  font-size: var(--fs-note);
+  letter-spacing: 0;
+}
+.picker-select:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+/* the field's own mark that it opens: a printed caret, not chrome */
+.picker-caret {
+  flex: 0 0 auto;
+  font-size: var(--fs-fine);
+  color: var(--ink-3);
+}
+
+/* Six columns do not fit a 390px sheet: the grid scrolls inside its labelled,
+   focusable scroller, the way the engraved scale does. Inside a table that
+   already scrolls, a wrapping cell buys nothing — it makes one row twice the
+   height of its neighbours and leaves a gap where a figure should be — so the
+   two cells that wrap elsewhere are held on one line here. */
+.config-grids th:first-child,
+.config-grids td.thin {
+  white-space: nowrap;
+}
+
+/* ---- the configuration grid on a narrow sheet ---- */
+/* Six columns do not fit a 390px measure. Scrolling them is the wrong trade:
+   the two rate columns end up off the sheet, so a phone reads configurations
+   and launch counts and none of the rates, which are the reason the page
+   exists. So the row reflows instead — two printed lines, every figure kept,
+   nothing truncated and nothing dropped.
+
+   Line one is the configuration, the launch count and the rate excluding
+   graduations inside the cutoff, which is the rate the site leads with and
+   therefore the one that must survive the smallest screen. Line two carries
+   the rate counting every graduation and the graduation count, a size down
+   and an ink step back — fine print, not the italic running face, because
+   these are figures and the running face is this register's mark for a cell
+   that is NOT a figure.
+
+   The column heads cannot be read across two lines, so each figure states its
+   own unit in their place: "n =" before the launch count keeps the
+   denominator attached to the rate beside it, which is the structural half of
+   the denominator rule that the head row was carrying.
+
+   Flex rather than grid, deliberately: in a grid, the two line-two cells span
+   the line-one tracks and inflate them, and the rate that must survive is the
+   track that gives the width up. In flex each line is sized by its own
+   contents. */
+.at-narrow {
+  display: none;
+}
+/* A quantity is kept whole: "1 in 279" does not break across lines, the same
+   rule the fold's prose already applies to a quantity set in a sentence. */
+.qty {
+  white-space: nowrap;
+}
+@media (max-width: 50rem) {
+  .at-narrow {
+    display: inline;
+  }
+  .config-grids thead {
+    display: none;
+  }
+  .config-grids table {
+    min-width: 0;
+  }
+  .config-grids tbody tr,
+  .config-grids tfoot tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--s-2);
+    row-gap: 0.125rem;
+    padding: 0.4375rem 0;
+    border-top: var(--rw-hair) solid transparent;
+    border-bottom: var(--rw-hair) solid var(--rule-hair);
+  }
+  .config-grids tfoot tr {
+    border-top: var(--rw-hair) solid var(--rule-heavy);
+    border-bottom: 0;
+  }
+  .config-grids tbody tr[data-picked="true"] {
+    border-top-color: var(--rule-heavy);
+    border-bottom-color: var(--rule-heavy);
+  }
+  .config-grids th,
+  .config-grids td,
+  .config-grids th:first-child,
+  .config-grids td.thin {
+    border: 0;
+    padding: 0;
+    min-width: 0;
+    text-align: left;
+    white-space: normal;
+  }
+  /* Line one, and the widths that keep all four of its fields on it. The
+     configuration is a label and takes two lines rather than a fifth of the
+     measure; the rate takes whatever is left and wraps between its percentage
+     and its "1 in N" when that is narrow, which keeps it in its place at the
+     right of the line instead of dropping to a line of its own. */
+  .config-grids tr th:first-child {
+    order: 1;
+    max-width: 5.5rem;
+  }
+  .config-grids tr td:nth-child(2) {
+    order: 2;
+    margin-right: auto;
+  }
+  .config-grids tr td:nth-child(3) {
+    order: 3;
+    white-space: nowrap;
+  }
+  .config-grids tr td:nth-child(6) {
+    order: 4;
+    flex: 1 1 3.5rem;
+    text-align: right;
+  }
+  /* Line two, and the break that makes it line two. A flex line is broken on
+     the items' own base widths, so the rate over every graduation asks for
+     the measure less 10rem: line one's four fields are never narrower than
+     that remainder at any width, so the rate can never join them and always
+     opens the second line, with the graduation count beside it. Stated as a
+     width rather than a percentage on purpose — a percentage holds only over
+     the band of viewports where it happens to beat line one, and reflows
+     differently row by row on either side of it. */
+  .config-grids tr td:nth-child(5) {
+    order: 5;
+    flex: 1 1 calc(100% - 10rem);
+  }
+  .config-grids tr td:nth-child(4) {
+    order: 6;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .config-grids tr td:nth-child(4),
+  .config-grids tr td:nth-child(5),
+  .config-grids tr td:nth-child(4).fig,
+  .config-grids tr td:nth-child(5).fig {
+    font-size: var(--fs-fine);
+    color: var(--ink-2);
+  }
+  .config-grids tr td.fig {
+    font-size: var(--fs-note);
+  }
+  /* the units and the separator, which only this layout needs */
+  .config-grids .at-narrow {
+    color: var(--ink-3);
   }
 }

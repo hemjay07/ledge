@@ -2,13 +2,21 @@ import type { ReactElement, ReactNode } from "react";
 import { LedgerEntry } from "./LedgerEntry";
 
 export interface RegisterCell {
-  text: string;
+  text?: string;
+  /** a rendered cell — a Stat, which carries its own n, window and measurement */
+  node?: ReactNode;
   /** "fig" for a figure, "n" for the denominator column, "thin" for no figure */
   kind?: "fig" | "n" | "thin";
 }
 
 export interface RegisterRow {
   label: string;
+  /** the row head as it is printed, when it carries more than its own text */
+  labelNode?: ReactNode;
+  /** the row key, for a register whose first column repeats down the table */
+  id?: string;
+  /** the row a reader marked: the register's own band, not an emphasis */
+  picked?: boolean;
   cells: RegisterCell[];
 }
 
@@ -62,11 +70,15 @@ export function Register(props: RegisterProps): ReactElement {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.label}>
-              <th scope="row">{row.label}</th>
+            <tr
+              key={row.id ?? row.label}
+              data-picked={row.picked === true ? "true" : undefined}
+              aria-current={row.picked === true ? "true" : undefined}
+            >
+              <th scope="row">{row.labelNode ?? row.label}</th>
               {row.cells.map((cell, i) => (
                 <td className={cellClass(cell.kind)} key={columns[i + 1] ?? i}>
-                  {cell.text}
+                  {cell.node ?? cell.text}
                 </td>
               ))}
             </tr>
@@ -77,7 +89,7 @@ export function Register(props: RegisterProps): ReactElement {
             <th scope="row">{foot.label}</th>
             {foot.cells.map((cell, i) => (
               <td className={cellClass(cell.kind ?? "fig")} key={columns[i + 1] ?? i}>
-                {cell.text}
+                {cell.node ?? cell.text}
               </td>
             ))}
           </tr>

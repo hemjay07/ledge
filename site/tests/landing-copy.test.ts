@@ -105,7 +105,10 @@ describe("the What this is entry", () => {
 describe("the register, renumbered", () => {
   it("runs the folios in order with no gap and no repeat", () => {
     const folios = [...PAGE.matchAll(/folio="(\d{2})"/g)].map((m) => m[1]);
-    expect(folios).toEqual(["02", "03", "04", "05", "06", "07"]);
+    /* 08 is the one line pointing at /cockpit, added beneath the existing
+       entries: the inventory grows with the register rather than the check
+       being loosened. */
+    expect(folios).toEqual(["02", "03", "04", "05", "06", "07", "08"]);
   });
 
   it("runs lookup, the pair finding, the distribution, the board, the explanation, the index", () => {

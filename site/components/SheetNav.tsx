@@ -10,11 +10,12 @@ import Link from "next/link";
    a button: they are links, underlined by a rule like every other link on the
    sheet. */
 
-export type SheetPage = "number" | "cohorts" | "method" | "card";
+export type SheetPage = "number" | "cohorts" | "cockpit" | "method" | "card";
 
 const PAGES: { key: SheetPage; href: string; label: string }[] = [
   { key: "number", href: "/", label: "The number" },
   { key: "cohorts", href: "/cohorts", label: "Cohorts" },
+  { key: "cockpit", href: "/cockpit", label: "Configurations" },
   { key: "method", href: "/method", label: "Method" },
   { key: "card", href: "/number", label: "Card" },
 ];
