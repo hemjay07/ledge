@@ -776,3 +776,122 @@ describe("the aggregates against a replay of the same logs", () => {
     expect(row.first_block_buyers).toBe(2);
   });
 });
+
+/* The measured cost of a minute, at the volume the chain actually runs at.
+
+   ~564 curve events a minute across ~121 distinct curves, ~13 launches a
+   minute, against a free-plan budget of 50 subrequests per invocation. This
+   counts every request the tick puts on the wire -- one per batch, one per
+   log query -- so the budget can be read off the assertion rather than
+   argued about. */
+describe("what one minute of chain costs", () => {
+  beforeEach(async () => {
+    await reset();
+  });
+
+  it("stays inside the subrequest budget at the measured event rate", async () => {
+    const base = 100_000;
+    await seedCursor(base, NOW);
+
+    const curves: string[] = [];
+    const seeds: D1PreparedStatement[] = [];
+    for (let i = 0; i < 121; i++) {
+      const curve = "0x" + (i + 1).toString(16).padStart(40, "0");
+      const token = "0x" + (i + 1001).toString(16).padStart(40, "0");
+      curves.push(curve);
+      seeds.push(
+        env.LEDGE_DB.prepare(
+          `INSERT INTO launch VALUES (?, ?, '0x0', 'eth', 0, ?, ?, ?, 0)`,
+        ).bind(token, curve, base - 500 + i, NOW - 600, `0xseed${i}`),
+      );
+    }
+    await env.LEDGE_DB.batch(seeds);
+
+    const buys = [];
+    const sells = [];
+    for (let i = 0; i < 564; i++) {
+      const curve = curves[i % curves.length] as string;
+      const block = base + 1 + (i % 600);
+      if (i % 3 === 2) sells.push(sellLog(curve, "0x" + "b1".padStart(40, "0"), 1n, block, i));
+      else buys.push(buyLog(curve, "0x" + "b2".padStart(40, "0"), 1n, block, i));
+    }
+    const launches = Array.from({ length: 13 }, (_, i) =>
+      launchLog(
+        "0x" + (i + 5000).toString(16).padStart(40, "0"),
+        base + 10 + i,
+        i,
+        `0xnew${i}`,
+        "0x" + (i + 9000).toString(16).padStart(40, "0"),
+      ),
+    );
+
+    let sent = 0;
+    const inner = fakeChain({
+      head: base + 600,
+      launches,
+      graduations: [],
+      buys,
+      sells,
+      timestampOf: (block) => NOW - 600 + (block - base),
+    });
+    const counting = new RpcClient("http://unused", async (payload) => {
+      sent += 1;
+      return (inner.client as any).transport(payload);
+    });
+
+    const result = await tick(env, NOW, counting);
+    expect(result.ok).toBe(true);
+    expect(result.trades).toBe(564);
+    expect(result.launches).toBe(13);
+
+    /* Measured, not bounded loosely. Thirteen requests: one eth_blockNumber,
+       four factory log queries over the 1,800-block re-read, two curve log
+       queries over the 600 new blocks (the two extra REPOSITION.md budgeted
+       for), five batches carrying the block headers the counters need and
+       the factory view for the new launches. D1 adds four calls -- the
+       cursor read, the curve lookup, the activity read and the write batch.
+       Seventeen against a free-plan allowance of fifty. */
+    expect(sent).toBe(13);
+    expect(sent).toBeLessThan(50);
+    const rows = await env.LEDGE_DB.prepare(
+      "SELECT count(*) AS n, sum(buys) AS b, sum(sells) AS s FROM token_activity",
+    ).first<any>();
+    expect(rows.b).toBe(buys.length);
+    expect(rows.s).toBe(sells.length);
+    expect(result.unattributed).toBe(0);
+  }, 120_000);
+});
+
+/* The fold writes a row whole, because a uint256 sum is BigInt addition and
+   SQLite cannot do it in an UPDATE. A row it seeds without reading first is
+   therefore a row it silently zeroes, so every token a pass touches -- the
+   launches it seeds as well as the curves that traded -- is read back first. */
+describe("a pass that seeds a row for a token it already holds", () => {
+  beforeEach(async () => {
+    await reset();
+  });
+
+  it("keeps the counters a previous pass wrote", async () => {
+    await seedCursor(5000, NOW);
+    await env.LEDGE_DB.prepare(
+      `INSERT INTO token_activity VALUES (?, 4000, 9, 2, '900', '20', ?, ?, 3)`,
+    )
+      .bind(TOKEN_A, NOW - 400, NOW - 300)
+      .run();
+    await tick(
+      env,
+      NOW,
+      fakeChain({
+        head: 5100,
+        launches: [launchLog(TOKEN_A, 5050, 0, "0xtx1", "0x00000000000000000000000000000000000000c1")],
+        graduations: [],
+        timestampOf: (block) => NOW - 1100 + block,
+      }).client,
+    );
+    const row = await env.LEDGE_DB.prepare("SELECT * FROM token_activity WHERE token = ?")
+      .bind(TOKEN_A)
+      .first<any>();
+    expect(row.buys).toBe(9);
+    expect(row.quote_in).toBe("900");
+  });
+});

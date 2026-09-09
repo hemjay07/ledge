@@ -379,10 +379,6 @@ export async function tick(
     const countFrom = cursor.last_indexed_block + 1;
     const trades = await fetchCurveTrades(rpc, countFrom, to);
     const { curveToToken, launchBlockOf } = await resolveCurves(db, trades, launches);
-    const existingActivity = await readActivityRows(
-      db,
-      [...new Set(trades.map((t) => curveToToken.get(t.curve)).filter((t): t is string => !!t))],
-    );
     /* Launches whose own block this pass folds: the only ones whose first
        block is in hand, and so the only ones whose first-block buyers can be
        counted. */
@@ -393,6 +389,14 @@ export async function tick(
         launchBlockOf.set(launch.token, launch.block);
       }
     }
+    /* Every token this pass touches, including the launches it seeds a row
+       for: the fold writes rows whole, so a row it has not read is a row it
+       would overwrite with zeros. */
+    const touched = [
+      ...trades.map((t) => curveToToken.get(t.curve)).filter((t): t is string => !!t),
+      ...newLaunches.keys(),
+    ];
+    const existingActivity = await readActivityRows(db, touched);
 
     const timestamps = await fetchBlockTimestamps(rpc, [
       ...launches.map((l) => l.block),
