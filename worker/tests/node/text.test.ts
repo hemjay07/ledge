@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { headline, lookupText, numberText, outcomeWord } from "../../src/text";
-import { fixtureNumber, makeBody, NOW_SECONDS, LAUNCH } from "./helpers";
+import { activitySentences, headline, lookupText, numberText, outcomeWord } from "../../src/text";
+import { ACTIVITY, fixtureNumber, makeBody, NOW_SECONDS, LAUNCH } from "./helpers";
 
 const MAX = fixtureNumber().allTime.ttg.max;
 
@@ -224,5 +224,72 @@ describe("the bound itself, from both sides", () => {
 
   it("leaves a recently measured file unmarked", () => {
     expect(lookupText(makeBody(), MAX)).not.toContain("freshness bound");
+  });
+});
+
+/* REPOSITION.md Phase B: /t/{address} states this token's own facts -- its
+   buys, its sells, its distinct buyers in its own launch block -- with no
+   conclusion drawn from them. */
+describe("activity facts", () => {
+  it("is absent entirely when LEDGE holds no activity row for this token", () => {
+    expect(activitySentences(makeBody())).toEqual([]);
+    expect(lookupText(makeBody(), MAX)).not.toContain("Activity,");
+  });
+
+  it("states buys, sells and quote in/out against the window it counted over, verbatim", () => {
+    const body = makeBody({ activity: ACTIVITY });
+    const lines = activitySentences(body);
+    expect(body.activity).not.toBeNull();
+    expect(lines[0]).toContain(body.activity!.window.label);
+    expect(lines[0]).toContain(`${ACTIVITY.buys} buys`);
+    expect(lines[0]).toContain(`${ACTIVITY.sells} sells`);
+    expect(lines[0]).toContain("ETH in and");
+  });
+
+  it("states first buy and last activity, each as a stamp", () => {
+    const lines = activitySentences(makeBody({ activity: ACTIVITY }));
+    expect(lines[1]).toContain("First buy:");
+    expect(lines[1]).toContain("Last activity:");
+    expect(lines[1]).toContain("Measured");
+  });
+
+  it("says 'no buy recorded yet' rather than a stamp when no buy has been seen", () => {
+    const noBuy = { ...ACTIVITY, first_buy_ts: null };
+    const lines = activitySentences(makeBody({ activity: noBuy }));
+    expect(lines[1]).toContain("no buy recorded yet");
+  });
+
+  it("distinguishes zero distinct buyers from an unindexed launch block", () => {
+    const zero = { ...ACTIVITY, first_block_buyers: 0 };
+    const zeroLines = activitySentences(makeBody({ activity: zero }));
+    expect(zeroLines[2]).toContain("block 56,172,001");
+    expect(zeroLines[2]).toContain(": 0.");
+
+    const neverIndexed = { ...ACTIVITY, first_block_buyers: null };
+    const nullLines = activitySentences(makeBody({ activity: neverIndexed }));
+    expect(nullLines[2]).toContain("that block was not indexed");
+    expect(nullLines[2]).not.toContain(": 0.");
+    expect(zeroLines[2]).not.toEqual(nullLines[2]);
+  });
+
+  it("prints the distinct buyer count for the launch's own block, and no wallet address", () => {
+    const lines = activitySentences(makeBody({ activity: ACTIVITY }));
+    expect(lines[2]).toContain(`${ACTIVITY.first_block_buyers}`);
+    expect(lines.join(" ")).not.toMatch(/0x[0-9a-f]{40}/i);
+  });
+
+  it("reaches the full /t/{address} text, after the curve fill", () => {
+    const text = lookupText(makeBody({ activity: ACTIVITY }), MAX);
+    expect(text).toContain("Activity,");
+    expect(text).toContain(`${ACTIVITY.buys} buys`);
+    const fillIndex = text.indexOf("Curve fill:");
+    const activityIndex = text.indexOf("Activity,");
+    expect(fillIndex).toBeGreaterThan(-1);
+    expect(activityIndex).toBeGreaterThan(fillIndex);
+  });
+
+  it("prints no percentage in the activity lines without an n beside it", () => {
+    const text = lookupText(makeBody({ activity: ACTIVITY }), MAX);
+    expect(percentagesWithoutAnN(text)).toEqual([]);
   });
 });

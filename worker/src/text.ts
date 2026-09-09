@@ -238,6 +238,56 @@ export function cohortSuppressed(body: Omit<TokenResponse, "text">): boolean {
   return isInsufficient({ rate: w.rate, n: w.launches, insufficient: w.insufficient });
 }
 
+/** quoteIn and quoteOut, in the pair token's own units. Same fallback as
+    fillSentence: where the decimals are unknown the raw integers are printed
+    rather than scaled by a guessed exponent. */
+function activityQuoteText(
+  a: NonNullable<TokenResponse["activity"]>,
+  config: TokenResponse["config"],
+): string {
+  const decimals = config.pairDecimals;
+  const inAmt = decimals === null ? null : formatAmount(a.quoteIn, decimals, config.pairSymbol);
+  const outAmt = decimals === null ? null : formatAmount(a.quoteOut, decimals, config.pairSymbol);
+  if (inAmt === null || outAmt === null) {
+    return (
+      `${a.quoteIn} in and ${a.quoteOut} out, in the pair token's smallest unit; ` +
+      "its decimals are not known"
+    );
+  }
+  return `${inAmt} in and ${outAmt} out`;
+}
+
+/** This token's own indexed curve activity (REPOSITION.md Phase B): its buys,
+    its sells, its quote in and out, when it first took a buy, when it last
+    saw one, and how many distinct addresses bought in its own launch block --
+    the coordination reading, because that costs gas and snipe tax to fake.
+
+    `null` and `0` distinct buyers are kept apart on purpose: null is "that
+    block was never indexed", 0 is "it was indexed and nobody bought" -- a
+    finding, not a gap. Absent entirely when LEDGE holds no activity row for
+    this token, which is a different silence than either. */
+export function activitySentences(body: Omit<TokenResponse, "text">): string[] {
+  const a = body.activity;
+  if (a === null) return [];
+
+  const quote = activityQuoteText(a, body.config);
+  const lines: string[] = [
+    `Activity, ${a.window.label}: ${formatCount(a.buys)} buys, ${formatCount(a.sells)} sells, ${quote}.`,
+  ];
+
+  const first = a.firstBuyAt === null ? "no buy recorded yet" : formatStamp(a.firstBuyAt);
+  lines.push(`First buy: ${first}. Last activity: ${formatStamp(a.lastActivityAt)}.`);
+
+  lines.push(
+    a.firstBlock === null
+      ? "Distinct buyers in the launch's own block: that block was not indexed."
+      : `Distinct buyers in the launch's own block (block ${formatCount(a.firstBlock.block)}): ` +
+          `${formatCount(a.firstBlock.distinctBuyers)}.`,
+  );
+
+  return lines;
+}
+
 /** The lookup, as plain text. Rendered by the API, the /t noscript block and
     the Telegram bot from the same objects, so the three cannot diverge. */
 export function lookupText(
@@ -269,6 +319,7 @@ export function lookupText(
   if (placement) lines.push(placement);
 
   lines.push(fillSentence(body.state, body.config, cohortSuppressed(body)));
+  lines.push(...activitySentences(body));
 
   if (body.cohort) lines.push(formatStamp(body.cohort.crawledAt));
   if (body.live.stale) {
