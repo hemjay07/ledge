@@ -8,6 +8,24 @@ export const TOPIC_TOKEN_LAUNCHED =
 export const TOPIC_POOL_GRADUATED =
   "0x0a44ef75df69c534f43cd6c1aa3ef8983065fe5fe79ef9e79f6494e6f258c259";
 
+/* The two curve events, verified in RESEARCH-PHASE2-3.md section A3.
+
+   CurveBuy(address,address,uint256,uint256,uint256,uint256)
+     topics [1]=buyer  [2]=recipient
+     data   [0]=quoteIn [1]=tokensOut [2]=fee [3]=tax
+   CurveSell(address,address,uint256,uint256,uint256,uint256)
+     topics [1]=seller [2]=recipient
+     data   [0]=tokensIn [1]=quoteOut [2]=fee [3]=tax
+
+   Both are emitted by the launch's OWN curve, and every launch deploys one:
+   there is no shared curve, so these are read by topic0 with no address
+   filter and the emitting curve is taken from each log's own `address`
+   field. */
+export const TOPIC_CURVE_BUY =
+  "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455";
+export const TOPIC_CURVE_SELL =
+  "0x8113d738abdcb6b38357e9d53a54a7157861a09031b453651f0fe7fe151f59df";
+
 /** getLaunchedToken(address) -- keccak256 prefix, verified against
     pipeline/keccak.py. Returns a 15-word static tuple. */
 export const SELECTOR_GET_LAUNCHED_TOKEN = "0x3cf28b5a";
@@ -52,6 +70,42 @@ export interface RawLog {
   blockNumber: string;
   transactionHash: string;
   logIndex: string;
+  /** The contract that emitted the log. Optional because a factory log is
+      already filtered by address and never needs to read it; a curve log has
+      nothing else to say which launch it belongs to. */
+  address?: string;
+}
+
+export type TradeSide = "buy" | "sell";
+
+/** One CurveBuy or CurveSell, decoded. `quoteIn` and `quoteOut` are decimal
+    strings: a uint256 does not fit a 64-bit integer, and the side that does
+    not apply is "0" rather than absent, so the two sums add the same way. */
+export interface CurveTradeLog {
+  curve: string;
+  side: TradeSide;
+  trader: string;
+  quoteIn: string;
+  quoteOut: string;
+  block: number;
+  txHash: string;
+  logIndex: number;
+}
+
+export function decodeCurveTrade(log: RawLog, side: TradeSide): CurveTradeLog {
+  if (!log.address) throw new Error("a curve log with no address names no curve");
+  if (log.topics.length < 2) throw new Error("a curve trade log carries too few topics");
+  const quote = wordToBigInt(dataWord(log.data, side === "buy" ? 0 : 1)).toString();
+  return {
+    curve: log.address.toLowerCase(),
+    side,
+    trader: wordToAddress(log.topics[1] as string),
+    quoteIn: side === "buy" ? quote : "0",
+    quoteOut: side === "sell" ? quote : "0",
+    block: Number(BigInt(log.blockNumber)),
+    txHash: log.transactionHash,
+    logIndex: Number(BigInt(log.logIndex)),
+  };
 }
 
 function topicToAddress(topic: string): string {

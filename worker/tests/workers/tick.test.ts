@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { RpcClient } from "../../src/rpc";
 import { MAX_CATCHUP_BLOCKS, REORG_OVERLAP_BLOCKS, RETENTION_SECONDS, dedupeLogs, logWindows, tick } from "../../src/tick";
-import { TOPIC_TOKEN_LAUNCHED, TOPIC_POOL_GRADUATED } from "../../src/pons";
+import { TOPIC_TOKEN_LAUNCHED, TOPIC_POOL_GRADUATED, TOPIC_CURVE_BUY, TOPIC_CURVE_SELL } from "../../src/pons";
 import { reset, seedCursor } from "./setup";
 
 const NOW = 1_788_720_000;
@@ -15,13 +15,19 @@ function word(value: bigint): string {
   return value.toString(16).padStart(64, "0");
 }
 
-function launchLog(token: string, block: number, logIndex: number, txHash: string) {
+function launchLog(
+  token: string,
+  block: number,
+  logIndex: number,
+  txHash: string,
+  curve = "0xf6e86610771ee7838cabe2f9c376265ca25ef04c",
+) {
   return {
     address: FACTORY,
     topics: [
       TOPIC_TOKEN_LAUNCHED,
       "0x" + pad(token),
-      "0x" + pad("0xf6e86610771ee7838cabe2f9c376265ca25ef04c"),
+      "0x" + pad(curve),
       "0x" + pad("0x96cb8eb2e349e64ba47b1015890a2fe7584c369b"),
     ],
     data: "0x" + word(0n) + word(0n) + word(4_200_000_000_000_000_000n),
@@ -42,12 +48,36 @@ function graduationLog(token: string, block: number, logIndex: number, txHash: s
   };
 }
 
+function buyLog(curve: string, buyer: string, quoteIn: bigint, block: number, logIndex = 0) {
+  return {
+    address: curve,
+    topics: [TOPIC_CURVE_BUY, "0x" + pad(buyer), "0x" + pad(buyer)],
+    data: "0x" + word(quoteIn) + word(1n) + word(0n) + word(0n),
+    blockNumber: "0x" + block.toString(16),
+    transactionHash: `0xb${block}${logIndex}`,
+    logIndex: "0x" + logIndex.toString(16),
+  };
+}
+
+function sellLog(curve: string, seller: string, quoteOut: bigint, block: number, logIndex = 0) {
+  return {
+    address: curve,
+    topics: [TOPIC_CURVE_SELL, "0x" + pad(seller), "0x" + pad(seller)],
+    data: "0x" + word(9n) + word(quoteOut) + word(0n) + word(0n),
+    blockNumber: "0x" + block.toString(16),
+    transactionHash: `0xs${block}${logIndex}`,
+    logIndex: "0x" + logIndex.toString(16),
+  };
+}
+
 /** A chain that answers from a fixed set of logs, exactly as the endpoint
     would: one topic per eth_getLogs, batched blocks and calls by id. */
 function fakeChain(options: {
   head: number;
   launches: ReturnType<typeof launchLog>[];
   graduations: ReturnType<typeof graduationLog>[];
+  buys?: ReturnType<typeof buyLog>[];
+  sells?: ReturnType<typeof sellLog>[];
   timestampOf?: (block: number) => number;
   fault?: { code: number; message: string };
   taxBps?: number;
@@ -67,8 +97,13 @@ function fakeChain(options: {
         const filter = request.params[0];
         const from = Number(BigInt(filter.fromBlock));
         const to = Number(BigInt(filter.toBlock));
-        const pool =
-          filter.topics[0] === TOPIC_TOKEN_LAUNCHED ? options.launches : options.graduations;
+        const pools: Record<string, any[]> = {
+          [TOPIC_TOKEN_LAUNCHED]: options.launches,
+          [TOPIC_POOL_GRADUATED]: options.graduations,
+          [TOPIC_CURVE_BUY]: options.buys ?? [],
+          [TOPIC_CURVE_SELL]: options.sells ?? [],
+        };
+        const pool = pools[filter.topics[0]] ?? [];
         return {
           id: request.id,
           result: pool.filter((log) => {
@@ -473,5 +508,271 @@ describe("retention keeps a launch as long as its graduation", () => {
     await tick(env, NOW, fakeChain({ head: 500_100, launches: [], graduations: [] }).client);
     const rows = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM launch").first<any>();
     expect(rows.n).toBe(0);
+  });
+});
+
+/* Phase A — the curve index.
+
+   Curves are deployed per launch: ~564 CurveBuy/CurveSell events a minute
+   across ~19,000 live curves, filtered by topic0 alone because there is no
+   address to filter on. What is stored is never the events -- 812,000 rows a
+   day would not fit the plan -- but one folded row per token, ~121 of them
+   touched in any five-minute window. */
+describe("curve activity", () => {
+  const CURVE_A = "0x00000000000000000000000000000000000000c1";
+  const CURVE_B = "0x00000000000000000000000000000000000000c2";
+  const BUYER_1 = "0x0000000000000000000000000000000000000b01";
+  const BUYER_2 = "0x0000000000000000000000000000000000000b02";
+
+  beforeEach(async () => {
+    await reset();
+  });
+
+  async function activityOf(token: string) {
+    return env.LEDGE_DB.prepare("SELECT * FROM token_activity WHERE token = ?")
+      .bind(token)
+      .first<any>();
+  }
+
+  it("folds buys and sells onto the token whose curve emitted them", async () => {
+    await seedCursor(1000, NOW);
+    const { client } = fakeChain({
+      head: 1100,
+      launches: [launchLog(TOKEN_A, 1050, 0, "0xtx1", CURVE_A)],
+      graduations: [],
+      buys: [buyLog(CURVE_A, BUYER_1, 300n, 1051), buyLog(CURVE_A, BUYER_2, 200n, 1052)],
+      sells: [sellLog(CURVE_A, BUYER_1, 120n, 1053)],
+      timestampOf: (block) => NOW - 1100 + block,
+    });
+    const result = await tick(env, NOW, client);
+    expect(result.ok).toBe(true);
+
+    const row = await activityOf(TOKEN_A);
+    expect(row.buys).toBe(2);
+    expect(row.sells).toBe(1);
+    expect(row.quote_in).toBe("500");
+    expect(row.quote_out).toBe("120");
+    expect(row.from_block).toBe(1050); // the launch block, not the first trade
+    expect(row.first_buy_ts).toBe(NOW - 1100 + 1051);
+    expect(row.last_activity_ts).toBe(NOW - 1100 + 1053);
+  });
+
+  it("counts the distinct buyers in the launch's own block", async () => {
+    await seedCursor(1000, NOW);
+    const { client } = fakeChain({
+      head: 1100,
+      launches: [launchLog(TOKEN_A, 1050, 0, "0xtx1", CURVE_A)],
+      graduations: [],
+      buys: [
+        buyLog(CURVE_A, BUYER_1, 10n, 1050, 1),
+        buyLog(CURVE_A, BUYER_1, 10n, 1050, 2),
+        buyLog(CURVE_A, BUYER_2, 10n, 1050, 3),
+        buyLog(CURVE_A, BUYER_2, 10n, 1060, 0),
+      ],
+      timestampOf: (block) => NOW - 1100 + block,
+    });
+    await tick(env, NOW, client);
+    const row = await activityOf(TOKEN_A);
+    expect(row.first_block_buyers).toBe(2);
+    expect(row.buys).toBe(4);
+  });
+
+  it("records a launch nobody bought as a row saying so", async () => {
+    await seedCursor(1000, NOW);
+    const { client } = fakeChain({
+      head: 1100,
+      launches: [launchLog(TOKEN_A, 1050, 0, "0xtx1", CURVE_A)],
+      graduations: [],
+      timestampOf: (block) => NOW - 1100 + block,
+    });
+    await tick(env, NOW, client);
+    const row = await activityOf(TOKEN_A);
+    expect(row.buys).toBe(0);
+    expect(row.first_block_buyers).toBe(0);
+    expect(row.first_buy_ts).toBeNull();
+  });
+
+  /* The overlap exists so a reorg cannot leave a launch behind, and launches
+     and graduations are rewritten from the fresh logs because they are keyed
+     on the log's own identity. A counter cannot be un-added, so the counters
+     fold only the blocks above the previous cursor -- exactly once each. */
+  it("does not count a trade twice when its block is re-read", async () => {
+    await seedCursor(1000, NOW);
+    const chain = {
+      launches: [launchLog(TOKEN_A, 1050, 0, "0xtx1", CURVE_A)],
+      graduations: [] as any[],
+      buys: [buyLog(CURVE_A, BUYER_1, 300n, 1051)],
+      timestampOf: (block: number) => NOW - 1100 + block,
+    };
+    await tick(env, NOW, fakeChain({ ...chain, head: 1100 }).client);
+    expect((await activityOf(TOKEN_A)).buys).toBe(1);
+
+    await tick(env, NOW + 60, fakeChain({ ...chain, head: 1160 }).client);
+    expect((await activityOf(TOKEN_A)).buys).toBe(1);
+  });
+
+  it("counts a log whose curve it cannot place rather than dropping it", async () => {
+    await seedCursor(1000, NOW);
+    const { client } = fakeChain({
+      head: 1100,
+      launches: [launchLog(TOKEN_A, 1050, 0, "0xtx1", CURVE_A)],
+      graduations: [],
+      buys: [buyLog(CURVE_A, BUYER_1, 10n, 1051), buyLog(CURVE_B, BUYER_1, 10n, 1052)],
+      timestampOf: (block) => NOW - 1100 + block,
+    });
+    const result = await tick(env, NOW, client);
+    expect(result.unattributed).toBe(1);
+    const meta = await env.LEDGE_DB.prepare("SELECT * FROM activity_unattributed").first<any>();
+    expect(meta.logs).toBe(1);
+    expect((await activityOf(TOKEN_A)).buys).toBe(1);
+  });
+
+  it("attributes a trade to a launch indexed on an earlier pass", async () => {
+    await seedCursor(1000, NOW);
+    await tick(
+      env,
+      NOW,
+      fakeChain({
+        head: 1100,
+        launches: [launchLog(TOKEN_A, 1050, 0, "0xtx1", CURVE_A)],
+        graduations: [],
+        timestampOf: (block) => NOW - 1100 + block,
+      }).client,
+    );
+    await tick(
+      env,
+      NOW + 60,
+      fakeChain({
+        head: 1700,
+        launches: [],
+        graduations: [],
+        buys: [buyLog(CURVE_A, BUYER_1, 77n, 1650)],
+        timestampOf: (block) => NOW - 1100 + block,
+      }).client,
+    );
+    const row = await activityOf(TOKEN_A);
+    expect(row.buys).toBe(1);
+    expect(row.quote_in).toBe("77");
+    expect(row.first_block_buyers).toBe(0); // measured on the pass that read block 1050
+  });
+
+  /* REPOSITION.md: two extra eth_getLogs per tick, and nothing else against
+     the subrequest budget. */
+  it("spends two extra log requests a tick and no more", async () => {
+    await seedCursor(10_000, NOW);
+    const { client, calls } = fakeChain({ head: 10_600, launches: [], graduations: [] });
+    await tick(env, NOW, client);
+    // 1,800 blocks of factory range at 1,000 a window, two topics: 4. The
+    // 600 new blocks carry the two curve topics: 2.
+    expect(calls.getLogs).toBe(6);
+  });
+});
+
+/* Retention (requirement 5). An activity row is pruned by the same seven-day
+   rule, and the chain of dependencies runs one way: a graduation keeps its
+   launch, and activity keeps the launch that carries the curve the activity
+   was attributed by. Evicting the launch under a live curve would turn every
+   later trade on it into an unattributed reading. */
+describe("retention reaches the activity rows", () => {
+  beforeEach(async () => {
+    await reset();
+  });
+
+  async function tickOnce() {
+    await tick(env, NOW, fakeChain({ head: 500_100, launches: [], graduations: [] }).client);
+  }
+
+  it("prunes an activity row whose last event is past the cutoff", async () => {
+    await seedCursor(500_000, NOW);
+    await env.LEDGE_DB.prepare(
+      `INSERT INTO token_activity VALUES ('0xold', 10, 1, 0, '1', '0', ?, ?, 1)`,
+    )
+      .bind(NOW - RETENTION_SECONDS - 10, NOW - RETENTION_SECONDS - 10)
+      .run();
+    await tickOnce();
+    const rows = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM token_activity").first<any>();
+    expect(rows.n).toBe(0);
+  });
+
+  it("keeps a launch past the cutoff whose curve is still trading", async () => {
+    await seedCursor(500_000, NOW);
+    await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES ('0xlive', '0xc', '0x0', 'eth', 0, 10, ?, '0xt1', 0)`,
+      ).bind(NOW - RETENTION_SECONDS - 3600),
+      env.LEDGE_DB.prepare(
+        `INSERT INTO token_activity VALUES ('0xlive', 10, 3, 0, '3', '0', ?, ?, 1)`,
+      ).bind(NOW - RETENTION_SECONDS - 3000, NOW - 60),
+    ]);
+    await tickOnce();
+    const rows = await env.LEDGE_DB.prepare("SELECT token FROM launch").all();
+    expect(rows.results.map((r: any) => r.token)).toEqual(["0xlive"]);
+  });
+
+  it("keeps an activity row while its graduation is still held", async () => {
+    await seedCursor(500_000, NOW);
+    await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(`INSERT INTO graduation VALUES ('0xgrad', 20, ?, '1', '0xt2', 0)`).bind(
+        NOW - 60,
+      ),
+      env.LEDGE_DB.prepare(
+        `INSERT INTO token_activity VALUES ('0xgrad', 10, 3, 0, '3', '0', ?, ?, 1)`,
+      ).bind(NOW - RETENTION_SECONDS - 3000, NOW - RETENTION_SECONDS - 10),
+    ]);
+    await tickOnce();
+    const rows = await env.LEDGE_DB.prepare("SELECT token FROM token_activity").all();
+    expect(rows.results.map((r: any) => r.token)).toEqual(["0xgrad"]);
+  });
+});
+
+/* Requirement 5 — reconciliation. The aggregates are the only record of
+   812,000 events a day, so they have to agree with a replay of the same logs:
+   the same trades folded in one pass and folded in three reach the same row. */
+describe("the aggregates against a replay of the same logs", () => {
+  const CURVE_A = "0x00000000000000000000000000000000000000c1";
+  const BUYER_1 = "0x0000000000000000000000000000000000000b01";
+  const BUYER_2 = "0x0000000000000000000000000000000000000b02";
+
+  const launches = [launchLog(TOKEN_A, 1050, 0, "0xtx1", CURVE_A)];
+  const buys = [
+    buyLog(CURVE_A, BUYER_1, 11n, 1050, 1),
+    buyLog(CURVE_A, BUYER_2, 22n, 1050, 2),
+    buyLog(CURVE_A, BUYER_1, 44n, 1300, 0),
+    buyLog(CURVE_A, BUYER_2, 88n, 1900, 0),
+  ];
+  const sells = [sellLog(CURVE_A, BUYER_1, 3n, 1301), sellLog(CURVE_A, BUYER_2, 5n, 1901)];
+  const timestampOf = (block: number) => NOW - 2000 + block;
+
+  async function rowAfter(heads: number[]) {
+    await reset();
+    await seedCursor(1000, NOW);
+    let clock = NOW;
+    for (const head of heads) {
+      await tick(
+        env,
+        clock,
+        fakeChain({ head, launches, graduations: [], buys, sells, timestampOf }).client,
+      );
+      clock += 60;
+    }
+    const row = await env.LEDGE_DB.prepare("SELECT * FROM token_activity WHERE token = ?")
+      .bind(TOKEN_A)
+      .first<any>();
+    return row;
+  }
+
+  it("reaches the same counters in one pass and in three", async () => {
+    const once = await rowAfter([2000]);
+    const thrice = await rowAfter([1200, 1600, 2000]);
+    expect(thrice).toEqual(once);
+  });
+
+  it("counts every log the replay contains, exactly once", async () => {
+    const row = await rowAfter([1200, 1600, 2000]);
+    expect(row.buys).toBe(buys.length);
+    expect(row.sells).toBe(sells.length);
+    expect(row.quote_in).toBe("165");
+    expect(row.quote_out).toBe("8");
+    expect(row.first_block_buyers).toBe(2);
   });
 });

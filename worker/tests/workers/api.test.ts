@@ -443,3 +443,75 @@ describe("the units a fill is denominated in", () => {
     expect(partial.text).not.toContain("0.000000004");
   });
 });
+
+/* Phase A — the activity block on the lookup.
+
+   Class B observations about one token: counts and block-header timestamps,
+   no rates, no ordering against other tokens. The window is part of the
+   object, so no consumer can render a count without the range it covers. */
+describe("GET /api/token/{address} — curve activity", () => {
+  async function seedActivity(): Promise<void> {
+    await env.LEDGE_DB.prepare(
+      `INSERT OR REPLACE INTO token_activity VALUES (?, 56172001, 41, 12, '1743200000000000000', '220000000000000000', ?, ?, 7)`,
+    )
+      .bind(ADDRESS, Math.floor(Date.now() / 1000) - 800, Math.floor(Date.now() / 1000) - 40)
+      .run();
+  }
+
+  it("carries the counts, their window and the first-block buyers", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    await seedActivity();
+    chainAnswers(launchedTokenReturn());
+    const body = (await (await get(`/api/token/${ADDRESS}`)).json()) as any;
+
+    expect(body.activity.buys).toBe(41);
+    expect(body.activity.sells).toBe(12);
+    expect(body.activity.quoteIn).toBe("1743200000000000000");
+    expect(body.activity.quoteOut).toBe("220000000000000000");
+    expect(body.activity.firstBuyAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(body.activity.lastActivityAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    // the window, named in the object and named in words
+    expect(body.activity.window.fromBlock).toBe(56_172_001);
+    expect(body.activity.window.toBlock).toBe(56_172_588);
+    expect(body.activity.window.label).toContain("56172001");
+    expect(body.activity.window.label).toContain("56172588");
+
+    // the coordination reading, with the block it was counted in
+    expect(body.activity.firstBlock).toEqual({ block: 56_172_001, distinctBuyers: 7 });
+  });
+
+  it("reports no activity row as null rather than as zero", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    chainAnswers(launchedTokenReturn());
+    const body = (await (await get(`/api/token/${ADDRESS}`)).json()) as any;
+    expect(body.activity).toBeNull();
+  });
+
+  it("publishes no rate, no ordering and no verdict beside the counts", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    await seedActivity();
+    chainAnswers(launchedTokenReturn());
+    const body = (await (await get(`/api/token/${ADDRESS}`)).json()) as any;
+    expect(Object.keys(body.activity).sort()).toEqual([
+      "buys",
+      "firstBlock",
+      "firstBuyAt",
+      "lastActivityAt",
+      "quoteIn",
+      "quoteOut",
+      "sells",
+      "window",
+    ]);
+  });
+});
+
+describe("GET /api/health", () => {
+  it("reports how many curve logs could not be attributed", async () => {
+    await env.LEDGE_DB.prepare(
+      "INSERT OR REPLACE INTO activity_unattributed VALUES (1, 12, NULL)",
+    ).run();
+    const body = (await (await get("/api/health")).json()) as any;
+    expect(body.unattributedCurveLogs).toBe(12);
+  });
+});

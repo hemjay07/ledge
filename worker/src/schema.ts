@@ -164,6 +164,55 @@ const state = z.object({
   indexed: z.boolean(),
 });
 
+/* ---- Class B: the curve activity index -------------------------------- */
+
+/* A count that does not say what it counted over is the same defect as a rate
+   with no denominator, so the window is not beside the counts -- it is the
+   object they live in, and it carries a sentence naming both of its bounds so
+   that no renderer has to compose one. */
+const activityWindow = z
+  .object({
+    fromBlock: z.number().int().nonnegative(),
+    toBlock: z.number().int().nonnegative(),
+    label: z.string().min(1),
+  })
+  .superRefine((w, ctx) => {
+    if (w.toBlock < w.fromBlock) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["toBlock"],
+        message: "a window cannot end before it begins",
+      });
+    }
+    if (!w.label.includes(String(w.fromBlock)) || !w.label.includes(String(w.toBlock))) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["label"],
+        message: "the label must name the blocks the counts were taken over",
+      });
+    }
+  });
+
+const activity = z.object({
+  window: activityWindow,
+  buys: z.number().int().nonnegative(),
+  sells: z.number().int().nonnegative(),
+  /** uint256 decimal strings: the quote paid in and the quote taken out. */
+  quoteIn: z.string(),
+  quoteOut: z.string(),
+  firstBuyAt: z.string().nullable(),
+  lastActivityAt: z.string(),
+  /* Distinct addresses that bought in the launch's own block, with the block
+     they were counted in. Null when that block was never indexed -- absent,
+     never zero, which is a reading. */
+  firstBlock: z
+    .object({
+      block: z.number().int().nonnegative(),
+      distinctBuyers: z.number().int().nonnegative(),
+    })
+    .nullable(),
+});
+
 const live = z.object({
   stale: z.boolean(),
   lastSuccessAt: z.string().nullable(),
@@ -180,6 +229,10 @@ export const tokenResponseSchema = z
     config,
     state,
     cohort: cohort.nullable(),
+    /* Class B. Counts of this token's own curve events, with the range of
+       blocks they were counted over. No rate, no ordering against any other
+       token. Null when LEDGE holds no activity row for it. */
+    activity: activity.nullable(),
     /* Beside the cohort rather than inside it: the cohort object is a verbatim
        copy of number.json rows, and the age is this response's own reading of
        the clock against the file's published bound. */

@@ -29,6 +29,7 @@ import {
   type LaunchedToken,
 } from "./pons";
 import { pairClassOf, taxBucketOf, type PairTokenEntry } from "./buckets";
+import type { ActivityRow } from "./activity";
 import { pairSymbolOf } from "./decimals";
 import { curveFill, FILL_UNAVAILABLE } from "./curve";
 import { placeOnLadder, type Placement } from "./ladder";
@@ -140,8 +141,13 @@ export async function readLaunchedToken(
 export async function readIndex(
   db: D1Database,
   address: string,
-): Promise<{ launch: LaunchRow | null; graduation: GraduationRow | null; cursor: CursorRow | null }> {
-  const [launch, graduation, cursor] = await db.batch([
+): Promise<{
+  launch: LaunchRow | null;
+  graduation: GraduationRow | null;
+  cursor: CursorRow | null;
+  activity: ActivityRow | null;
+}> {
+  const [launch, graduation, cursor, activity] = await db.batch([
     /* `token` is indexed but not unique -- the durable key is the log's own
        identity -- so both reads name the row they want: the earliest, which
        is the one that actually happened. */
@@ -154,11 +160,46 @@ export async function readIndex(
       .prepare("SELECT token, block, ts FROM graduation WHERE token = ? ORDER BY block ASC LIMIT 1")
       .bind(address),
     db.prepare("SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1"),
+    db.prepare("SELECT * FROM token_activity WHERE token = ?").bind(address),
   ]);
   return {
     launch: (launch?.results[0] as LaunchRow | undefined) ?? null,
     graduation: (graduation?.results[0] as GraduationRow | undefined) ?? null,
     cursor: (cursor?.results[0] as CursorRow | undefined) ?? null,
+    activity: (activity?.results[0] as ActivityRow | undefined) ?? null,
+  };
+}
+
+/* The activity block, restated in the response contract.
+
+   Every field is copied across; none is derived. The window is the range of
+   blocks the counts cover: it opens at the token's own launch block, which is
+   where LEDGE started reading its curve, and closes at the last block the
+   indexer has read -- so "0 buys" means none were seen in that range, not
+   that none were looked for. Without a cursor there is no range to name, and
+   the block is withheld rather than published with an open end. */
+export function activityFrom(
+  row: ActivityRow | null,
+  cursor: CursorRow | null,
+): TokenResponse["activity"] {
+  if (row === null || cursor === null) return null;
+  if (cursor.last_indexed_block < row.from_block) return null;
+  return {
+    window: {
+      fromBlock: row.from_block,
+      toBlock: cursor.last_indexed_block,
+      label: `counted over blocks ${row.from_block} to ${cursor.last_indexed_block}`,
+    },
+    buys: row.buys,
+    sells: row.sells,
+    quoteIn: row.quote_in,
+    quoteOut: row.quote_out,
+    firstBuyAt: row.first_buy_ts === null ? null : toIso(row.first_buy_ts),
+    lastActivityAt: toIso(row.last_activity_ts),
+    firstBlock:
+      row.first_block_buyers === null
+        ? null
+        : { block: row.from_block, distinctBuyers: row.first_block_buyers },
   };
 }
 
@@ -176,6 +217,8 @@ export interface BuildInput {
   fill: Awaited<ReturnType<typeof curveFill>>;
   /** Decimals for the pair token, resolved by decimals.ts. Null when unknown. */
   pairDecimals: number | null;
+  /** The folded curve activity, when the index holds a row for this token. */
+  activity?: ActivityRow | null;
   siteOrigin: string;
 }
 
@@ -262,6 +305,7 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
       indexed,
     },
     cohort,
+    activity: activityFrom(input.activity ?? null, cursor),
     freshness,
     /* `reason` stays internal to ladder.ts: the pair (rung, insufficient) is
        already a complete encoding for a consumer -- a null rung with

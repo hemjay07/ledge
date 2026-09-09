@@ -71,6 +71,20 @@ const FILL = {
 
 const PAIR_TOKENS = { [ZERO]: { class: "eth", symbol: "ETH" } };
 
+/* One token's folded curve activity, as the tick would have written it: the
+   counts opening at the launch block, and the distinct buyers in that block. */
+const ACTIVITY = {
+  token: ADDRESS,
+  from_block: LAUNCH.block,
+  buys: 41,
+  sells: 12,
+  quote_in: "1743200000000000000",
+  quote_out: "220000000000000000",
+  first_buy_ts: NOW - ELAPSED + 4,
+  last_activity_ts: NOW - 40,
+  first_block_buyers: 7,
+};
+
 const cursor = (lastSuccessSecondsAgo) => ({
   last_indexed_block: LAST_INDEXED_BLOCK,
   last_success_at: NOW - lastSuccessSecondsAgo,
@@ -141,7 +155,13 @@ function write(name, value) {
 const { mod, cleanup } = await bundled();
 const { buildTokenBody, lookupText, tokenResponseSchema, liveResponseSchema } = mod;
 
-function response({ launch = LAUNCH, numberFile = NUMBER, cursorRow = cursor(20), fill = FILL }) {
+function response({
+  launch = LAUNCH,
+  numberFile = NUMBER,
+  cursorRow = cursor(20),
+  fill = FILL,
+  activity = ACTIVITY,
+}) {
   const body = buildTokenBody({
     address: ADDRESS,
     nowSeconds: NOW,
@@ -153,6 +173,7 @@ function response({ launch = LAUNCH, numberFile = NUMBER, cursorRow = cursor(20)
     pairTokens: PAIR_TOKENS,
     fill,
     pairDecimals: 18,
+    activity,
     siteOrigin: SITE,
   });
   const payload = { ...body, text: lookupText(body, numberFile?.allTime.ttg.max ?? null) };
@@ -173,7 +194,9 @@ write("token-not-indexed", {
   error: "not_indexed",
   message: "Launched more than 7 days ago, or LEDGE has not reached this block yet.",
   lastIndexedBlock: LAST_INDEXED_BLOCK,
-  partial: response({ launch: null }),
+  /* No launch row means no curve mapping, and retention keeps the two
+     together: a token LEDGE cannot place has no activity row either. */
+  partial: response({ launch: null, activity: null }),
 });
 write("token-number-unavailable", {
   schemaVersion: 1,

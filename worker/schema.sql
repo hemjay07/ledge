@@ -40,6 +40,14 @@ CREATE TABLE IF NOT EXISTS launch (
   PRIMARY KEY (tx_hash, log_index)
 );
 CREATE INDEX IF NOT EXISTS launch_token_idx ON launch (token);
+-- The curve index (REPOSITION.md "What has to be built"). Curves are deployed
+-- per launch, so a CurveBuy/CurveSell log names its curve and nothing else,
+-- and the token it belongs to is whatever launch deployed that curve. That
+-- mapping is already here, in `launch.curve`, recorded free at launch time
+-- from the TokenLaunched topics -- it wanted only an index to be usable as a
+-- lookup. A second table holding the same pair would need its own retention
+-- rule and could fall out of step with this one; an index cannot.
+CREATE INDEX IF NOT EXISTS launch_curve_idx ON launch (curve);
 CREATE INDEX IF NOT EXISTS launch_block_idx ON launch (block DESC);
 CREATE INDEX IF NOT EXISTS launch_ts_idx    ON launch (ts DESC);
 
@@ -60,6 +68,48 @@ CREATE INDEX IF NOT EXISTS graduation_block_idx ON graduation (block DESC);
 -- Retention deletes a launch only when no graduation still references it
 -- (W2), which is a lookup by token on every eviction pass.
 CREATE INDEX IF NOT EXISTS graduation_ts_idx    ON graduation (ts DESC);
+
+-- Per-token curve activity, folded. Never the events themselves: CurveBuy and
+-- CurveSell run at ~564 a minute (~812,000 a day) across every live curve,
+-- which as rows would not fit the plan, while only ~121 distinct curves see
+-- any activity in a five-minute window -- so this table is bounded by the
+-- number of live curves and not by the number of trades.
+--
+-- Class B throughout: counts and block-header timestamps about one token,
+-- with no denominator because there is no population. No rate is computed
+-- from them here or anywhere else in the Worker.
+--
+-- The quote sums are TEXT because a uint256 does not fit a SQLite INTEGER
+-- (2^63 wei is 9.2 ETH, and a curve sees more than that over its life); they
+-- are added as BigInt in worker/src/activity.ts.
+--
+-- first_block_buyers is the coordination reading: distinct addresses that
+-- bought in the launch's own block, which costs gas and snipe tax to fake.
+-- It needs no (token, buyer) table -- see the note at the top of
+-- worker/src/activity.ts for why a block is never split across ticks.
+CREATE TABLE IF NOT EXISTS token_activity (
+  token              TEXT PRIMARY KEY,       -- lowercase 0x address
+  from_block         INTEGER NOT NULL,       -- the launch block: where these counts open
+  buys               INTEGER NOT NULL DEFAULT 0,
+  sells              INTEGER NOT NULL DEFAULT 0,
+  quote_in           TEXT NOT NULL DEFAULT '0',
+  quote_out          TEXT NOT NULL DEFAULT '0',
+  first_buy_ts       INTEGER,                -- NULL until a buy is seen
+  last_activity_ts   INTEGER NOT NULL,       -- block header, never a wall clock
+  first_block_buyers INTEGER                 -- NULL when the launch block was never read
+);
+-- Retention prunes on the row's own last event, exactly as the other tables do.
+CREATE INDEX IF NOT EXISTS token_activity_ts_idx ON token_activity (last_activity_ts DESC);
+
+-- Curve logs LEDGE could not attribute: the curve belongs to a launch older
+-- than the indexed record, or to one that has been evicted. Counted rather
+-- than dropped, so the size of what the index cannot see is itself readable
+-- (on /api/health). A single row, like the cursor.
+CREATE TABLE IF NOT EXISTS activity_unattributed (
+  id           INTEGER PRIMARY KEY CHECK (id = 1),
+  logs         INTEGER NOT NULL DEFAULT 0,
+  last_seen_at INTEGER
+);
 
 -- Single-row cursor. Mirrors data/state.json in spirit, never in authority.
 CREATE TABLE IF NOT EXISTS cursor (

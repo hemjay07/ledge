@@ -192,10 +192,17 @@ async function handleHealth(env: Env, nowMs: number): Promise<Response> {
     "SELECT last_indexed_block, last_success_at, consecutive_failures, last_error FROM cursor WHERE id = 1",
   ).first<CursorRow & { last_error: string | null }>();
   const file = await loadNumber(env, nowMs);
+  /* Curve logs the index could not place: their curve belongs to a launch
+     older than the record, or to one that has been evicted. Published rather
+     than swallowed, so the size of what the index cannot see is readable. */
+  const unattributed = await env.LEDGE_DB.prepare(
+    "SELECT logs, last_seen_at FROM activity_unattributed WHERE id = 1",
+  ).first<{ logs: number; last_seen_at: number | null }>();
   return json(
     {
       schemaVersion: SCHEMA_VERSION,
       lastIndexedBlock: cursor?.last_indexed_block ?? null,
+      unattributedCurveLogs: unattributed?.logs ?? 0,
       lastSuccessAt: cursor ? toIso(cursor.last_success_at) : null,
       consecutiveFailures: cursor?.consecutive_failures ?? null,
       lastError: cursor?.last_error ?? null,

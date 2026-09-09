@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { tokenResponseSchema, errorResponseSchema } from "../../src/schema";
 import { lookupText } from "../../src/text";
-import { makeBody, fixtureNumber } from "./helpers";
+import { ACTIVITY, makeBody, fixtureNumber } from "./helpers";
 
 /* Gate 4. The same Zod discipline as site/lib/schema.ts: a Class A object
    without its denominator, its window and the moment it was computed does not
@@ -85,5 +85,55 @@ describe("the response contract", () => {
     expect(
       errorResponseSchema.safeParse({ schemaVersion: 1, error: "token_is_unsafe", message: "x" }).success,
     ).toBe(false);
+  });
+});
+
+/* Phase A. The activity block is Class B: counts of events about one token,
+   with no denominator because there is no population. The one rule the shape
+   itself enforces is that a count cannot reach a reader without the range of
+   blocks it was counted over -- the same posture as a rate without its n. */
+describe("the activity block", () => {
+  function withActivity() {
+    const body = makeBody({ activity: ACTIVITY });
+    return { ...body, text: lookupText(body, fixtureNumber().allTime.ttg.max) };
+  }
+
+  it("accepts a lookup that carries counts and their window", () => {
+    const parsed = tokenResponseSchema.safeParse(withActivity());
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
+  });
+
+  it("refuses counts with no window at all", () => {
+    const r = withActivity() as Record<string, any>;
+    delete r["activity"].window;
+    expect(tokenResponseSchema.safeParse(r).success).toBe(false);
+  });
+
+  it("refuses a window whose label does not name the blocks it covers", () => {
+    const r = withActivity() as Record<string, any>;
+    r["activity"].window.label = "recent activity";
+    expect(tokenResponseSchema.safeParse(r).success).toBe(false);
+  });
+
+  it("refuses a window that ends before it begins", () => {
+    const r = withActivity() as Record<string, any>;
+    r["activity"].window.toBlock = r["activity"].window.fromBlock - 1;
+    expect(tokenResponseSchema.safeParse(r).success).toBe(false);
+  });
+
+  it("refuses a first-block buyer count that does not say which block", () => {
+    const r = withActivity() as Record<string, any>;
+    delete r["activity"].firstBlock.block;
+    expect(tokenResponseSchema.safeParse(r).success).toBe(false);
+  });
+
+  it("accepts a lookup with no activity row at all", () => {
+    const body = makeBody({ activity: null });
+    const parsed = tokenResponseSchema.safeParse({
+      ...body,
+      text: lookupText(body, fixtureNumber().allTime.ttg.max),
+    });
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
+    expect(body.activity).toBeNull();
   });
 });

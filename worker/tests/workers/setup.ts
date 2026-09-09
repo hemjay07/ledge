@@ -25,6 +25,8 @@ export async function reset(): Promise<void> {
     env.LEDGE_DB.prepare("DELETE FROM launch"),
     env.LEDGE_DB.prepare("DELETE FROM graduation"),
     env.LEDGE_DB.prepare("DELETE FROM cursor"),
+    env.LEDGE_DB.prepare("DELETE FROM token_activity"),
+    env.LEDGE_DB.prepare("DELETE FROM activity_unattributed"),
     env.LEDGE_DB.prepare("DELETE FROM tg_usage"),
   ]);
   await env.LEDGE_KV.put(KV_NUMBER, JSON.stringify(numberFixture));

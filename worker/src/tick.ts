@@ -21,6 +21,10 @@ import { RpcClient, LOG_WINDOW_BLOCKS, MAX_BATCH, RpcUnavailable } from "./rpc";
 import {
   TOPIC_TOKEN_LAUNCHED,
   TOPIC_POOL_GRADUATED,
+  TOPIC_CURVE_BUY,
+  TOPIC_CURVE_SELL,
+  decodeCurveTrade,
+  type CurveTradeLog,
   SELECTOR_GET_LAUNCHED_TOKEN,
   decodeLaunchedToken,
   decodePoolGraduated,
@@ -31,6 +35,7 @@ import {
   type TokenLaunchedLog,
 } from "./pons";
 import { pairClassOf } from "./buckets";
+import { activityBlocks, planActivity, type ActivityRow } from "./activity";
 import { loadPairTokens } from "./numberFile";
 
 /** One minute of chain. The cron is `* * * * *` and Robinhood Chain runs at
@@ -69,6 +74,18 @@ export function logSubrequests(from: number, to: number): number {
   return Math.ceil((to - from + 1) / LOG_WINDOW_BLOCKS) * 2;
 }
 
+/** What one tick's log reads cost.
+
+    The factory pair (TokenLaunched, PoolGraduated) is read over the whole
+    re-read range; the curve pair (CurveBuy, CurveSell) only over the blocks
+    above the previous cursor, which is a subset of it. Twice the factory cost
+    is therefore an upper bound on the pair of pairs, and the window is fitted
+    against the bound rather than against the steady state -- two extra
+    requests a minute in practice, four windows' worth at the catch-up limit. */
+export function tickLogSubrequests(from: number, to: number): number {
+  return logSubrequests(from, to) * 2;
+}
+
 /** The widest `to` at or below the one asked for whose range fits the budget.
 
     A range too wide to read is not a range to refuse: the blocks are still
@@ -78,7 +95,7 @@ export function logSubrequests(from: number, to: number): number {
     every pass makes progress and the catch-up finishes. */
 export function fitWindow(from: number, to: number, budget = LOG_SUBREQUEST_BUDGET): number {
   let end = to;
-  while (end > from && logSubrequests(from, end) > budget) {
+  while (end > from && tickLogSubrequests(from, end) > budget) {
     end = from + Math.floor((end - from) / 2);
   }
   return end;
@@ -100,6 +117,10 @@ export interface TickResult {
   to: number;
   launches: number;
   graduations: number;
+  /** Curve trade logs read in this pass, and how many of them belonged to no
+      launch LEDGE holds. */
+  trades?: number;
+  unattributed?: number;
   skipped?: "rate_limited";
   error?: string;
 }
@@ -157,6 +178,96 @@ async function fetchLogs(
     for (const log of graduated) graduations.push(decodePoolGraduated(log));
   }
   return { launches: dedupeLogs(launches), graduations: dedupeLogs(graduations) };
+}
+
+/** The two curve topics, over the blocks this pass folds into the counters.
+
+    No address filter and none possible: every launch deploys its own curve,
+    so there is nothing to filter on and the emitting curve is read out of
+    each log's own `address` field (RESEARCH-PHASE2-3.md section 0). */
+async function fetchCurveTrades(
+  rpc: RpcClient,
+  from: number,
+  to: number,
+): Promise<CurveTradeLog[]> {
+  if (to < from) return [];
+  const trades: CurveTradeLog[] = [];
+  for (const [start, end] of logWindows(from, to)) {
+    for (const [topic, side] of [
+      [TOPIC_CURVE_BUY, "buy"],
+      [TOPIC_CURVE_SELL, "sell"],
+    ] as const) {
+      const logs = (await rpc.getLogs(start, end, null, topic)) as RawLog[];
+      for (const log of logs) trades.push(decodeCurveTrade(log, side));
+    }
+  }
+  return dedupeLogs(trades);
+}
+
+/** D1 caps a statement's bound parameters, so every IN list is chunked. */
+function chunk<T>(items: T[], size = 90): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+async function selectChunked<T>(
+  db: D1Database,
+  sql: (placeholders: string) => string,
+  keys: string[],
+): Promise<T[]> {
+  if (keys.length === 0) return [];
+  const results = await db.batch<T>(
+    chunk(keys).map((part) =>
+      db.prepare(sql(part.map(() => "?").join(","))).bind(...part),
+    ),
+  );
+  return results.flatMap((result) => result.results ?? []);
+}
+
+/** Curve to the token whose launch deployed it, and that launch's block.
+
+    The mapping is free at launch time -- TokenLaunched carries both as
+    indexed topics -- so it is read back out of `launch`, which already holds
+    it, rather than duplicated into a table with a retention rule of its own.
+    Launches folded in this same pass are not in D1 yet and are merged in
+    from memory, so a token bought in its own launch block is attributed. */
+async function resolveCurves(
+  db: D1Database,
+  trades: CurveTradeLog[],
+  launches: TokenLaunchedLog[],
+): Promise<{ curveToToken: Map<string, string>; launchBlockOf: Map<string, number> }> {
+  const curveToToken = new Map<string, string>();
+  const launchBlockOf = new Map<string, number>();
+  for (const launch of launches) {
+    curveToToken.set(launch.curve, launch.token);
+    const held = launchBlockOf.get(launch.token);
+    if (held === undefined || launch.block < held) launchBlockOf.set(launch.token, launch.block);
+  }
+  const unknown = [...new Set(trades.map((t) => t.curve))].filter((c) => !curveToToken.has(c));
+  const rows = await selectChunked<{ curve: string; token: string; block: number }>(
+    db,
+    (placeholders) => `SELECT curve, token, block FROM launch WHERE curve IN (${placeholders})`,
+    unknown,
+  );
+  for (const row of rows) {
+    curveToToken.set(row.curve, row.token);
+    const held = launchBlockOf.get(row.token);
+    if (held === undefined || row.block < held) launchBlockOf.set(row.token, row.block);
+  }
+  return { curveToToken, launchBlockOf };
+}
+
+async function readActivityRows(
+  db: D1Database,
+  tokens: string[],
+): Promise<Map<string, ActivityRow>> {
+  const rows = await selectChunked<ActivityRow>(
+    db,
+    (placeholders) => `SELECT * FROM token_activity WHERE token IN (${placeholders})`,
+    [...new Set(tokens)],
+  );
+  return new Map(rows.map((row) => [row.token, row]));
 }
 
 /** Block-header timestamps, batched. Never a wall clock: the whole dataset
@@ -259,10 +370,44 @@ export async function tick(
 
     const { launches, graduations } = await fetchLogs(rpc, factory, from, to);
 
+    /* The counters advance strictly above the previous cursor. The overlap
+       below it is re-read so that launches and graduations can be reconciled
+       against the chain, and those are keyed on the log's own identity so a
+       re-read costs nothing. A counter has no such key -- folding a block
+       twice counts every trade in it twice -- so the curve topics are read
+       over the new blocks alone. See worker/src/activity.ts. */
+    const countFrom = cursor.last_indexed_block + 1;
+    const trades = await fetchCurveTrades(rpc, countFrom, to);
+    const { curveToToken, launchBlockOf } = await resolveCurves(db, trades, launches);
+    const existingActivity = await readActivityRows(
+      db,
+      [...new Set(trades.map((t) => curveToToken.get(t.curve)).filter((t): t is string => !!t))],
+    );
+    /* Launches whose own block this pass folds: the only ones whose first
+       block is in hand, and so the only ones whose first-block buyers can be
+       counted. */
+    const newLaunches = new Map<string, number>();
+    for (const launch of launches) {
+      if (launch.block >= countFrom && !newLaunches.has(launch.token)) {
+        newLaunches.set(launch.token, launch.block);
+        launchBlockOf.set(launch.token, launch.block);
+      }
+    }
+
     const timestamps = await fetchBlockTimestamps(rpc, [
       ...launches.map((l) => l.block),
       ...graduations.map((g) => g.block),
+      ...activityBlocks(trades, curveToToken, existingActivity),
     ]);
+
+    const activity = planActivity({
+      trades,
+      curveToToken,
+      launchBlockOf,
+      newLaunches,
+      existing: existingActivity,
+      timestamps,
+    });
 
     const configs = await fetchTokenConfigs(
       rpc,
@@ -341,6 +486,43 @@ export async function tick(
       );
     }
 
+    /* One row per token touched, written whole: the fold read the previous
+       row out of D1 above and produced its successor, because a uint256 sum
+       is BigInt addition and SQLite cannot do it in an UPDATE. The read
+       happened before this batch and the write happens inside it, and the
+       tick is the only writer. */
+    for (const row of activity.rows) {
+      statements.push(
+        db
+          .prepare(
+            `INSERT OR REPLACE INTO token_activity
+               (token, from_block, buys, sells, quote_in, quote_out, first_buy_ts, last_activity_ts, first_block_buyers)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            row.token,
+            row.from_block,
+            row.buys,
+            row.sells,
+            row.quote_in,
+            row.quote_out,
+            row.first_buy_ts,
+            row.last_activity_ts,
+            row.first_block_buyers,
+          ),
+      );
+    }
+    if (activity.unattributed > 0) {
+      statements.push(
+        db
+          .prepare(
+            `INSERT INTO activity_unattributed (id, logs, last_seen_at) VALUES (1, ?, ?)
+             ON CONFLICT (id) DO UPDATE SET logs = logs + excluded.logs, last_seen_at = excluded.last_seen_at`,
+          )
+          .bind(activity.unattributed, nowSeconds),
+      );
+    }
+
     statements.push(
       db
         .prepare(
@@ -362,12 +544,28 @@ export async function tick(
     statements.push(
       db.prepare("DELETE FROM graduation WHERE ts < ?").bind(nowSeconds - RETENTION_SECONDS),
     );
+    /* Activity is pruned on its own last event, under the same graduation
+       hold, and BEFORE the launch that carries it -- a launch is what maps a
+       curve to a token, so evicting one whose curve is still trading would
+       turn every later trade on it into an unattributed reading. An activity
+       row never predates its launch, so the two always age out together and
+       the window an activity row names is never wider than what was read. */
+    statements.push(
+      db
+        .prepare(
+          `DELETE FROM token_activity
+             WHERE last_activity_ts < ?
+               AND token NOT IN (SELECT token FROM graduation)`,
+        )
+        .bind(nowSeconds - RETENTION_SECONDS),
+    );
     statements.push(
       db
         .prepare(
           `DELETE FROM launch
              WHERE ts < ?
-               AND token NOT IN (SELECT token FROM graduation)`,
+               AND token NOT IN (SELECT token FROM graduation)
+               AND token NOT IN (SELECT token FROM token_activity)`,
         )
         .bind(nowSeconds - RETENTION_SECONDS),
     );
@@ -376,7 +574,15 @@ export async function tick(
     );
 
     await db.batch(statements);
-    return { ok: true, from, to, launches: launches.length, graduations: graduations.length };
+    return {
+      ok: true,
+      from,
+      to,
+      launches: launches.length,
+      graduations: graduations.length,
+      trades: trades.length,
+      unattributed: activity.unattributed,
+    };
   } catch (error) {
     const rateLimited = error instanceof RpcUnavailable && (error.rateLimited || rpc.rateLimitSeen);
     const message = error instanceof Error ? error.message : String(error);

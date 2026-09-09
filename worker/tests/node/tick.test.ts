@@ -8,6 +8,7 @@ import {
   fitWindow,
   logSubrequests,
   logWindows,
+  tickLogSubrequests,
 } from "../../src/tick";
 
 /* B8 — the overlap against the advance it is meant to cover.
@@ -67,5 +68,33 @@ describe("fitting a window inside the subrequest budget", () => {
     const from = 1_000;
     const to = from + MAX_CATCHUP_BLOCKS + REORG_OVERLAP_BLOCKS;
     expect(logSubrequests(from, to)).toBeLessThanOrEqual(LOG_SUBREQUEST_BUDGET);
+  });
+});
+
+/* Phase A — the curve topics against the same budget.
+
+   The factory pair is read over the whole re-read range and the curve pair
+   over the blocks above the previous cursor, which is a subset of it. The
+   budget is fitted against twice the factory cost, which bounds both. */
+describe("the curve topics inside the subrequest budget", () => {
+  it("counts a second pair of topics over the same range", () => {
+    expect(tickLogSubrequests(1, 2500)).toBe(logSubrequests(1, 2500) * 2);
+  });
+
+  it("keeps the bounded catch-up inside the budget with both pairs read", () => {
+    const from = 1_000;
+    const to = from + MAX_CATCHUP_BLOCKS + REORG_OVERLAP_BLOCKS;
+    expect(tickLogSubrequests(from, to)).toBeLessThanOrEqual(LOG_SUBREQUEST_BUDGET);
+  });
+
+  it("fits a window against the cost of both pairs, not one", () => {
+    const from = 4_000_000;
+    const fitted = fitWindow(from, from + 10_000_000);
+    expect(tickLogSubrequests(from, fitted)).toBeLessThanOrEqual(LOG_SUBREQUEST_BUDGET);
+  });
+
+  it("spends two extra requests on a steady tick", () => {
+    // one minute of new chain, one window, two curve topics
+    expect(tickLogSubrequests(1, BLOCKS_PER_TICK) - logSubrequests(1, BLOCKS_PER_TICK)).toBe(2);
   });
 });

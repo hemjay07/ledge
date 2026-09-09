@@ -34,7 +34,7 @@ export async function lookupToken(
   }
   if (!onChain || !onChain.exists) return { kind: "not_a_pons_token" };
 
-  const [{ launch, graduation, cursor }, numberFile, pairTokens] = await Promise.all([
+  const [{ launch, graduation, cursor, activity }, numberFile, pairTokens] = await Promise.all([
     readIndex(env.LEDGE_DB, address),
     loadNumber(env, nowMs),
     loadPairTokens(env, nowMs),
@@ -64,6 +64,7 @@ export async function lookupToken(
     launch,
     graduation,
     cursor,
+    activity,
     numberFile,
     pairTokens,
     fill,

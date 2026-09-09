@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildTokenBody, type BuildInput, type LaunchRow } from "../../src/lookup";
+import type { ActivityRow } from "../../src/activity";
 import type { NumberFile } from "../../src/numberFile";
 import type { LaunchedToken } from "../../src/pons";
 import type { TokenResponse } from "../../src/schema";
@@ -42,6 +43,19 @@ export const LAUNCH: LaunchRow = {
   creator_tax_bps: 300,
   block: 56172001,
   ts: NOW_SECONDS - 811,
+};
+
+/** One token's folded curve activity, as the tick would have written it. */
+export const ACTIVITY: ActivityRow = {
+  token: ADDRESS,
+  from_block: 56172001,
+  buys: 41,
+  sells: 12,
+  quote_in: "1743200000000000000",
+  quote_out: "220000000000000000",
+  first_buy_ts: NOW_SECONDS - 800,
+  last_activity_ts: NOW_SECONDS - 40,
+  first_block_buyers: 7,
 };
 
 export function makeBody(overrides: Partial<BuildInput> = {}): Omit<TokenResponse, "text"> {
