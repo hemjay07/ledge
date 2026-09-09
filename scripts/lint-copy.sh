@@ -31,9 +31,10 @@ cd "$REPO_ROOT"
 PATTERN='trade smarter'
 PATTERN+='|know before you ape'
 PATTERN+='|data.driven insights?'
-PATTERN+='|\balpha\b'
-PATTERN+='|\bedge\b'
-PATTERN+='|\bsignals\b'   # the crypto noun, plural as CONSTRAINTS words it; AbortController.signal is code, not copy
+# "alpha", "edge" and "signals" were unbanned on 2026-09-09: they are ordinary
+# words, and banning them cost readers while protecting nothing about whether a
+# number is true. They stay banned as PROMISES, which is what the claim
+# patterns below catch. See CONSTRAINTS.md's changelog.
 PATTERN+='|we believe'
 PATTERN+='|our mission'
 PATTERN+="|in today's"
@@ -46,7 +47,7 @@ PATTERN+='|premium'
 PATTERN+='|coming soon'
 PATTERN+='|join the waitlist'
 PATTERN+='|\bwaitlist\b'
-PATTERN+='|\bsubscribe\b'
+# "subscribe" was unbanned with the optional email field (clause 8).
 PATTERN+='|connect wallet'
 PATTERN+='|gradient'
 PATTERN+='|\bglow'
@@ -56,6 +57,17 @@ PATTERN+='|hero illustration'
 PATTERN+='|mascot'
 PATTERN+='|should (buy|sell|avoid|wait)'
 PATTERN+='|you should'
+# Claims no measurement of ours can support. Deliberately not a complete theory
+# of dishonest copy -- a regex cannot tell "this token will pump" from "the
+# crawl will run hourly", so the bare auxiliaries are left to review and only
+# the phrasings that are never legitimate here are enforced.
+PATTERN+='|guaranteed'
+PATTERN+='|risk.free'
+PATTERN+='|sure thing'
+PATTERN+='|\bsafest?\b'
+PATTERN+='|\brug.?proof\b'
+PATTERN+='|(safety|risk|quality) (score|rating|grade)'
+PATTERN+='|\bwill (pump|moon|graduate|succeed|fail)\b'
 
 
 # Targets: site source, README, pipeline copy strings, and the contract source.

@@ -776,6 +776,14 @@ footer {
   padding-top: var(--s-3);
   overflow-wrap: anywhere;
 }
+/* The non-affiliation line. Set a step down from the provenance above it: it
+   is a statement of standing rather than a measurement, and it must be legible
+   without competing with the figures. */
+.disclaim {
+  color: var(--ink-3);
+  margin-top: var(--s-3);
+  max-width: 62ch;
+}
 .foot-text a,
 .addr {
   color: var(--ink);
