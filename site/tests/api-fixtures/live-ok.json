@@ -2,31 +2,109 @@
   "schemaVersion": 1,
   "observedAt": "2026-09-06T18:14:07Z",
   "lastIndexedBlock": 56172588,
+  "sortedBy": "lastActivity",
   "count": 4,
   "rows": [
     {
+      "token": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "pairClass": "eth",
-      "taxBucket": "0%",
+      "pairToken": "0x0000000000000000000000000000000000000000",
+      "creatorTaxBps": 0,
+      "launchBlock": 56172547,
       "ageSeconds": 41,
-      "graduated": false
+      "graduated": false,
+      "buys": 41,
+      "sells": 12,
+      "quoteIn": "1743200000000000000",
+      "quoteOut": "220000000000000000",
+      "netQuoteWei": "1523200000000000000",
+      "firstBlockBuyers": 7,
+      "lastActivityAt": "2026-09-06T18:14:02Z",
+      "window": {
+        "fromBlock": 56172547,
+        "toBlock": 56172588,
+        "label": "counted over blocks 56172547 to 56172588",
+        "partial": false
+      },
+      "fill": {
+        "graduationThresholdWei": "4200000000000000000",
+        "label": "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure is an upper bound on the curve's real reserve, not the reading /t/{address} shows."
+      }
     },
     {
+      "token": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "pairClass": "eth",
-      "taxBucket": "2-3%",
+      "pairToken": "0x0000000000000000000000000000000000000000",
+      "creatorTaxBps": 300,
+      "launchBlock": 56172398,
       "ageSeconds": 190,
-      "graduated": false
+      "graduated": false,
+      "buys": 6,
+      "sells": 1,
+      "quoteIn": "300000000000000000",
+      "quoteOut": "0",
+      "netQuoteWei": "300000000000000000",
+      "firstBlockBuyers": 2,
+      "lastActivityAt": "2026-09-06T18:13:07Z",
+      "window": {
+        "fromBlock": 56172398,
+        "toBlock": 56172588,
+        "label": "counted over blocks 56172398 to 56172588",
+        "partial": false
+      },
+      "fill": {
+        "graduationThresholdWei": "4200000000000000000",
+        "label": "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure is an upper bound on the curve's real reserve, not the reading /t/{address} shows."
+      }
     },
     {
+      "token": "0xcccccccccccccccccccccccccccccccccccccccc",
       "pairClass": "stable",
-      "taxBucket": "1%",
+      "pairToken": "0x1111111111111111111111111111111111111111",
+      "creatorTaxBps": 100,
+      "launchBlock": 56171688,
       "ageSeconds": 900,
-      "graduated": true
+      "graduated": true,
+      "buys": 88,
+      "sells": 40,
+      "quoteIn": "8500000000",
+      "quoteOut": "410000000",
+      "netQuoteWei": "8090000000",
+      "firstBlockBuyers": 14,
+      "lastActivityAt": "2026-09-06T18:09:07Z",
+      "window": {
+        "fromBlock": 56171688,
+        "toBlock": 56172588,
+        "label": "counted over blocks 56171688 to 56172588",
+        "partial": false
+      },
+      "fill": {
+        "graduationThresholdWei": "8090000000",
+        "label": "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure is an upper bound on the curve's real reserve, not the reading /t/{address} shows."
+      }
     },
     {
+      "token": "0xdddddddddddddddddddddddddddddddddddddddd",
       "pairClass": "other",
-      "taxBucket": null,
+      "pairToken": "0x2222222222222222222222222222222222222222",
+      "creatorTaxBps": null,
+      "launchBlock": 56168388,
       "ageSeconds": 4200,
-      "graduated": false
+      "graduated": false,
+      "buys": 3,
+      "sells": 0,
+      "quoteIn": "40000000000000000",
+      "quoteOut": "0",
+      "netQuoteWei": "40000000000000000",
+      "firstBlockBuyers": null,
+      "lastActivityAt": "2026-09-06T17:09:07Z",
+      "window": {
+        "fromBlock": 56168488,
+        "toBlock": 56172588,
+        "label": "counted over blocks 56168488 to 56172588 -- partial: this launch's own block predates LEDGE's indexed record, so trades before block 56168488 are not counted",
+        "partial": true
+      },
+      "fill": null
     }
   ],
   "live": {

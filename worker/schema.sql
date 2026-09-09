@@ -28,12 +28,20 @@
 
 -- One row per TokenLaunched seen by the minute indexer, keyed on the log.
 CREATE TABLE IF NOT EXISTS launch (
-  token           TEXT NOT NULL,             -- lowercase 0x address, indexed, NOT unique
-  curve           TEXT NOT NULL,
-  pair_token      TEXT NOT NULL,
-  pair_class      TEXT NOT NULL,             -- eth | stable | stock | other
-  creator_tax_bps INTEGER,                   -- NULL when enrichment failed
-  block           INTEGER NOT NULL,
+  token                TEXT NOT NULL,        -- lowercase 0x address, indexed, NOT unique
+  curve                TEXT NOT NULL,
+  pair_token           TEXT NOT NULL,
+  pair_class           TEXT NOT NULL,        -- eth | stable | stock | other
+  creator_tax_bps      INTEGER,              -- NULL when enrichment failed
+  -- graduationThreshold, word 5 of the 15-word getLaunchedToken tuple
+  -- (REPOSITION.md B1). Free: the same factory-view call that reads
+  -- creator_tax_bps already returns this word, so it is stored alongside it
+  -- rather than fetched again. TEXT, not INTEGER: a uint256 does not fit a
+  -- SQLite INTEGER (worker/src/activity.ts carries the same reasoning for
+  -- the quote sums). NULL exactly when creator_tax_bps is NULL -- the
+  -- enrichment call that would have supplied both did not answer.
+  graduation_threshold TEXT,
+  block                INTEGER NOT NULL,
   ts              INTEGER NOT NULL,          -- block header timestamp, seconds
   tx_hash         TEXT NOT NULL,
   log_index       INTEGER NOT NULL,

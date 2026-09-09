@@ -296,15 +296,21 @@ async function fetchBlockTimestamps(rpc: RpcClient, blocks: number[]): Promise<M
   return out;
 }
 
-/** creatorTaxBps and pairToken, batched over the factory view. A token whose
-    call fails keeps a null tax -- the cohort lookup then has no bucket for it
-    and says so, which is the honest outcome. */
+/** creatorTaxBps, pairToken and graduationThreshold, batched over the factory
+    view. A token whose call fails keeps a null tax and a null threshold --
+    the cohort lookup has no bucket for it and the board renders no fill for
+    it, both honest outcomes for the same missing read (REPOSITION.md B1:
+    graduationThreshold is word 5 of the same 15-word tuple, so this is not a
+    second RPC call). */
 async function fetchTokenConfigs(
   rpc: RpcClient,
   factory: string,
   tokens: string[],
-): Promise<Map<string, { pairToken: string; creatorTaxBps: number }>> {
-  const out = new Map<string, { pairToken: string; creatorTaxBps: number }>();
+): Promise<Map<string, { pairToken: string; creatorTaxBps: number; graduationThresholdWei: string }>> {
+  const out = new Map<
+    string,
+    { pairToken: string; creatorTaxBps: number; graduationThresholdWei: string }
+  >();
   if (tokens.length === 0) return out;
   const results = await rpc.callBatch(
     tokens.map((token) => ({
@@ -315,7 +321,11 @@ async function fetchTokenConfigs(
   tokens.forEach((token, i) => {
     const decoded = decodeLaunchedToken(results[i] as string | null);
     if (decoded?.exists && decoded.creatorTaxBps !== null) {
-      out.set(token, { pairToken: decoded.pairToken, creatorTaxBps: decoded.creatorTaxBps });
+      out.set(token, {
+        pairToken: decoded.pairToken,
+        creatorTaxBps: decoded.creatorTaxBps,
+        graduationThresholdWei: decoded.graduationThresholdWei,
+      });
     }
   });
   return out;
@@ -453,8 +463,8 @@ export async function tick(
         db
           .prepare(
             `INSERT OR IGNORE INTO launch
-               (token, curve, pair_token, pair_class, creator_tax_bps, block, ts, tx_hash, log_index)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               (token, curve, pair_token, pair_class, creator_tax_bps, graduation_threshold, block, ts, tx_hash, log_index)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
             launch.token,
@@ -462,6 +472,7 @@ export async function tick(
             pairToken,
             pairClassOf(pairToken, pairTokens),
             config ? config.creatorTaxBps : null,
+            config ? config.graduationThresholdWei : null,
             launch.block,
             ts,
             launch.txHash,

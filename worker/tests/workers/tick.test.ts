@@ -267,12 +267,12 @@ describe("the tick", () => {
   it("prunes rows past the retention window and keeps the rest", async () => {
     await seedCursor(500_000, NOW);
     await env.LEDGE_DB.prepare(
-      `INSERT INTO launch VALUES ('0xold', '0xc', '0x0', 'eth', 0, 1, ?, '0xt', 0)`,
+      `INSERT INTO launch VALUES ('0xold', '0xc', '0x0', 'eth', 0, NULL, 1, ?, '0xt', 0)`,
     )
       .bind(NOW - RETENTION_SECONDS - 1)
       .run();
     await env.LEDGE_DB.prepare(
-      `INSERT INTO launch VALUES ('0xkeep', '0xc', '0x0', 'eth', 0, 2, ?, '0xt', 1)`,
+      `INSERT INTO launch VALUES ('0xkeep', '0xc', '0x0', 'eth', 0, NULL, 2, ?, '0xt', 1)`,
     )
       .bind(NOW - RETENTION_SECONDS + 60)
       .run();
@@ -308,10 +308,10 @@ describe("the durable key is the log's own identity", () => {
   it("holds two rows for one token seen in two different logs", async () => {
     await env.LEDGE_DB.batch([
       env.LEDGE_DB.prepare(
-        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, 10, 100, '0xaa', 0)`,
+        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, NULL, 10, 100, '0xaa', 0)`,
       ).bind(TOKEN_A),
       env.LEDGE_DB.prepare(
-        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, 11, 101, '0xbb', 0)`,
+        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, NULL, 11, 101, '0xbb', 0)`,
       ).bind(TOKEN_A),
     ]);
     const rows = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM launch").first<any>();
@@ -320,13 +320,13 @@ describe("the durable key is the log's own identity", () => {
 
   it("refuses a second row for the same (tx_hash, log_index)", async () => {
     await env.LEDGE_DB.prepare(
-      `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, 10, 100, '0xaa', 0)`,
+      `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, NULL, 10, 100, '0xaa', 0)`,
     )
       .bind(TOKEN_A)
       .run();
     await expect(
       env.LEDGE_DB.prepare(
-        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, 10, 100, '0xaa', 0)`,
+        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, NULL, 10, 100, '0xaa', 0)`,
       )
         .bind(TOKEN_B)
         .run(),
@@ -406,7 +406,7 @@ describe("a log the chain no longer has", () => {
   it("leaves rows below the re-read range alone", async () => {
     await seedCursor(5000, NOW);
     await env.LEDGE_DB.prepare(
-      `INSERT INTO launch VALUES ('0xbefore', '0xc', '0x0', 'eth', 0, 10, ?, '0xt', 0)`,
+      `INSERT INTO launch VALUES ('0xbefore', '0xc', '0x0', 'eth', 0, NULL, 10, ?, '0xt', 0)`,
     )
       .bind(NOW - 3600)
       .run();
@@ -487,7 +487,7 @@ describe("retention keeps a launch as long as its graduation", () => {
     await seedCursor(500_000, NOW);
     await env.LEDGE_DB.batch([
       env.LEDGE_DB.prepare(
-        `INSERT INTO launch VALUES ('0xslow', '0xc', '0x0', 'eth', 0, 10, ?, '0xt1', 0)`,
+        `INSERT INTO launch VALUES ('0xslow', '0xc', '0x0', 'eth', 0, NULL, 10, ?, '0xt1', 0)`,
       ).bind(NOW - RETENTION_SECONDS - 3600),
       env.LEDGE_DB.prepare(`INSERT INTO graduation VALUES ('0xslow', 20, ?, '1', '0xt2', 0)`).bind(
         NOW - RETENTION_SECONDS + 3600,
@@ -501,7 +501,7 @@ describe("retention keeps a launch as long as its graduation", () => {
   it("still evicts a launch past the cutoff that never graduated", async () => {
     await seedCursor(500_000, NOW);
     await env.LEDGE_DB.prepare(
-      `INSERT INTO launch VALUES ('0xgone', '0xc', '0x0', 'eth', 0, 10, ?, '0xt1', 0)`,
+      `INSERT INTO launch VALUES ('0xgone', '0xc', '0x0', 'eth', 0, NULL, 10, ?, '0xt1', 0)`,
     )
       .bind(NOW - RETENTION_SECONDS - 3600)
       .run();
@@ -698,7 +698,7 @@ describe("retention reaches the activity rows", () => {
     await seedCursor(500_000, NOW);
     await env.LEDGE_DB.batch([
       env.LEDGE_DB.prepare(
-        `INSERT INTO launch VALUES ('0xlive', '0xc', '0x0', 'eth', 0, 10, ?, '0xt1', 0)`,
+        `INSERT INTO launch VALUES ('0xlive', '0xc', '0x0', 'eth', 0, NULL, 10, ?, '0xt1', 0)`,
       ).bind(NOW - RETENTION_SECONDS - 3600),
       env.LEDGE_DB.prepare(
         `INSERT INTO token_activity VALUES ('0xlive', 10, 3, 0, '3', '0', ?, ?, 1)`,
@@ -801,7 +801,7 @@ describe("what one minute of chain costs", () => {
       curves.push(curve);
       seeds.push(
         env.LEDGE_DB.prepare(
-          `INSERT INTO launch VALUES (?, ?, '0x0', 'eth', 0, ?, ?, ?, 0)`,
+          `INSERT INTO launch VALUES (?, ?, '0x0', 'eth', 0, NULL, ?, ?, ?, 0)`,
         ).bind(token, curve, base - 500 + i, NOW - 600, `0xseed${i}`),
       );
     }

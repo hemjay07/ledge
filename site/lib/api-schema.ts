@@ -267,17 +267,80 @@ export const tokenResponseSchema = z
 export type TokenResponse = z.infer<typeof tokenResponseSchema>;
 export type CohortWindow = z.infer<typeof cohortWindowShape>;
 
+/* ---- Class B: the live board (REPOSITION.md Phase B1) ------------------- */
+
+/* A count that does not say what it counted over is the same defect as a rate
+   with no denominator (reused from `activityWindow` above, with one more
+   field: a launch older than the indexed record has partial counts, and a
+   partial count that looks complete is the same defect as a missing one). */
+const boardWindow = z
+  .object({
+    fromBlock: z.number().int().nonnegative(),
+    toBlock: z.number().int().nonnegative(),
+    label: z.string().min(1),
+    partial: z.boolean(),
+  })
+  .superRefine((w, ctx) => {
+    if (w.toBlock < w.fromBlock) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["toBlock"],
+        message: "a window cannot end before it begins",
+      });
+    }
+    if (!w.label.includes(String(w.fromBlock)) || !w.label.includes(String(w.toBlock))) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["label"],
+        message: "the label must name the blocks the counts were taken over",
+      });
+    }
+  });
+
+/* Never a lone percentage: the threshold travels with the label that says
+   what the figure is measured against and why it disagrees with the curve's
+   own reading (worker/src/board.ts). Null, not a guess, when the launch
+   carries no threshold. */
+const boardFill = z.object({
+  graduationThresholdWei: z.string(),
+  label: z.string().min(1),
+});
+
+export const LIVE_SORT_KEYS = ["buys", "lastActivity", "age", "netQuote", "newest"] as const;
+export const liveSortKeySchema = z.enum(LIVE_SORT_KEYS);
+export type LiveSortKey = z.infer<typeof liveSortKeySchema>;
+
 export const liveRowSchema = z.object({
+  /* Permitted: CONSTRAINTS 2 bans a wallet or a deployer as a subject, never
+     the token itself, and /t/{address} already prints it. */
+  token: z.string().regex(/^0x[0-9a-f]{40}$/),
   pairClass: z.string(),
-  taxBucket: z.string().nullable(),
+  pairToken: z.string(),
+  creatorTaxBps: z.number().int().nullable(),
+  launchBlock: z.number().int().nonnegative(),
   ageSeconds: z.number().int().nonnegative(),
   graduated: z.boolean(),
+  buys: z.number().int().nonnegative(),
+  sells: z.number().int().nonnegative(),
+  quoteIn: z.string(),
+  quoteOut: z.string(),
+  netQuoteWei: z.string(),
+  firstBlockBuyers: z.number().int().nonnegative().nullable(),
+  lastActivityAt: z.string(),
+  window: boardWindow,
+  fill: boardFill.nullable(),
 });
 
 export const liveResponseSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   observedAt: z.string(),
   lastIndexedBlock: z.number().int().nullable(),
+  /* CONSTRAINTS 1: a ranking is permitted only when the ranked quantity is
+     shown. Naming the column here is what makes that true structurally --
+     every row already carries buys, lastActivityAt, ageSeconds and
+     netQuoteWei regardless of which one was asked for, so the reader can
+     always see the column this board was ordered by. */
+  sortedBy: liveSortKeySchema,
   count: z.number().int().nonnegative(),
   rows: z.array(liveRowSchema).max(200),
   live: live,
@@ -293,6 +356,7 @@ export const ERROR_CODES = [
   "rpc_down",
   "number_unavailable",
   "rate_limited",
+  "bad_sort",
   "not_found",
 ] as const;
 

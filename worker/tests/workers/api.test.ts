@@ -81,7 +81,7 @@ async function get(path: string): Promise<Response> {
 
 async function seedLaunch(ts: number): Promise<void> {
   await env.LEDGE_DB.prepare(
-    `INSERT OR REPLACE INTO launch VALUES (?, '0xf6e8', '0x0000000000000000000000000000000000000000', 'eth', 300, 56172001, ?, '0xtx', 0)`,
+    `INSERT OR REPLACE INTO launch VALUES (?, '0xf6e8', '0x0000000000000000000000000000000000000000', 'eth', 300, '4200000000000000000', 56172001, ?, '0xtx', 0)`,
   )
     .bind(ADDRESS, ts)
     .run();
@@ -216,34 +216,227 @@ describe("GET /api/token/{address}", () => {
 });
 
 describe("GET /api/live", () => {
-  it("renders the population with no address and no ticker in it", async () => {
+  interface SeedOptions {
+    token: string;
+    pairClass?: string;
+    creatorTaxBps?: number | null;
+    graduationThreshold?: string | null;
+    launchBlock: number;
+    launchTs: number;
+    graduated?: boolean;
+    buys?: number;
+    sells?: number;
+    quoteIn?: string;
+    quoteOut?: string;
+    firstBlockBuyers?: number | null;
+    lastActivityTs: number;
+    fromBlock?: number;
+  }
+
+  /* One row on the board is one launch row plus one token_activity row --
+     board.ts inner-joins the two, so a token with no activity row never
+     appears (the ~121-row population REPOSITION.md measured). */
+  function seedRow(opts: SeedOptions): D1PreparedStatement[] {
+    const fromBlock = opts.fromBlock ?? opts.launchBlock;
+    return [
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES (?, '0xc', '0x0', ?, ?, ?, ?, ?, ?, 0)`,
+      ).bind(
+        opts.token,
+        opts.pairClass ?? "eth",
+        opts.creatorTaxBps ?? null,
+        opts.graduationThreshold ?? null,
+        opts.launchBlock,
+        opts.launchTs,
+        `0xtx${opts.token}`,
+      ),
+      env.LEDGE_DB.prepare(
+        `INSERT INTO token_activity VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        opts.token,
+        fromBlock,
+        opts.buys ?? 1,
+        opts.sells ?? 0,
+        opts.quoteIn ?? "0",
+        opts.quoteOut ?? "0",
+        null,
+        opts.lastActivityTs,
+        opts.firstBlockBuyers === undefined ? 1 : opts.firstBlockBuyers,
+      ),
+      ...(opts.graduated
+        ? [
+            env.LEDGE_DB.prepare(`INSERT INTO graduation VALUES (?, ?, ?, '1', ?, 0)`).bind(
+              opts.token,
+              opts.launchBlock + 1,
+              opts.lastActivityTs,
+              `0xgrad${opts.token}`,
+            ),
+          ]
+        : []),
+    ];
+  }
+
+  it("prints one row per token, with the token address, its counts, and its indexed fill", async () => {
     const now = Math.floor(Date.now() / 1000);
     await env.LEDGE_DB.batch([
-      env.LEDGE_DB.prepare(
-        `INSERT INTO launch VALUES ('0xaaa', '0xc', '0x0', 'eth', 300, 10, ?, '0xt1', 0)`,
-      ).bind(now - 30),
-      env.LEDGE_DB.prepare(
-        `INSERT INTO launch VALUES ('0xbbb', '0xc', '0x0', 'stable', 0, 11, ?, '0xt2', 0)`,
-      ).bind(now - 60),
-      env.LEDGE_DB.prepare(
-        `INSERT INTO graduation VALUES ('0xbbb', 12, ?, '1', '0xt3', 0)`,
-      ).bind(now - 10),
+      ...seedRow({
+        token: "0x111111111111111111111111111111111111111a",
+        pairClass: "eth",
+        creatorTaxBps: 300,
+        graduationThreshold: "4200000000000000000",
+        launchBlock: 56_172_500,
+        launchTs: now - 30,
+        buys: 41,
+        sells: 12,
+        quoteIn: "1743200000000000000",
+        quoteOut: "220000000000000000",
+        firstBlockBuyers: 7,
+        lastActivityTs: now - 5,
+      }),
+      ...seedRow({
+        token: "0x222222222222222222222222222222222222222b",
+        pairClass: "stable",
+        creatorTaxBps: 0,
+        graduationThreshold: "8090000000",
+        launchBlock: 56_172_400,
+        launchTs: now - 60,
+        graduated: true,
+        buys: 3,
+        sells: 1,
+        quoteIn: "100",
+        quoteOut: "20",
+        lastActivityTs: now - 10,
+      }),
     ]);
     const response = await get("/api/live");
     expect(response.status).toBe(200);
-    const text = await response.text();
-    expect(text).not.toContain("0xaaa");
-    expect(text).not.toContain("0xbbb");
+    const body = (await response.json()) as any;
 
-    const body = JSON.parse(text);
+    // R1: the token address is permitted -- CONSTRAINTS 2 bans a wallet or a
+    // deployer as a subject, never the token itself.
     expect(body.count).toBe(2);
-    expect(body.rows[0]).toEqual({
-      pairClass: "stable",
-      taxBucket: "0%",
-      ageSeconds: expect.any(Number),
-      graduated: true,
-    });
+    const tokens = body.rows.map((r: any) => r.token);
+    expect(tokens).toContain("0x111111111111111111111111111111111111111a");
+    expect(tokens).toContain("0x222222222222222222222222222222222222222b");
+    expect(body.sortedBy).toBe("lastActivity");
     expect(body.lastIndexedBlock).toBe(56_172_588);
+
+    const row = body.rows.find((r: any) => r.token === "0x111111111111111111111111111111111111111a");
+    expect(row.pairClass).toBe("eth");
+    expect(row.pairToken).toBe("0x0");
+    expect(row.creatorTaxBps).toBe(300);
+    expect(row.launchBlock).toBe(56_172_500);
+    expect(row.ageSeconds).toBeGreaterThanOrEqual(30);
+    expect(row.graduated).toBe(false);
+    expect(row.buys).toBe(41);
+    expect(row.sells).toBe(12);
+    expect(row.quoteIn).toBe("1743200000000000000");
+    expect(row.quoteOut).toBe("220000000000000000");
+    expect(row.netQuoteWei).toBe("1523200000000000000");
+    expect(row.firstBlockBuyers).toBe(7);
+    expect(row.window.fromBlock).toBe(56_172_500);
+    expect(row.window.toBlock).toBe(56_172_588);
+    expect(row.window.partial).toBe(false);
+    expect(row.window.label).toContain("56172500");
+    expect(row.window.label).toContain("56172588");
+    // R2b: never a lone percentage -- the threshold is labelled and both
+    // figures it is measured against travel outside the fill object too.
+    expect(row.fill.graduationThresholdWei).toBe("4200000000000000000");
+    expect(row.fill.label).toContain("not read from the curve");
+    expect(row.fill.label).not.toMatch(/\d+(\.\d+)?%/);
+
+    const graduated = body.rows.find((r: any) => r.token === "0x222222222222222222222222222222222222222b");
+    expect(graduated.graduated).toBe(true);
+  });
+
+  it("renders no fill for a row whose launch carries no threshold, rather than guessing one", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await env.LEDGE_DB.batch(
+      seedRow({
+        token: "0x333333333333333333333333333333333333333c",
+        pairClass: "other",
+        creatorTaxBps: null,
+        graduationThreshold: null,
+        launchBlock: 56_172_300,
+        launchTs: now - 200,
+        lastActivityTs: now - 100,
+      }),
+    );
+    const body = (await (await get("/api/live")).json()) as any;
+    expect(body.rows[0].fill).toBeNull();
+    expect(body.rows[0].creatorTaxBps).toBeNull();
+  });
+
+  it("marks a row's window partial when its own launch block was never indexed", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await env.LEDGE_DB.batch(
+      seedRow({
+        token: "0x444444444444444444444444444444444444444d",
+        launchBlock: 56_100_000,
+        fromBlock: 56_150_000,
+        launchTs: now - 5000,
+        firstBlockBuyers: null,
+        lastActivityTs: now - 100,
+      }),
+    );
+    const body = (await (await get("/api/live")).json()) as any;
+    expect(body.rows[0].window.partial).toBe(true);
+    expect(body.rows[0].window.label).toContain("predates LEDGE's indexed record");
+    expect(body.rows[0].firstBlockBuyers).toBeNull();
+  });
+
+  it("sorts by the requested column and names that column in the payload", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await env.LEDGE_DB.batch([
+      ...seedRow({
+        token: "0x555555555555555555555555555555555555555e",
+        launchBlock: 1,
+        launchTs: now - 10,
+        buys: 3,
+        lastActivityTs: now - 10,
+      }),
+      ...seedRow({
+        token: "0x666666666666666666666666666666666666666f",
+        launchBlock: 2,
+        launchTs: now - 20,
+        buys: 99,
+        lastActivityTs: now - 20,
+      }),
+    ]);
+    const body = (await (await get("/api/live?sort=buys")).json()) as any;
+    expect(body.sortedBy).toBe("buys");
+    expect(body.rows[0].token).toBe("0x666666666666666666666666666666666666666f");
+    expect(body.rows[0].buys).toBe(99);
+  });
+
+  /* `age` orders biggest-first like every other key, so it puts the OLDEST
+     launch first. `newest` is the opposite ordering a discovery reader wants,
+     on the launch block itself. Both are orderings of a shown quantity. */
+  it("orders age oldest-first and newest by launch block, opposite ways round", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const older = "0x777777777777777777777777777777777777777a";
+    const newer = "0x888888888888888888888888888888888888888b";
+    await env.LEDGE_DB.batch([
+      ...seedRow({ token: older, launchBlock: 10, launchTs: now - 900, lastActivityTs: now - 10 }),
+      ...seedRow({ token: newer, launchBlock: 20, launchTs: now - 30, lastActivityTs: now - 20 }),
+    ]);
+
+    const byAge = (await (await get("/api/live?sort=age")).json()) as any;
+    expect(byAge.sortedBy).toBe("age");
+    expect(byAge.rows[0].token).toBe(older);
+
+    const byNewest = (await (await get("/api/live?sort=newest")).json()) as any;
+    expect(byNewest.sortedBy).toBe("newest");
+    expect(byNewest.rows[0].token).toBe(newer);
+    expect(byNewest.rows[0].launchBlock).toBe(20);
+  });
+
+  it("refuses an unrecognised sort key with 400 rather than defaulting silently", async () => {
+    const response = await get("/api/live?sort=trending");
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as any;
+    expect(body.error).toBe("bad_sort");
+    expect(body.message).toContain("trending");
   });
 
   /* W1 — the board reports the same staleness the lookup does. */
@@ -261,20 +454,52 @@ describe("GET /api/live", () => {
   it("never returns more than 200 rows", async () => {
     const now = Math.floor(Date.now() / 1000);
     const statements = Array.from({ length: 210 }, (_, i) =>
-      /* One row per LOG, so each carries its own (tx_hash, log_index): the
-         durable key is the log's identity, not the token's. */
-      env.LEDGE_DB.prepare(
-        `INSERT INTO launch VALUES (?, '0xc', '0x0', 'eth', 0, ?, ?, ?, 0)`,
-      ).bind(
-        `0x${i.toString(16).padStart(40, "0")}`,
-        i,
-        now - i,
-        `0xt${i.toString(16)}`,
-      ),
-    );
+      seedRow({
+        token: `0x${i.toString(16).padStart(40, "0")}`,
+        launchBlock: i,
+        launchTs: now - i,
+        lastActivityTs: now - i,
+      }),
+    ).flat();
     await env.LEDGE_DB.batch(statements);
     const body = (await (await get("/api/live")).json()) as any;
     expect(body.rows).toHaveLength(200);
+  });
+
+  /* REPOSITION.md's whole feasibility argument for this board: 121 live
+     curves read individually would be 121+ subrequests against a free-plan
+     budget of 50. This pins the guarantee that the board reads D1 only, at
+     roughly that population, so a future change that adds a per-row RPC read
+     is caught here rather than in production. */
+  it("costs zero chain subrequests at the measured population, however many rows it reads", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const statements = Array.from({ length: 121 }, (_, i) =>
+      seedRow({
+        token: `0x${(i + 1).toString(16).padStart(40, "0")}`,
+        launchBlock: i,
+        launchTs: now - i,
+        graduationThreshold: "4200000000000000000",
+        creatorTaxBps: 100,
+        buys: i,
+        lastActivityTs: now - i,
+      }),
+    ).flat();
+    await env.LEDGE_DB.batch(statements);
+
+    let chainCalls = 0;
+    vi.stubGlobal("fetch", async () => {
+      chainCalls += 1;
+      return new Response("not stubbed", { status: 500 });
+    });
+    try {
+      const response = await get("/api/live");
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as any;
+      expect(body.count).toBe(121);
+      expect(chainCalls).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

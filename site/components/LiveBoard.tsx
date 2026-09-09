@@ -3,15 +3,20 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { LedgerEntry } from "./LedgerEntry";
 import { fetchLive, stripAddresses, type LiveResult } from "../lib/api";
-import { formatAge, formatCount, pairLabel, taxLabel } from "../lib/format";
+import { formatAge, formatCount, pairLabel } from "../lib/format";
 
 /* The last launches, as the index has them.
 
-   Anonymous by construction: the Worker selects no token column, and every
-   cell is put through stripAddresses on the way to the DOM anyway, because a
-   rule that lives only on the other side of a network call is not a rule. The
-   board carries no rate and no cohort, so there is no denominator to print and
-   nothing here for the recompute gate to cover. */
+   The API now names the token on every row (CONSTRAINTS 2 permits the token
+   itself as a subject; only a wallet or a deployer stays banned), but this
+   board still does not print it -- that is a later phase's decision, not
+   this one's. stripAddresses runs on every cell regardless, because a rule
+   that lives only on the other side of a network call is not a rule.
+
+   The board carries no rate and no cohort, so there is no denominator to
+   print and nothing here for the recompute gate to cover: creator tax is
+   shown as the raw bps LEDGE indexed, not the cohort's tax bucket, because a
+   bucket is a statistic and this board computes none. */
 
 const REFRESH_MS = 15_000;
 
@@ -27,7 +32,7 @@ function rowsOf(result: LiveResult): Row[] {
   return result.body.rows.map((row) => ({
     age: stripAddresses(formatAge(row.ageSeconds)),
     pair: stripAddresses(pairLabel(row.pairClass)),
-    tax: stripAddresses(row.taxBucket === null ? "tax not read" : taxLabel(row.taxBucket)),
+    tax: stripAddresses(row.creatorTaxBps === null ? "tax not read" : `${row.creatorTaxBps} bps`),
     state: row.graduated ? "graduated" : "on the curve",
   }));
 }

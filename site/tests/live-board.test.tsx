@@ -24,7 +24,7 @@ describe("the last launches board", () => {
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
     const text = container.textContent ?? "";
     expect(text).toContain("ETH");
-    expect(text).toContain("2–3%");
+    expect(text).toContain("300 bps");
     expect(text).toContain("graduated");
     expect(text).toContain("on the curve");
     expect(text).not.toMatch(/0x[0-9a-f]{40}/i);
@@ -36,10 +36,19 @@ describe("the last launches board", () => {
     await waitFor(() => expect(container.textContent).toContain("tax not read"));
   });
 
-  it("strips a 20-byte address defensively, even if the API sends one", async () => {
+  it("strips a 20-byte address defensively, even if the API sends one in a field this board does not use", async () => {
     answerWith({
       ...live,
-      rows: [{ pairClass: ADDRESS, taxBucket: ADDRESS, ageSeconds: 30, graduated: false }],
+      rows: [
+        {
+          ...live.rows[0],
+          token: ADDRESS,
+          pairClass: ADDRESS,
+          pairToken: ADDRESS,
+          ageSeconds: 30,
+          graduated: false,
+        },
+      ],
       count: 1,
     });
     const { container } = render(<LiveBoard folio="04" />);

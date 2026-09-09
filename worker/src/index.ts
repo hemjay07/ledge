@@ -13,8 +13,8 @@ import { headline } from "./text";
 import { numberText } from "./text";
 import { tokenResponseSchema, liveResponseSchema, SCHEMA_VERSION, type ErrorCode } from "./schema";
 import { loadNumber, KV_NUMBER } from "./numberFile";
-import { taxBucketOf } from "./buckets";
 import { liveStale, type CursorRow } from "./lookup";
+import { BOARD_QUERY, BOARD_SORT_KEYS, buildBoardRows, isBoardSortKey, type BoardDbRow } from "./board";
 import { ageSeconds, formatAge, normaliseAddress, toIso } from "./format";
 import {
   classify,
@@ -112,45 +112,41 @@ async function handleToken(env: Env, address: string, nowMs: number): Promise<Re
   return json(payload, 200, cache);
 }
 
-/* ---- /api/live ---------------------------------------------------------- */
+/* ---- /api/live ------------------------------------------------------------
 
-interface LiveRow {
-  pair_class: string;
-  creator_tax_bps: number | null;
-  ts: number;
-  graduated: number;
-}
+   The discovery board (REPOSITION.md Phase B1): one row per token with
+   indexed curve activity. Every figure comes from D1 -- worker/src/board.ts
+   carries the full reasoning for why the curve itself is never read here --
+   so this handler costs the same two D1 reads regardless of how many tokens
+   are on the board. */
 
-/** The board is a view of the population, not a list of things to click:
-    no addresses and no tickers, stripped here rather than in the client. */
-async function handleLive(env: Env, nowMs: number): Promise<Response> {
+async function handleLive(env: Env, nowMs: number, url: URL): Promise<Response> {
   const nowSeconds = Math.floor(nowMs / 1000);
+
+  const sortParam = url.searchParams.get("sort") ?? "lastActivity";
+  if (!isBoardSortKey(sortParam)) {
+    return apiError(
+      "bad_sort",
+      `Unknown sort key "${sortParam}". Use one of ${BOARD_SORT_KEYS.join(", ")}.`,
+      400,
+    );
+  }
+
   const [rowsResult, cursorResult] = await env.LEDGE_DB.batch([
-    env.LEDGE_DB.prepare(
-      /* EXISTS, not a join: a token may hold more than one graduation row
-         while a reorg is being reconciled, and a join would then print one
-         launch twice on the board. */
-      `SELECT l.pair_class, l.creator_tax_bps, l.ts,
-              EXISTS (SELECT 1 FROM graduation g WHERE g.token = l.token) AS graduated
-         FROM launch l
-        ORDER BY l.block DESC LIMIT 200`,
-    ),
+    env.LEDGE_DB.prepare(BOARD_QUERY),
     env.LEDGE_DB.prepare(
       "SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1",
     ),
   ]);
   const cursor = (cursorResult?.results[0] as CursorRow | undefined) ?? null;
-  const rows = ((rowsResult?.results ?? []) as unknown as LiveRow[]).map((row) => ({
-    pairClass: row.pair_class,
-    taxBucket: taxBucketOf(row.creator_tax_bps),
-    ageSeconds: Math.max(0, nowSeconds - row.ts),
-    graduated: row.graduated === 1,
-  }));
+  const dbRows = (rowsResult?.results ?? []) as unknown as BoardDbRow[];
+  const rows = buildBoardRows(dbRows, cursor, nowSeconds, sortParam);
 
   const payload = {
     schemaVersion: SCHEMA_VERSION,
     observedAt: toIso(nowSeconds),
     lastIndexedBlock: cursor ? cursor.last_indexed_block : null,
+    sortedBy: sortParam,
     count: rows.length,
     rows,
     live: {
@@ -327,7 +323,7 @@ export default {
       return new Response("method not allowed", { status: 405, headers: CORS });
     }
 
-    if (path === "/api/live") return handleLive(env, nowMs);
+    if (path === "/api/live") return handleLive(env, nowMs, url);
     if (path === "/api/number") return handleNumber(env);
     if (path === "/api/health") return handleHealth(env, nowMs);
 

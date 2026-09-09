@@ -135,6 +135,7 @@ async function bundled() {
               export { buildTokenBody } from "${join(WORKER, "src", "lookup.ts").replace(/\\/g, "/")}";
               export { lookupText } from "${join(WORKER, "src", "text.ts").replace(/\\/g, "/")}";
               export { tokenResponseSchema, liveResponseSchema } from "${join(WORKER, "src", "schema.ts").replace(/\\/g, "/")}";
+              export { buildBoardRows } from "${join(WORKER, "src", "board.ts").replace(/\\/g, "/")}";
             `,
             resolveDir: WORKER,
             loader: "ts",
@@ -153,7 +154,7 @@ function write(name, value) {
 }
 
 const { mod, cleanup } = await bundled();
-const { buildTokenBody, lookupText, tokenResponseSchema, liveResponseSchema } = mod;
+const { buildTokenBody, lookupText, tokenResponseSchema, liveResponseSchema, buildBoardRows } = mod;
 
 function response({
   launch = LAUNCH,
@@ -205,17 +206,97 @@ write("token-number-unavailable", {
   partial: response({ numberFile: null }),
 });
 
+/* One token per row, as board.ts's own builder would assemble them from D1:
+   the fixture drives the Worker's real code rather than a hand-typed guess
+   at its shape, for the same reason every other fixture here does. */
+const BOARD_DB_ROWS = [
+  {
+    token: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    pair_class: "eth",
+    pair_token: ZERO,
+    creator_tax_bps: 0,
+    graduation_threshold: "4200000000000000000",
+    block: LAST_INDEXED_BLOCK - 41,
+    ts: NOW - 41,
+    graduated: 0,
+    from_block: LAST_INDEXED_BLOCK - 41,
+    buys: 41,
+    sells: 12,
+    quote_in: "1743200000000000000",
+    quote_out: "220000000000000000",
+    first_block_buyers: 7,
+    last_activity_ts: NOW - 5,
+  },
+  {
+    token: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    pair_class: "eth",
+    pair_token: ZERO,
+    creator_tax_bps: 300,
+    graduation_threshold: "4200000000000000000",
+    block: LAST_INDEXED_BLOCK - 190,
+    ts: NOW - 190,
+    graduated: 0,
+    from_block: LAST_INDEXED_BLOCK - 190,
+    buys: 6,
+    sells: 1,
+    quote_in: "300000000000000000",
+    quote_out: "0",
+    first_block_buyers: 2,
+    last_activity_ts: NOW - 60,
+  },
+  {
+    token: "0xcccccccccccccccccccccccccccccccccccccccc",
+    pair_class: "stable",
+    pair_token: "0x1111111111111111111111111111111111111111",
+    creator_tax_bps: 100,
+    graduation_threshold: "8090000000",
+    block: LAST_INDEXED_BLOCK - 900,
+    ts: NOW - 900,
+    graduated: 1,
+    from_block: LAST_INDEXED_BLOCK - 900,
+    buys: 88,
+    sells: 40,
+    quote_in: "8500000000",
+    quote_out: "410000000",
+    first_block_buyers: 14,
+    last_activity_ts: NOW - 300,
+  },
+  {
+    /* Enrichment failed for this one: no tax bucket, no threshold, no fill --
+       and its own launch block predates what the index holds, so its window
+       is partial. */
+    token: "0xdddddddddddddddddddddddddddddddddddddddd",
+    pair_class: "other",
+    pair_token: "0x2222222222222222222222222222222222222222",
+    creator_tax_bps: null,
+    graduation_threshold: null,
+    block: LAST_INDEXED_BLOCK - 4200,
+    ts: NOW - 4200,
+    graduated: 0,
+    from_block: LAST_INDEXED_BLOCK - 4100,
+    buys: 3,
+    sells: 0,
+    quote_in: "40000000000000000",
+    quote_out: "0",
+    first_block_buyers: null,
+    last_activity_ts: NOW - 3900,
+  },
+];
+
+const boardRows = buildBoardRows(
+  BOARD_DB_ROWS,
+  { last_indexed_block: LAST_INDEXED_BLOCK, last_success_at: NOW - 20, consecutive_failures: 0 },
+  NOW,
+  "lastActivity",
+);
+
 const live = {
   schemaVersion: 1,
   observedAt: OBSERVED_AT,
   lastIndexedBlock: LAST_INDEXED_BLOCK,
-  count: 4,
-  rows: [
-    { pairClass: "eth", taxBucket: "0%", ageSeconds: 41, graduated: false },
-    { pairClass: "eth", taxBucket: "2-3%", ageSeconds: 190, graduated: false },
-    { pairClass: "stable", taxBucket: "1%", ageSeconds: 900, graduated: true },
-    { pairClass: "other", taxBucket: null, ageSeconds: 4200, graduated: false },
-  ],
+  sortedBy: "lastActivity",
+  count: boardRows.length,
+  rows: boardRows,
   live: { stale: false, lastSuccessAt: "2026-09-06T18:13:47Z", lastIndexedBlock: LAST_INDEXED_BLOCK },
 };
 if (!liveResponseSchema.safeParse(live).success) throw new Error("the live fixture fails its own schema");
