@@ -135,7 +135,9 @@ describe("GET /api/token/{address}", () => {
     }
     expect(body.placement.n).toBeTypeOf("number");
     expect(body.placement.crawledAt).toBe(numberFixture.crawledAt);
-    expect(body.text).toContain("https://ledge.tools/method");
+    // asserted against the configured origin, not a literal: the test follows
+    // the deployment's own SITE_ORIGIN instead of duplicating it
+    expect(body.text).toContain(`${env.SITE_ORIGIN}/method`);
   });
 
   it("refuses anything that is not a 20-byte hex address", async () => {
@@ -298,8 +300,8 @@ describe("the other endpoints", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toContain("text/html");
     const html = await response.text();
-    expect(html).toContain(`<meta property="og:image" content="https://ledge.tools/og/t/${ADDRESS}.png">`);
-    expect(html).toContain(`https://ledge.tools/t/${ADDRESS}`);
+    expect(html).toContain(`<meta property="og:image" content="${env.SITE_ORIGIN}/og/t/${ADDRESS}.png">`);
+    expect(html).toContain(`${env.SITE_ORIGIN}/t/${ADDRESS}`);
     expect(html).toContain("minute 13");
     expect(html).toContain("LEDGE.TOOLS");
     // the facts are in the HTML, not only in a script

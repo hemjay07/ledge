@@ -8,6 +8,7 @@
    The parsed file is held in module scope for 60 seconds so a burst of
    lookups is one KV read, not one per request. */
 
+import { USER_AGENT } from "./rpc";
 import type { Env } from "./env";
 import type { PairTokenEntry } from "./buckets";
 
@@ -139,7 +140,7 @@ export async function loadNumber(env: Env, nowMs = Date.now()): Promise<NumberFi
   if (!file && env.NUMBER_JSON_URL) {
     try {
       const response = await fetch(env.NUMBER_JSON_URL, {
-        headers: { "User-Agent": "ledge/1.0 (+https://ledge.tools)" },
+        headers: { "User-Agent": USER_AGENT },
       });
       if (response.ok) file = (await response.json()) as NumberFile;
     } catch {

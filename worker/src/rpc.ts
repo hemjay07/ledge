@@ -19,7 +19,11 @@
 export const MAX_BATCH = 50;
 export const BATCH_PACING_MS = 2000;
 export const LOG_WINDOW_BLOCKS = 1000;
-export const USER_AGENT = "ledge/1.0 (+https://ledge.tools)";
+/* What the crawler calls itself to the RPC. The host name happens to contain
+   a word the copy lint bans, and the lint is right to ban it in copy -- a
+   User-Agent is machine configuration, so it takes the documented exemption
+   rather than being spelled around. */
+export const USER_AGENT = "ledge/1.0 (+https://ledge-alpha.vercel.app)"; // lint-copy:allow — a User-Agent, not copy
 const RETRYABLE_HTTP = new Set([408, 429, 500, 502, 503, 504]);
 const MAX_RETRIES = 4;
 const BACKOFF_BASE_MS = 1000;

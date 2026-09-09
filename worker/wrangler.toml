@@ -15,8 +15,14 @@ RPC_URL = "https://rpc.mainnet.chain.robinhood.com"
 # Fallback used only when RPC_URL answers with a transport fault. Left equal to
 # RPC_URL until a second endpoint exists (risk register, "two indexers").
 RPC_URL_FALLBACK = "https://rpc.ordofi.network"
-NUMBER_JSON_URL = "https://ledge.tools/number.json"
-SITE_ORIGIN = "https://ledge.tools"
+# The live site. These were "https://ledge.tools" -- a domain that was never
+# bought and does not resolve -- so the canonical config pointed at a dead
+# host and only a `wrangler deploy --var` override kept the card and the
+# per-token page working. A config that is wrong unless you remember a flag is
+# a config that will be wrong. Point them at the host that actually serves the
+# site, and change them once when a domain exists.
+NUMBER_JSON_URL = "https://ledge-alpha.vercel.app/number.json"
+SITE_ORIGIN = "https://ledge-alpha.vercel.app"
 
 [[d1_databases]]
 binding = "LEDGE_DB"
