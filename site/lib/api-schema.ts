@@ -354,6 +354,81 @@ export const liveResponseSchema = z.object({
 
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 
+/* ---- Class B: the graveyard (launches at zero buys, 72h+ old) ----------- */
+
+/* Reused shape from `boardWindow` above, with the same reasoning: a partial
+   count that looks complete is the denominator defect CONSTRAINTS 3 exists to
+   catch. */
+const graveyardWindow = z
+  .object({
+    fromBlock: z.number().int().nonnegative(),
+    toBlock: z.number().int().nonnegative(),
+    label: z.string().min(1),
+    partial: z.boolean(),
+  })
+  .superRefine((w, ctx) => {
+    if (w.toBlock < w.fromBlock) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["toBlock"],
+        message: "a window cannot end before it begins",
+      });
+    }
+    if (!w.label.includes(String(w.fromBlock)) || !w.label.includes(String(w.toBlock))) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["label"],
+        message: "the label must name the blocks the counts were taken over",
+      });
+    }
+  });
+
+export const GRAVEYARD_SORT_KEYS = ["age", "newest"] as const;
+export const graveyardSortKeySchema = z.enum(GRAVEYARD_SORT_KEYS);
+export type GraveyardSortKey = z.infer<typeof graveyardSortKeySchema>;
+
+export const graveyardRowSchema = z.object({
+  token: z.string().regex(/^0x[0-9a-f]{40}$/),
+  pairClass: z.string(),
+  pairToken: z.string(),
+  creatorTaxBps: z.number().int().nullable(),
+  launchBlock: z.number().int().nonnegative(),
+  ageSeconds: z.number().int().nonnegative(),
+  buys: z.literal(0),
+  sells: z.number().int().nonnegative(),
+  /* Null when the launch's own block was never indexed; 0 when it was
+     indexed and nobody bought in it. Never collapsed into one cell. */
+  firstBlockBuyers: z.number().int().nonnegative().nullable(),
+  lastActivityAt: z.string(),
+  window: graveyardWindow,
+  pairDecimals: z.number().int().min(0).max(36).nullable(),
+  pairSymbol: z.string().nullable(),
+});
+
+/* The caveat CONSTRAINTS 3 requires: the activity index only began recording
+   recently, so a launch predating it has no row and is not counted here at
+   all. This object is how far back the index's own record reaches, read live
+   off the same tables the row query joins -- never a hand-maintained date. */
+export const graveyardScopeSchema = z.object({
+  ageCutoffSeconds: z.number().int().positive(),
+  indexedLaunches: z.number().int().nonnegative(),
+  earliestIndexedLaunchAt: z.string().nullable(),
+  label: z.string().min(1),
+});
+
+export const graveyardResponseSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  observedAt: z.string(),
+  lastIndexedBlock: z.number().int().nullable(),
+  sortedBy: graveyardSortKeySchema,
+  count: z.number().int().nonnegative(),
+  rows: z.array(graveyardRowSchema).max(200),
+  scope: graveyardScopeSchema,
+  live: live,
+});
+
+export type GraveyardResponse = z.infer<typeof graveyardResponseSchema>;
+
 /** The complete set of error codes. Anything else is a bug, not a shape. */
 export const ERROR_CODES = [
   "bad_address",

@@ -11,10 +11,26 @@ import { renderCard } from "./og";
 import { tokenShell } from "./html";
 import { headline } from "./text";
 import { numberText } from "./text";
-import { tokenResponseSchema, liveResponseSchema, SCHEMA_VERSION, type ErrorCode } from "./schema";
+import {
+  tokenResponseSchema,
+  liveResponseSchema,
+  graveyardResponseSchema,
+  SCHEMA_VERSION,
+  type ErrorCode,
+} from "./schema";
 import { loadNumber, loadPairTokens, KV_NUMBER } from "./numberFile";
 import { liveStale, type CursorRow } from "./lookup";
 import { BOARD_QUERY, BOARD_SORT_KEYS, buildBoardRows, isBoardSortKey, type BoardDbRow } from "./board";
+import {
+  GRAVEYARD_QUERY,
+  GRAVEYARD_SCOPE_QUERY,
+  GRAVEYARD_SORT_KEYS,
+  buildGraveyardRows,
+  buildGraveyardScope,
+  isGraveyardSortKey,
+  type GraveyardDbRow,
+  type GraveyardScopeDbRow,
+} from "./graveyard";
 import { ageSeconds, formatAge, normaliseAddress, toIso } from "./format";
 import {
   classify,
@@ -165,6 +181,65 @@ async function handleLive(env: Env, nowMs: number, url: URL): Promise<Response> 
   const parsed = liveResponseSchema.safeParse(payload);
   if (!parsed.success) {
     console.error("live response failed its own schema", JSON.stringify(parsed.error.issues));
+    return apiError("not_found", "The response did not satisfy the published contract.", 500);
+  }
+  return json(payload, 200, "public, max-age=15, stale-while-revalidate=45");
+}
+
+/* ---- /api/graveyard --------------------------------------------------------
+
+   Launches LEDGE has indexed that took zero buys, at least 72 hours after
+   their own launch block (worker/src/graveyard.ts carries the full reasoning,
+   including why `scope` is not optional: a launch older than the activity
+   index has no row and is not counted, and the reader is owed that in the
+   payload, not only in a comment). Same cost profile as /api/live: D1 only,
+   no chain read regardless of row count. */
+
+async function handleGraveyard(env: Env, nowMs: number, url: URL): Promise<Response> {
+  const nowSeconds = Math.floor(nowMs / 1000);
+
+  const sortParam = url.searchParams.get("sort") ?? "age";
+  if (!isGraveyardSortKey(sortParam)) {
+    return apiError(
+      "bad_sort",
+      `Unknown sort key "${sortParam}". Use one of ${GRAVEYARD_SORT_KEYS.join(", ")}.`,
+      400,
+    );
+  }
+
+  const [[rowsResult, scopeResult, cursorResult], pairTokens] = await Promise.all([
+    env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(GRAVEYARD_QUERY),
+      env.LEDGE_DB.prepare(GRAVEYARD_SCOPE_QUERY),
+      env.LEDGE_DB.prepare(
+        "SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1",
+      ),
+    ]),
+    loadPairTokens(env, nowMs),
+  ]);
+  const cursor = (cursorResult?.results[0] as CursorRow | undefined) ?? null;
+  const dbRows = (rowsResult?.results ?? []) as unknown as GraveyardDbRow[];
+  const scopeRow = (scopeResult?.results[0] as GraveyardScopeDbRow | undefined) ?? null;
+  const rows = buildGraveyardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens);
+  const scope = buildGraveyardScope(scopeRow);
+
+  const payload = {
+    schemaVersion: SCHEMA_VERSION,
+    observedAt: toIso(nowSeconds),
+    lastIndexedBlock: cursor ? cursor.last_indexed_block : null,
+    sortedBy: sortParam,
+    count: rows.length,
+    rows,
+    scope,
+    live: {
+      stale: liveStale(cursor, nowSeconds),
+      lastSuccessAt: cursor ? toIso(cursor.last_success_at) : null,
+      lastIndexedBlock: cursor ? cursor.last_indexed_block : null,
+    },
+  };
+  const parsed = graveyardResponseSchema.safeParse(payload);
+  if (!parsed.success) {
+    console.error("graveyard response failed its own schema", JSON.stringify(parsed.error.issues));
     return apiError("not_found", "The response did not satisfy the published contract.", 500);
   }
   return json(payload, 200, "public, max-age=15, stale-while-revalidate=45");
@@ -331,6 +406,7 @@ export default {
     }
 
     if (path === "/api/live") return handleLive(env, nowMs, url);
+    if (path === "/api/graveyard") return handleGraveyard(env, nowMs, url);
     if (path === "/api/number") return handleNumber(env);
     if (path === "/api/health") return handleHealth(env, nowMs);
 

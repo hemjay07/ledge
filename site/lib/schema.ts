@@ -36,6 +36,19 @@ const pairTaxRow = cohortRow.extend({
    always present, so a reader can check the share against it; the share is
    null for every rung whenever the ttg block may not be printed. The live
    layer places a token by looking a rung up here — it never divides. */
+/* One doubling bucket of the time-to-graduation histogram. Half-open
+   [fromSeconds, toSeconds); the last bucket carries a null `toSeconds` and
+   holds the tail, so the counts sum to n and no graduation falls outside the
+   table. The raw count is always present so a reader can check the share;
+   the share is null for every bucket whenever the sample cannot support one.
+   It describes how long graduations took and labels nothing. */
+const ttgHistogramBucket = z.object({
+  fromSeconds: z.number().int().nonnegative(),
+  toSeconds: z.number().int().positive().nullable(),
+  graduations: z.number().int().nonnegative(),
+  share: z.number().nullable(),
+});
+
 const ladderRung = z.object({
   atSeconds: z.number().int().positive(),
   cumulative: z.number().int().nonnegative(),
@@ -120,6 +133,14 @@ const windowShape = z.object({
     p95: z.number().int().nullable(),
     max: z.number().int().nullable(),
     ladder: z.array(ladderRung),
+    /* Defaulted, not required, for the same reason the Worker's copy is
+       optional: a number.json written before this block landed does not carry
+       it, and such a file is still a legal file rather than a broken one. The
+       LIVE file's histogram is asserted present and summing to n by
+       tests/shape.test.tsx, so a pipeline that quietly stopped emitting it
+       still fails a test -- the tolerance is for old files, not for
+       regressions. */
+    histogram: z.array(ttgHistogramBucket).default([]),
   }),
   cohorts: z.object({
     pair: z.array(cohortRow),
@@ -278,4 +299,5 @@ export type CohortRow = z.infer<typeof cohortRow>;
 export type PairTaxRow = z.infer<typeof pairTaxRow>;
 export type LadderRung = z.infer<typeof ladderRung>;
 export type HistogramRow = z.infer<typeof histogramRow>;
+export type TtgHistogramBucket = z.infer<typeof ttgHistogramBucket>;
 export type Sample = z.infer<typeof sampleShape>;

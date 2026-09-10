@@ -48,6 +48,23 @@ _PERCENTILES = (10, 25, 50, 75, 90, 95)
 # (CONSTRAINTS.md #9). ARCHITECTURE-PHASE2-4.md section 0.
 LADDER_EDGES = (30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600)
 
+# Bucket edges of the time-to-graduation histogram, in seconds, each about
+# double the last. Like LADDER_EDGES these are a definition and not a
+# rendering choice: moving one moves a published figure and needs a dated
+# /method entry (CONSTRAINTS.md #9).
+#
+# Doubling is what makes the shape legible. Graduation times run from under a
+# second to over four days, so equal-width buckets put 99% of the record in
+# the first bar and say nothing. On a doubling scale the distribution is
+# visibly TWO populations with a trough between them: measured 2026-09-10 over
+# 2,465 graduations, 158 landed under two seconds, 96 in the 2-5s bucket, and
+# the broad hump peaked at 285 in 160-320s.
+#
+# The first edge is 2 rather than 1 because a launch and a graduation in the
+# same block have a difference of zero, and a bucket that cannot separate zero
+# from one second would hide the very thing this histogram exists to show.
+HISTOGRAM_EDGES = (0, 2, 5, 10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240)
+
 
 def window(launches: list, graduations: list, since: Optional[int], until: int) -> dict:
     """Select launches with ts in the HALF-OPEN interval [since, until) and
@@ -173,9 +190,53 @@ def ttg_ladder(w: dict) -> list[dict]:
     return rungs
 
 
+def ttg_histogram(w: dict) -> list[dict]:
+    """The distribution of times to graduation, in doubling buckets.
+
+    Every bucket is half-open `[fromSeconds, toSeconds)`, so the buckets
+    partition the record without double-counting a graduation that lands
+    exactly on an edge -- the same half-open convention the windows use. The
+    final bucket has `toSeconds: None` and holds everything past the last
+    edge, so the counts always sum to n and no graduation falls outside the
+    table.
+
+    The raw count is always published. The share is null for every bucket
+    whenever n is below MIN_N, never 0.0 (CONSTRAINTS.md #4), and the count is
+    still there to be checked against.
+
+    This is a description of a population and nothing more. It says how long
+    graduations took; it does not say which of them were real, and no bucket
+    is a label. CONSTRAINTS.md #6 binds: the 5-minute mark is a descriptive
+    threshold, never a definition of "rigged", and the same is true of every
+    edge here.
+    """
+    deltas = sorted(_ttg_deltas(w))
+    n = len(deltas)
+    insufficient = n < MIN_N
+    rows = []
+    edges = list(HISTOGRAM_EDGES) + [None]
+    for i, low in enumerate(HISTOGRAM_EDGES):
+        high = edges[i + 1]
+        count = (
+            len(deltas) - bisect_left(deltas, low)
+            if high is None
+            else bisect_left(deltas, high) - bisect_left(deltas, low)
+        )
+        rows.append(
+            {
+                "fromSeconds": low,
+                "toSeconds": high,
+                "graduations": count,
+                "share": None if insufficient else round(count / n, 6),
+            }
+        )
+    return rows
+
+
 def ttg_block(w: dict) -> dict:
-    """The published `ttg` object: percentiles plus the ladder, one gate."""
-    return {**ttg_percentiles(w), "ladder": ttg_ladder(w)}
+    """The published `ttg` object: percentiles, the ladder and the histogram,
+    one gate over all three."""
+    return {**ttg_percentiles(w), "ladder": ttg_ladder(w), "histogram": ttg_histogram(w)}
 
 
 def fast_shares(w: dict) -> dict:

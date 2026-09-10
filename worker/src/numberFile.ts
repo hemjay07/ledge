@@ -46,6 +46,19 @@ export interface Ttg {
       before it landed, and the placement then reports itself unavailable
       rather than being derived here. */
   ladder?: LadderStep[];
+  /** The doubling-bucket distribution of graduation times. Optional for the
+      same reason the ladder is: a number.json written before it landed does
+      not carry it, and nothing here derives it. The Worker only ever passes
+      it through -- computing it would be a statistic, which is stats.py's
+      alone. */
+  histogram?: TtgHistogramBucket[];
+}
+
+export interface TtgHistogramBucket {
+  fromSeconds: number;
+  toSeconds: number | null;
+  graduations: number;
+  share: number | null;
 }
 
 /** A row of cohorts.pairTax: pair class crossed with creator-tax bucket.

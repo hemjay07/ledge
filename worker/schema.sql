@@ -119,6 +119,16 @@ CREATE TABLE IF NOT EXISTS activity_unattributed (
   last_seen_at INTEGER
 );
 
+-- The graveyard: launches already announced as having taken zero buys past
+-- the age threshold (worker/src/graveyard.ts). Keyed on the token alone -- a
+-- launch enters the graveyard once, the first time it is observed there, and
+-- is never posted a second time even though it stays in the SELECT that
+-- finds candidates for as long as its activity row survives retention.
+CREATE TABLE IF NOT EXISTS graveyard_posted (
+  token      TEXT PRIMARY KEY,
+  posted_at  INTEGER NOT NULL
+);
+
 -- Single-row cursor. Mirrors data/state.json in spirit, never in authority.
 CREATE TABLE IF NOT EXISTS cursor (
   id                    INTEGER PRIMARY KEY CHECK (id = 1),

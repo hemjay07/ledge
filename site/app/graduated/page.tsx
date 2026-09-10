@@ -5,6 +5,7 @@ import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Footer } from "../../components/Footer";
 import { GraduatedBoard } from "../../components/Graduated";
 import { LedgerEntry } from "../../components/LedgerEntry";
+import { Shape } from "../../components/Shape";
 import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { graduatedFile } from "../../lib/graduated";
@@ -113,11 +114,26 @@ export default function Graduated(): ReactElement {
         </div>
         <ColophonStrip stamp="Graduated · list built at deploy time, no live API" />
 
-        <LedgerEntry folio="02" id="h-ladder" heading="Time to graduate, across the population">
+        {/* The shape before the table. A cumulative ladder answers "how many
+            by 60 seconds"; it cannot show that the record is two populations
+            with a trough between them, and that is the thing worth seeing
+            here. Both are the same measurement drawn two ways, and both come
+            from allTime.ttg, so neither can disagree with the other. */}
+        <LedgerEntry folio="02" id="h-shape" heading="The shape of the record">
+          <p className="note">
+            Every graduation LEDGE holds, by how long it took, in buckets that each roughly double
+            the last. Counted over {formatCount(ttg.n)} graduations. The bars are counts, drawn from
+            zero, and no bucket is a label: this says how long graduations took and nothing about
+            why.
+          </p>
+          <Shape histogram={ttg.histogram} n={ttg.n} insufficient={ttg.insufficient} />
+        </LedgerEntry>
+
+        <LedgerEntry folio="03" id="h-ladder" heading="Time to graduate, across the population">
           <LadderContext />
         </LedgerEntry>
 
-        <LedgerEntry folio="03" id="h-graduated-board" heading="Every graduation">
+        <LedgerEntry folio="04" id="h-graduated-board" heading="Every graduation">
           <ExcludedNote />
           <p className="note note--fine">
             <Age crawledAt={graduatedFile.generatedAt} staleAfterSeconds={graduatedFile.staleAfterSeconds} prefix="list built" />
@@ -125,7 +141,7 @@ export default function Graduated(): ReactElement {
           <GraduatedBoard data={graduatedFile} />
         </LedgerEntry>
 
-        <LedgerEntry folio="04" id="h-graduated-what" heading="What this counts">
+        <LedgerEntry folio="05" id="h-graduated-what" heading="What this counts">
           <p className="lede">
             Time to graduate is one token&rsquo;s own graduation timestamp minus its own launch
             timestamp — a fact about that token, not a rate over the population. The ladder above is

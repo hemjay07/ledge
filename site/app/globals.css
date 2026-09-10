@@ -620,6 +620,21 @@ a:focus-visible,
   width: 100%;
   height: auto;
 }
+/* The shape of the record. Ink, like every other mark on an instrument page:
+   the bars carry no meaning in their colour, and --stale stays the only
+   colour on this site that means anything. */
+.shape {
+  margin: var(--s-4) 0 0;
+}
+.shape svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.shape-bar {
+  fill: var(--ink-2);
+}
+
 .eng-line,
 .eng-tick {
   stroke: var(--rule-mid);

@@ -11,4 +11,9 @@ export interface Env {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   TELEGRAM_HEADER_SECRET?: string;
+  /** Where the graveyard's own bot post is sent. Absent means the tick finds
+      new entries and records nothing posted -- it never falls back to
+      replying into an inbound chat, which would send a stranger's DM a
+      message they did not ask for. */
+  TELEGRAM_GRAVEYARD_CHAT_ID?: string;
 }
