@@ -1440,6 +1440,17 @@ footer {
    whole block. At rest it sits quiet at the accent colour; when it remounts it
    plays once and stops. Readers who have asked not to see motion get the mark
    without the flash, which still reads correctly as a live indicator. */
+/* Separates what a reader browses from how we know it. A rule rather than a
+   heading: it groups the nav without adding two more words to read. */
+.sheet-nav-split {
+  display: inline-block;
+  width: 1px;
+  height: 0.85em;
+  margin: 0 0.35em;
+  background: var(--rule-mid);
+  vertical-align: -0.1em;
+}
+
 .pulse-tick {
   display: inline-block;
   width: 0.4em;
