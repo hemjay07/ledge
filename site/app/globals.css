@@ -1442,6 +1442,13 @@ footer {
    without the flash, which still reads correctly as a live indicator. */
 /* Separates what a reader browses from how we know it. A rule rather than a
    heading: it groups the nav without adding two more words to read. */
+/* The lookup, promoted out of the register and up under the claim. Held to
+   the same measure as the prose so it reads as part of the fold rather than as
+   a control bolted onto it. */
+.lookup-lead {
+  margin: var(--s-5) 0 var(--s-6);
+}
+
 .sheet-nav-split {
   display: inline-block;
   width: 1px;

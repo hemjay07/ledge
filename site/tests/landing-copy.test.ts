@@ -113,14 +113,18 @@ describe("the sheet, without folio numbers", () => {
     expect([...PAGE.matchAll(/folio="(\d{2})"/g)].map((m) => m[1])).toEqual([]);
   });
 
-  it("runs the pulse, the capability, the shape, the paths, then the rate and the lookup", () => {
+  /* The lookup moved above the proof on 2026-09-11. Pasting an address is the
+     only decision this page offers, and it was sitting under a heading halfway
+     down, beneath the chart and the paths. The action now comes before the
+     argument for it. */
+  it("runs the pulse, the capability, the lookup, then the proof, the paths and the rate", () => {
     const order = [
       "<LivePulse",
       'className="capability"',
+      'className="lookup-lead"',
       'className="shape-lead"',
       'className="paths-on"',
       'className="headline-rate"',
-      "h-lookup",
     ].map((marker) => PAGE.indexOf(marker));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));

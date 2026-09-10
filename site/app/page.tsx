@@ -151,6 +151,20 @@ const exFastOneIn =
           </p>
         </div>
 
+        {/* The only decision anyone makes here, so it sits where it can be
+            reached without scrolling.
+
+            It was halfway down the page, under a heading, beneath the proof and
+            the paths. Browsing the board is not a decision and reading the
+            evidence is not a decision; pasting an address to find out whether a
+            specific token has anything behind it is, and it is what a person
+            arriving from a group chat already has in their clipboard. One input
+            costs almost no vertical space, and putting it above the proof puts
+            the action before the argument for it. */}
+        <section className="lookup-lead" id="h-lookup">
+          <Lookup />
+        </section>
+
         <div className="shape-lead">
           <h2 className="kicker">The shape of the record</h2>
           <Shape
@@ -193,10 +207,6 @@ const exFastOneIn =
           </p>
         </section>
         <ColophonStrip stamp={formatStamp(crawledAt)} />
-
-        <LedgerEntry id="h-lookup" heading="One launch" headingNote="· against the published cohorts">
-          <Lookup />
-        </LedgerEntry>
 
         {/* The ~150-word entry this used to be named our own constraints back at a
             reader who does not care what we refuse to do (design critique,
