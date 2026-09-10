@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Cockpit from "../app/cockpit/page";
 import Home from "../app/page";
 import Cohorts from "../app/cohorts/page";
-import { allTime, h24 } from "../lib/number";
+import { ConfigGrid, type GridWindow } from "../components/ConfigGrid";
+import { allTime, h24, numberFile } from "../lib/number";
 import { sameMeasurement } from "../lib/windows";
 import { PAIR_ORDER, TAX_ORDER, pairTaxOrder } from "../lib/rows";
 
@@ -96,11 +97,68 @@ describe("the grid", () => {
 });
 
 describe("a cell the sample cannot support", () => {
-  it("prints its sample size and no percentage", () => {
+  /* The rule under test is a RENDERING rule: a cell the sample cannot support
+     prints its sample size instead of a percentage. It was asserted over
+     whichever live rows happened to be insufficient, plus a guard that at
+     least one existed. That guard turned the rule into a hostage of the
+     crawl: every pairTax cohort has now passed n = 30, the guard failed, and
+     the suite went red without anything being wrong. Data moving is not a
+     regression, and this suite has been broken by live figures before.
+
+     So the rule is now proved against a FROZEN row that is insufficient by
+     construction, which cannot stop being insufficient. The loop over live
+     rows is kept underneath it: while any real cell is under n = 30 it is
+     still checked, and when none are, the frozen case still proves the rule.
+     Strictly more coverage than before, and none of it drifts. */
+  it("prints its sample size and no percentage, on a row that cannot support one", () => {
+    const under30 = {
+      bucket: "eth/4-5%",
+      pairClass: "eth",
+      taxBucket: "4–5%",
+      launches: 12,
+      graduations: 0,
+      rate: null,
+      insufficient: true,
+      excludingFast: {
+        cutoffSeconds: 300,
+        graduations: 0,
+        rate: null,
+        oneIn: null,
+        insufficient: true,
+      },
+    };
+    const frozen: GridWindow = {
+      key: "all",
+      label: "all-time",
+      folio: "04",
+      heading: "All-time",
+      headingNote: "· all-time · n = 12 launches",
+      caption: "A frozen cell under n = 30.",
+      ariaLabel: "A frozen cell under n = 30",
+      note: null,
+      rows: [under30],
+      total: {
+        launches: 12,
+        graduations: 0,
+        rate: null,
+        insufficient: true,
+        excludingFast: { graduations: 0, rate: null, oneIn: null, insufficient: true },
+      },
+    };
+    const frozenRender = render(
+      <ConfigGrid folio="04" windows={[frozen]} crawledAt={numberFile.crawledAt} />,
+    );
+    const cell = frozenRender.container.querySelector(
+      '[data-stat="pairtax-rate-all-eth/4-5%"]',
+    ) as HTMLElement | null;
+    expect(cell).not.toBeNull();
+    expect(plain(cell)).toBe("not enough data (n=12)");
+    expect(plain(cell)).not.toContain("%");
+    expect(cell?.dataset.insufficient).toBe("true");
+    cleanup();
+
     const { container } = render(<Cockpit />);
     const insufficient = allTime.cohorts.pairTax.filter((r) => r.insufficient);
-    // the honest state of the measurement, not a gap: assert there are some
-    expect(insufficient.length).toBeGreaterThan(0);
 
     for (const row of insufficient) {
       const el = container.querySelector(

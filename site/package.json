@@ -7,7 +7,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "prebuild": "node scripts/copy-number.mjs && node scripts/og.mjs",
+    "prebuild": "node scripts/copy-number.mjs && node scripts/generate-graduated.mjs && node scripts/og.mjs",
+    "pretest": "node scripts/generate-graduated.mjs",
+    "predev": "node scripts/generate-graduated.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "npx serve out",
