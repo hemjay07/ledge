@@ -40,26 +40,89 @@ Form fields for ponsfamily.com/launchpad/create. Copy exactly; the copy has been
 
 ## What the token is
 
-Patronage for a public instrument. The tool is free and complete without it.
-Holders get nothing financial: no yield, no revenue share, no lock-up, no
-promise.
+The operator who will launch this said, on 2026-09-10, that it matters more than
+anything else: *"its very important to give the token utility a reason to buy the
+token if the token is detached from the project the token will be useless."* Four
+independent assessments the same day reached the identical conclusion without
+conferring. So this section is the answer to that, and it starts with the part
+nobody wants to say.
 
-That is the honest position and it is also, on the evidence of 2026-09-10, the
-weakest part of this launch. Four assessors independently called it the
-critical defect: a reader is given no reason to hold. The reference case, CHIT,
-earned roughly 5 ETH with an unshipped testnet prototype and a token its own
-documentation never mentions. What it had was a sentence a reader repeats and a
-founder present in a room.
+### The thing that has to be said first
 
-The one thing that can honestly be attached is speed, not access: the room hears
-each graduation and its duration as it lands, because the bot posts it. That is
-a fact arriving early, not a signal and not advice, so it survives CONSTRAINTS 1.
-CONSTRAINTS 8 is not in the way either: it forbids gating the SITE behind a
-wallet or an account, and every figure stays free and unkeyed at ledge.tools. A
-Telegram room is not the site.
+**There is no honest utility for a free public statistics site's token that does
+not either gate the statistics or promise a return.** Gating is out: CONSTRAINTS 8
+says never require a wallet or an account to see anything, and `/number.json`
+stays public and unkeyed, because an instrument that checks your wallet before it
+answers is not a public instrument. Promising a return is out too, and for a
+harder reason than taste: revenue share, yield and buybacks are the shape of a
+security, and a solo developer in Nigeria promising them to strangers on a US
+company's launchpad is not a risk worth taking for any amount of volume.
 
-Not built yet. Until it is, the token is patronage, and saying otherwise in the
-description would be the promise this file exists to avoid.
+Everything below is written against that wall rather than pretending it is not
+there. Anyone who tells you a tool token has utility without a gate or a promise
+is describing one of the two and hoping you do not look.
+
+### 1. The token is the subject, not a fee on the subject
+
+LEDGE has measured 108,000 launches. Then it launches one.
+
+Every reading this site takes of another launch, it takes of itself, in public,
+from the same indexer, with no special treatment: its own curve fill against its
+own threshold, its own buys and sells, its own distinct buyers in its own launch
+block, its own time to graduation, and its own creator fees as they accrue. The
+machinery already exists — `/t/{address}` renders exactly this for any token, and
+LEDGE's own address is just another argument to it.
+
+That is the reason to hold that survives contact with the wall above. It is not
+access and it is not a promise. It is that this is the only token on the venue
+whose complete launch telemetry is published, as it happens, by the instrument
+that measures the venue — including the parts that look bad. If LEDGE graduates in
+eight seconds with two distinct buyers, the site says so on its own front page,
+under the same definitions it applies to everyone else.
+
+That claim is worth something precisely because it can go wrong in public, and
+nobody else can make it.
+
+### 2. The room hears it as it lands
+
+The bot posts each reading to the holders' room as the tick produces it: a
+graduation and how long it took, a launch entering the graveyard, a curve taking
+its first buys from many distinct wallets in its own block.
+
+Be precise about what this is worth, because overselling it is how this becomes a
+signal service. Every one of those facts is on the site, free, unkeyed, seconds
+later. The edge is attention, not information: someone watching the site sees the
+same thing. What the room gets is that it arrives without being watched for.
+
+CONSTRAINTS 8 is untouched — it constrains the site, and a Telegram room is not
+the site. CONSTRAINTS 1 is the one to keep watching: a fact broadcast quickly is
+still a fact, and it stays on the right side of the line only for as long as the
+message says what happened and never what it means or what to do. "Graduated in
+8 s, 2 distinct buyers in its launch block" is a reading. "Worth a look" is a
+signal, and the day the bot says it, this project is a different and worse thing.
+
+### 3. Holders decide what gets measured next
+
+The smallest of the three and the most real. What the index covers next — another
+venue, another chain, a cohort nobody has cut — is put to the room. It is
+governance over the roadmap, not over the numbers: no vote can change a
+definition, move a threshold, or unpublish a finding, because those are settled
+by CONSTRAINTS 9 and the recompute gate, and a token that could vote a bad number
+away would make every good number worthless.
+
+### What holders still do not get
+
+No yield. No revenue share. No buyback. No airdrop. No early or exclusive access
+to any figure. No say over any published number. The tool is free and complete
+without the token, and it stays that way.
+
+### Status
+
+Section 1 needs LEDGE's own address, which does not exist until launch. Section 2
+needs `TELEGRAM_BOT_TOKEN` and a room. Section 3 needs a room. None of the three
+may be claimed in the token description or anywhere else until it is actually
+running: an unbuilt promise in the one line every buyer reads is exactly the
+defect this file exists to prevent.
 
 ## First post (X or Telegram), with the card link
 
