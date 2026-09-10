@@ -654,6 +654,15 @@ a:focus-visible,
   width: 100%;
   height: auto;
 }
+/* The minor tier of bucket labels. Hidden where the drawing is rendered small
+   and the type is stepped up, because seven labels across a 390px screen run
+   into one another. The major tier, every fourth edge, always shows. */
+@media (max-width: 40rem) {
+  .shape-tick--minor {
+    display: none;
+  }
+}
+
 .shape-bar {
   fill: var(--fill);
 }

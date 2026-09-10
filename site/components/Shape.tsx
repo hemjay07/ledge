@@ -30,8 +30,8 @@ const W = 639;
 const BASE_Y = 210;
 const TOP_Y = 30;
 const LABEL_Y = BASE_Y + 20;
-const AXIS_CAPTION_Y = BASE_Y + 46;
-const VIEWBOX_H = BASE_Y + 88;
+const AXIS_CAPTION_Y = BASE_Y + 56;
+const VIEWBOX_H = BASE_Y + 98;
 
 /** The tick label under a bucket: its lower edge, which is where it starts. */
 function edgeLabel(seconds: number): string {
@@ -110,12 +110,24 @@ export function Shape({
           strokeWidth="1"
         />
 
-        {/* Every other bucket's lower edge, so the labels clear each other at
-            390px where the type is stepped up. */}
+        {/* Bucket edges, on two tiers.
+
+            Every other edge was labelled, which reads well at full width and
+            collides into "5 MIN21 MI1NH 25 MIN" at 390px, where the sheet draws
+            this at about half its viewBox width and the stylesheet steps the
+            type up to keep it legible. So every fourth edge is a major label
+            that always shows, and the ones between are minors the stylesheet
+            hides on a narrow screen. Four labels across is legible on a phone;
+            seven is not. */}
         <g className="eng-text" textAnchor="middle">
           {histogram.map((bucket, i) =>
             i % 2 === 0 ? (
-              <text key={bucket.fromSeconds} x={X0 + i * slot + slot / 2} y={LABEL_Y}>
+              <text
+                key={bucket.fromSeconds}
+                x={X0 + i * slot + slot / 2}
+                y={LABEL_Y}
+                className={i % 4 === 0 ? "shape-tick" : "shape-tick shape-tick--minor"}
+              >
                 {edgeLabel(bucket.fromSeconds)}
               </text>
             ) : null,
