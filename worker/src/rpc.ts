@@ -25,6 +25,42 @@ export const LOG_WINDOW_BLOCKS = 1000;
    rather than being spelled around. */
 export const USER_AGENT = "ledge/1.0 (+https://ledge-alpha.vercel.app)"; // lint-copy:allow — a User-Agent, not copy
 const RETRYABLE_HTTP = new Set([408, 429, 500, 502, 503, 504]);
+
+/* JSON-RPC error codes that mean "ask again", rather than "this is broken".
+
+   These arrive inside a perfectly valid HTTP 200 whose body is a well-formed
+   JSON-RPC response carrying an `error` member, so nothing above the JSON layer
+   can see them. On 2026-09-10 the live indexer failed 117 times in a row, for
+   about five and a half hours, on a single one of these: -32005, "the network
+   is busy, please try again in a moment". Every one of those failures was
+   transient and every one was treated as fatal.
+
+   This is the third time this envelope has bitten in the same way -- a 403 on
+   the default user agent, a 429 delivered as an object where an array was
+   asked for, and now a retryable condition signalled one layer below where the
+   retry was looking. The lesson each time is the same: this endpoint reports
+   trouble at whatever layer it feels like, so the retry has to read all of
+   them.
+
+   -32005 is "limit exceeded" in the JSON-RPC error space and is what this
+   endpoint uses for load shedding. -32603 is "internal error", sometimes
+   permanent and sometimes not; it is included because retrying a permanent one
+   costs a few seconds, and not retrying a transient one costs the whole tick. */
+const RETRYABLE_RPC_CODES = new Set([-32005, -32603]);
+
+/** True when a JSON-RPC response carries an error worth asking again about.
+    Accepts a single response object or a batch array, because both shapes
+    reach this. */
+export function hasRetryableRpcError(response: unknown): boolean {
+  const items = Array.isArray(response) ? response : [response];
+  for (const item of items) {
+    if (typeof item !== "object" || item === null) continue;
+    const error = (item as { error?: { code?: unknown } }).error;
+    if (typeof error !== "object" || error === null) continue;
+    if (typeof error.code === "number" && RETRYABLE_RPC_CODES.has(error.code)) return true;
+  }
+  return false;
+}
 const MAX_RETRIES = 4;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 8000;
@@ -166,6 +202,19 @@ export class RpcClient {
     let delay = BACKOFF_BASE_MS;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       const response = await transport(payload);
+      /* A retryable condition signalled inside a valid response, rather than
+         by the HTTP status. Checked before `validate`, because a body carrying
+         an error member has no `result` to validate and would otherwise be
+         thrown away as malformed or handed to a caller that reads it as "no
+         result" and gives up. */
+      if (hasRetryableRpcError(response)) {
+        if (attempt === MAX_RETRIES - 1) {
+          throw new RpcUnavailable(`rpc: gave up after retryable error: ${JSON.stringify(response).slice(0, 200)}`);
+        }
+        await sleep(delay);
+        delay = Math.min(delay * 2, BACKOFF_CAP_MS);
+        continue;
+      }
       if (isFault(response)) {
         if (response.code === 429) this.rateLimitSeen = true;
         if (attempt === MAX_RETRIES - 1) {

@@ -307,13 +307,16 @@ async function handleShell(env: Env, address: string, nowMs: number): Promise<Re
     });
   }
   const title = headline(outcome.body, outcome.observedMaxSeconds);
-  return new Response(tokenShell(outcome.body, outcome.text, title, env.SITE_ORIGIN), {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=60",
-      ...CORS,
+  return new Response(
+    tokenShell(outcome.body, outcome.text, title, env.SITE_ORIGIN, outcome.observedMaxSeconds),
+    {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=60",
+        ...CORS,
+      },
     },
-  });
+  );
 }
 
 async function handleCard(env: Env, address: string, nowMs: number): Promise<Response> {
