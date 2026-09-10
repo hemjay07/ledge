@@ -71,6 +71,29 @@ export const REORG_OVERLAP_BLOCKS = BLOCKS_PER_TICK * 2;
     batches, one KV read -- about 21, leaving room for the fallback endpoint
     to double a failed call. Catching up from an hour behind takes ~20 ticks. */
 export const MAX_CATCHUP_BLOCKS = BLOCKS_PER_TICK * 3;
+/** The gap past which catching up is not worth attempting, so the cursor jumps
+    to the head instead and says it did.
+
+    Catch-up nets MAX_CATCHUP_BLOCKS minus one tick of chain per minute, which
+    is 1,200 blocks a minute here. A gap of this size therefore takes about
+    eight hours of unbroken ticking to close, and every minute of that serves a
+    "live" board showing hours-old data.
+
+    On 2026-09-10 the indexer stalled and was found 2.95 MILLION blocks behind,
+    about 83 hours. Closing that would have taken 41 hours of flawless ticking,
+    during which the live layer would have been useless. Nothing in the code
+    noticed; it ground away at 1,800 blocks a minute against a chain producing
+    594, and only a manual check found it.
+
+    Jumping is the right answer and it costs nothing that matters. **D1 is
+    canonical for nothing.** The launch and graduation record lives in the repo
+    and is rebuilt hourly by the Python pipeline, which has its own backfill for
+    exactly this. The Worker's job is the LIVE layer, and a live layer that is
+    three days behind is not a degraded live layer, it is a broken one.
+
+    The skipped range is recorded on the cursor rather than passed over in
+    silence, so `/api/health` can say a gap was skipped and how big it was. */
+export const MAX_RECOVERABLE_GAP = 600_000;
 /** How many `eth_getLogs` subrequests one tick may spend. The rest of the
     Worker's allowance goes to block headers, the factory view and KV. */
 export const LOG_SUBREQUEST_BUDGET = 20;
@@ -419,6 +442,30 @@ export async function tick(
         .bind(start, nowSeconds, nowSeconds)
         .run();
       return { ok: true, from: start, to: start, launches: 0, graduations: 0 };
+    }
+
+    /* Hopelessly behind: jump rather than grind. See MAX_RECOVERABLE_GAP. */
+    const gap = head - cursor.last_indexed_block;
+    if (gap > MAX_RECOVERABLE_GAP) {
+      const resumeFrom = Math.max(0, head - COLD_START_BLOCKS);
+      await db
+        .prepare(
+          "UPDATE cursor SET last_indexed_block = ?, skipped_from = ?, skipped_to = ?, consecutive_failures = 0, last_error = ? WHERE id = 1",
+        )
+        .bind(
+          resumeFrom,
+          cursor.last_indexed_block,
+          resumeFrom,
+          `skipped ${gap} blocks to rejoin the head; the repo record is canonical and unaffected`,
+        )
+        .run();
+      return {
+        ok: true,
+        from: cursor.last_indexed_block,
+        to: resumeFrom,
+        launches: 0,
+        graduations: 0,
+      };
     }
 
     from = Math.max(0, cursor.last_indexed_block + 1 - REORG_OVERLAP_BLOCKS);

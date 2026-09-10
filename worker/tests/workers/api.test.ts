@@ -443,7 +443,9 @@ describe("GET /api/live", () => {
   it("declares itself stale when the tick has failed since its last success", async () => {
     const now = Math.floor(Date.now() / 1000);
     await env.LEDGE_DB.prepare(
-      `INSERT OR REPLACE INTO cursor VALUES (1, 56172588, ?, ?, 2, 'an outage')`,
+      `INSERT OR REPLACE INTO cursor
+         (id, last_indexed_block, last_tick_at, last_success_at, consecutive_failures, last_error)
+       VALUES (1, 56172588, ?, ?, 2, 'an outage')`,
     )
       .bind(now, now - 10)
       .run();

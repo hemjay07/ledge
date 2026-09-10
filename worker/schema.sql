@@ -130,13 +130,20 @@ CREATE TABLE IF NOT EXISTS graveyard_posted (
 );
 
 -- Single-row cursor. Mirrors data/state.json in spirit, never in authority.
+-- `skipped_from`/`skipped_to` record a range the indexer jumped rather than
+-- indexed, which happens when it falls further behind than catching up could
+-- ever close (tick.ts MAX_RECOVERABLE_GAP). Recorded rather than passed over
+-- in silence: the repo's own record covers the range, and a live layer that
+-- quietly has a hole in it is worse than one that says where the hole is.
 CREATE TABLE IF NOT EXISTS cursor (
   id                    INTEGER PRIMARY KEY CHECK (id = 1),
   last_indexed_block    INTEGER NOT NULL,
   last_tick_at          INTEGER NOT NULL,
   last_success_at       INTEGER NOT NULL,
   consecutive_failures  INTEGER NOT NULL DEFAULT 0,
-  last_error            TEXT
+  last_error            TEXT,
+  skipped_from          INTEGER,
+  skipped_to            INTEGER
 );
 
 -- Telegram abuse counters. Bucketed by hour so eviction is a range delete.

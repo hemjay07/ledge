@@ -1,7 +1,16 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { RpcClient } from "../../src/rpc";
-import { MAX_CATCHUP_BLOCKS, REORG_OVERLAP_BLOCKS, RETENTION_SECONDS, dedupeLogs, logWindows, tick } from "../../src/tick";
+import {
+  BLOCKS_PER_TICK,
+  MAX_CATCHUP_BLOCKS,
+  MAX_RECOVERABLE_GAP,
+  REORG_OVERLAP_BLOCKS,
+  RETENTION_SECONDS,
+  dedupeLogs,
+  logWindows,
+  tick,
+} from "../../src/tick";
 import { TOPIC_TOKEN_LAUNCHED, TOPIC_POOL_GRADUATED, TOPIC_CURVE_BUY, TOPIC_CURVE_SELL } from "../../src/pons";
 import { reset, seedCursor } from "./setup";
 
@@ -253,7 +262,9 @@ describe("the tick", () => {
 
   it("clears the failure count on the next pass that succeeds", async () => {
     await env.LEDGE_DB.prepare(
-      `INSERT OR REPLACE INTO cursor VALUES (1, 1000, ?, ?, 3, 'earlier outage')`,
+      `INSERT OR REPLACE INTO cursor
+         (id, last_indexed_block, last_tick_at, last_success_at, consecutive_failures, last_error)
+       VALUES (1, 1000, ?, ?, 3, 'earlier outage')`,
     )
       .bind(NOW, NOW - 600)
       .run();
@@ -284,9 +295,37 @@ describe("the tick", () => {
 
   it("bounds the catch-up after an outage rather than blowing the budget", async () => {
     await seedCursor(1000, NOW);
-    const { client } = fakeChain({ head: 900_000, launches: [], graduations: [] });
+    /* A gap inside MAX_RECOVERABLE_GAP, so this exercises bounding rather than
+       the skip below. It used to use a head of 900,000, which is now past the
+       point where catching up is worth attempting. */
+    const { client } = fakeChain({ head: 400_000, launches: [], graduations: [] });
     const result = await tick(env, NOW, client);
     expect(result.to).toBe(1000 + MAX_CATCHUP_BLOCKS);
+  }, 60_000);
+
+  /* Found in production on 2026-09-10: the indexer had fallen 2.95 million
+     blocks behind, about 83 hours, and was grinding at 1,800 blocks a minute
+     against a chain producing 594. Closing it would have taken 41 hours of
+     flawless ticking, serving a "live" board three days stale throughout, and
+     nothing in the code noticed. */
+  it("jumps to the head rather than grinding when it is hopelessly behind", async () => {
+    await seedCursor(1000, NOW);
+    const head = 1000 + MAX_RECOVERABLE_GAP + 50_000;
+    const { client } = fakeChain({ head, launches: [], graduations: [] });
+    const result = await tick(env, NOW, client);
+
+    expect(result.ok).toBe(true);
+    // rejoined the head rather than advancing one bounded window
+    expect(result.to).toBeGreaterThan(1000 + MAX_CATCHUP_BLOCKS);
+    expect(result.to).toBeGreaterThanOrEqual(head - BLOCKS_PER_TICK);
+
+    // and said so, rather than passing the gap over in silence
+    const row = await env.LEDGE_DB.prepare(
+      "SELECT last_indexed_block, skipped_from, skipped_to, last_error FROM cursor WHERE id = 1",
+    ).first<{ last_indexed_block: number; skipped_from: number; skipped_to: number; last_error: string }>();
+    expect(row?.skipped_from).toBe(1000);
+    expect(row?.skipped_to).toBe(row?.last_indexed_block);
+    expect(row?.last_error).toContain("skipped");
   }, 60_000);
 
 });
