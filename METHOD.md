@@ -76,6 +76,18 @@ The marks are a definition. They exist so that anything asking "where does this 
 
 ## Changelog of definitions
 
+- 2026-09-10 — **what a graduation completing in under a second can and cannot tell you.** No figure changed; this entry constrains how the published ones may be read, including by us.
+
+  Blocks on this chain arrive about every 0.101 seconds, measured across the whole indexed record. So a graduation recorded at zero seconds after its launch is not necessarily in the same block as that launch: of 102 such graduations, 18 are in the launch's own block, 54 are one block later and 21 are two blocks later. "Zero seconds" means within one second, which here is roughly ten blocks.
+
+  What that supports: no person saw the launch, decided to buy, and acted. One second is below human reaction time, and a curve that fills in that window filled without anyone discovering it.
+
+  **What it does not support, and the site does not claim:** that the deployer filled their own curve. A sub-second fill is equally consistent with an automated buyer watching for `TokenLaunched` and acting on it, which is not the deployer and is not coordination — it is a bot doing on this venue what bots do on every venue. Distinguishing the two needs the buyers' identities, and CONSTRAINTS 2 forbids printing a wallet as a subject, so this site will not be the thing that distinguishes them.
+
+  This is why every published surface states the duration and stops. The word "self-filled" does not appear on the site, no bucket is labelled, and the 5-minute mark stays a descriptive threshold under CONSTRAINTS 6. A reader may conclude what they like from eight seconds; the measurement supports "nobody discovered this in time to buy it", and it does not support "the deployer bought it".
+
+  Recorded because the temptation to say the stronger thing is the standing risk of this project, and because an earlier internal framing did say it.
+
 - 2026-09-10 — **a published finding has partially reversed, and this entry is the reversal.** No definition changed; the data moved.
 
   On 2026-09-07 the front page stated that, once graduations completed inside five minutes are excluded, the pair token makes no difference. On the record as it stood that was right, and it was the correction of an earlier artifact: the raw rates differed by pair while the organic rates did not.

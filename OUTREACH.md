@@ -10,7 +10,7 @@ The old version of this file led with the exposé — 62.9% of graduations compl
 
 The lead is now the thing they can actually use. `ponsfamily.com/analytics` renders "$0" trading volume and "0" token launches, with the note "Dune history is unavailable." A launchpad with a $551.6M-FDV token and roughly $35M of daily volume is shipping a dead statistics tab. We hold 108,317 launches and 1,932 graduations, indexed hourly from the factory contract and reproducible from public data. That is a replacement for something visibly broken, not a favour.
 
-The self-fill finding does not disappear. It stays published on `/method`, where it belongs — as the reason the rate excluding fast graduations is 0.66% rather than 1.78%, and as the empirical proof of a caveat pons wrote themselves: *"Graduation only confirms the threshold was reached. It is not a quality signal and does not guarantee future liquidity, price, or an exit."* Their words. We measured them.
+The fast-graduation finding does not disappear. It stays published on `/method`, where it belongs — as the reason the rate excluding fast graduations is 0.66% rather than 1.78%, and as the measured reason, and as evidence for a caveat pons wrote themselves: *"Graduation only confirms the threshold was reached. It is not a quality signal and does not guarantee future liquidity, price, or an exit."* Their words. We measured them.
 
 ## Rules for every message
 
