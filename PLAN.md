@@ -80,6 +80,8 @@ for what he had in mind.
 
 ## Phase 1 — the site does its new job (days, not weeks)
 
+**Planned in full in `REVAMP.md`.** The order changed on 2026-09-11 to site, token, agent, which means the site is now the entire thing anyone buys at launch rather than a warm-up. Summary below; the detail, the DONE criteria and the ordering are in that file.
+
 The site's job changed. It used to be "publish an honest number". It is now
 **"show a person what is happening, and show them what they could have an agent
 watch for"**. That is a real information architecture, which is why the revamp
