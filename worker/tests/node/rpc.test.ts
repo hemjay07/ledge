@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { MalformedBatchResponse, RpcClient, USER_AGENT, indexBatchResponse, isRateLimited } from "../../src/rpc";
+import {
+  MalformedBatchResponse,
+  RpcClient,
+  RpcUnavailable,
+  USER_AGENT,
+  indexBatchResponse,
+  isRateLimited,
+  type Transport,
+} from "../../src/rpc";
 
 /* The envelope pipeline/rpc.py proved. Anything here that changes changes the
    shared assumption both indexers rest on. */
@@ -81,4 +89,57 @@ describe("fallback endpoint", () => {
     await expect(client.getHeadBlock()).rejects.toBeInstanceOf(RpcUnavailable);
     expect(fallbackCalls).toBe(1);
   });
+});
+
+/* The subrequest budget. A Worker invocation on the free plan may issue 50
+   subrequests and every attempt and every fallback costs one. On 2026-09-10
+   the indexer failed with "Too many subrequests by single Worker invocation"
+   because retrying a busy RPC multiplied 13 logical calls into more than 50
+   network calls. The budget makes the client refuse rather than abort the
+   invocation mid-tick, so the tick fails at a decision point and the cron
+   retries a minute later. */
+describe("the subrequest budget", () => {
+  /* These exercise the real backoff, so they carry their own timeout and use
+     small budgets: every extra attempt is another real second of sleep. */
+  const busyTransport = (counter: { n: number }): Transport => async () => {
+    counter.n += 1;
+    return [{ jsonrpc: "2.0", id: 0, error: { code: -32005, message: "the network is busy" } }];
+  };
+
+  it(
+    "refuses a further call once the budget is spent, rather than blowing the limit",
+    async () => {
+      const counter = { n: 0 };
+      // budget 2, below MAX_RETRIES: the loop would otherwise keep attempting
+      const client = new RpcClient(
+        "https://example.invalid",
+        busyTransport(counter),
+        undefined,
+        undefined,
+        2,
+      );
+      await expect(client.getLogs(1, 2, "0xfactory", "0xtopic")).rejects.toThrow(RpcUnavailable);
+      expect(counter.n).toBe(2);
+      expect(client.subrequests).toBe(2);
+    },
+    20_000,
+  );
+
+  it(
+    "counts every attempt, so a retry is not free",
+    async () => {
+      const counter = { n: 0 };
+      const client = new RpcClient(
+        "https://example.invalid",
+        busyTransport(counter),
+        undefined,
+        undefined,
+        3,
+      );
+      await expect(client.getLogs(1, 2, "0xfactory", "0xtopic")).rejects.toThrow(RpcUnavailable);
+      expect(client.subrequests).toBe(counter.n);
+      expect(client.subrequests).toBeGreaterThan(1);
+    },
+    20_000,
+  );
 });

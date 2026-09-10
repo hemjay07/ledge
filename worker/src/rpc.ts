@@ -62,6 +62,27 @@ export function hasRetryableRpcError(response: unknown): boolean {
   return false;
 }
 const MAX_RETRIES = 4;
+
+/* How many network calls one RpcClient may make before it refuses to make
+   another.
+
+   A Worker invocation on the free plan may issue 50 subrequests, and every
+   attempt and every fallback counts as one. The tick makes about 13 logical
+   calls; at MAX_RETRIES = 4 with a fallback transport behind it, one logical
+   call can cost 8, and 13 of those is 104. On 2026-09-10 that is exactly what
+   happened: making retries handle a busy RPC turned a clean failure into
+   "Too many subrequests by single Worker invocation", which is a worse failure
+   because it aborts mid-tick rather than at a decision point.
+
+   So the budget is enforced here rather than assumed by the caller. When it is
+   gone the client raises RpcUnavailable, the tick fails cleanly and commits
+   nothing, and the cron tries again in sixty seconds.
+
+   That is the shape this wants: **the cron is the outer retry loop.** A Worker
+   running every minute need not fight for a result inside one invocation, and
+   the budget spent fighting is the budget the rest of the tick needs. 40 leaves
+   headroom under the 50 for everything else an invocation does. */
+const SUBREQUEST_BUDGET = 40;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 8000;
 const TIMEOUT_MS = 20_000;
@@ -177,9 +198,30 @@ export class RpcClient {
       a fallback keeps a lookup honest-but-answered instead of rpc_down. */
   private readonly fallback: Transport | null;
 
-  constructor(url: string, transport?: Transport, fallbackUrl?: string, fallbackTransport?: Transport) {
+  /** Network calls made by this client, against SUBREQUEST_BUDGET. Public so a
+      caller can see what a pass cost, and so a test can pin it. */
+  subrequests = 0;
+
+  constructor(
+    url: string,
+    transport?: Transport,
+    fallbackUrl?: string,
+    fallbackTransport?: Transport,
+    private readonly budget: number = SUBREQUEST_BUDGET,
+  ) {
     this.transport = transport ?? httpTransport(url);
     this.fallback = fallbackTransport ?? (fallbackUrl && fallbackUrl !== url ? httpTransport(fallbackUrl) : null);
+  }
+
+  /** Spend one subrequest, or refuse. Called before every network attempt,
+      including retries and the fallback, because all three cost the same. */
+  private spend(): void {
+    if (this.subrequests >= this.budget) {
+      throw new RpcUnavailable(
+        `rpc: subrequest budget spent (${this.budget}); the next tick resumes`,
+      );
+    }
+    this.subrequests += 1;
   }
 
   private async sendWithRetry(
@@ -201,6 +243,7 @@ export class RpcClient {
   ): Promise<unknown> {
     let delay = BACKOFF_BASE_MS;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      this.spend();
       const response = await transport(payload);
       /* A retryable condition signalled inside a valid response, rather than
          by the HTTP status. Checked before `validate`, because a body carrying
