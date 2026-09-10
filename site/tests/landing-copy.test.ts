@@ -71,25 +71,16 @@ const BANNED = [
   "ape",
 ];
 
+/* The visual pass of 2026-09-10 cut the ~150-word "What this is" entry to one
+   line linking to /method: a trader does not care what we refuse to do, and
+   naming our own constraints back at the reader was exactly the essay this
+   pass exists to remove. The assertions that pinned the withdrawn copy's own
+   wording (what it said it measures, the never-list phrasing, the gap
+   sentence) are removed with it -- that copy no longer exists to check. The
+   assertions that guard a CONSTRAINT rather than a sentence (banned words,
+   no emoji, no-verdict) carry forward unchanged onto the one line that
+   replaced it. */
 describe("the What this is entry", () => {
-  it("says what LEDGE measures and how it measures it", () => {
-    expect(WHAT_THIS_IS).toContain("reads the Pons factory contract every hour");
-    expect(WHAT_THIS_IS).toContain("counts how many graduated");
-    expect(WHAT_THIS_IS).toContain("the number of launches it was counted from");
-  });
-
-  it("states the never-list, three items, plainly", () => {
-    expect(WHAT_THIS_IS).toContain("never rank a token");
-    expect(WHAT_THIS_IS).toContain("never name a wallet");
-    expect(WHAT_THIS_IS).toContain("never print a rate without its denominator");
-  });
-
-  it("states the gap as a fact, not as a claim about LEDGE", () => {
-    expect(WHAT_THIS_IS).toContain(
-      "No public tool publishes the graduation rate of launches by configuration; this does.",
-    );
-  });
-
   it("passes the banned-words list", () => {
     const lower = WHAT_THIS_IS.toLowerCase();
     for (const banned of BANNED) {

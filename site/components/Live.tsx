@@ -114,8 +114,7 @@ export function LivePulse(): ReactElement {
   if (result !== null && result.kind === "error") {
     return (
       <p className="pulse-quiet">
-        The live count is not reachable right now. Every figure below is from the last
-        indexed measurement and is unaffected.
+        The live count is not reachable right now — everything below is unaffected.
       </p>
     );
   }
@@ -145,6 +144,14 @@ export function LivePulse(): ReactElement {
           <span className="mono is-stale">the live index has not run recently</span>
         ) : (
           <>
+            {/* The one piece of motion on this block, and it carries
+                information rather than decorating a number: the key is the
+                measurement's own timestamp, so React remounts this span and
+                replays its animation exactly when a fetch lands with newer
+                data, and not otherwise. A reader watching sees the tick and
+                knows something arrived. Nothing animates while nothing is
+                happening. Purely decorative, so it is aria-hidden. */}
+            <span key={body.observedAt} className="pulse-tick" aria-hidden="true" />
             as of <span className="mono">{formatAge(ageSeconds)}</span> ago · updates every 15s
           </>
         )}
@@ -265,15 +272,6 @@ export function LiveBoardFull(): ReactElement {
 
       {body !== null ? (
         <>
-          <p className="note note--fine">
-            {formatCount(body.count)} tokens with activity in this window · sorted by{" "}
-            {SORT_LABEL[body.sortedBy]}
-            {" · "}
-            <span className={body.live.stale ? "mono is-stale" : "mono"}>
-              observed {formatAge(Math.max(0, Math.round((Date.now() - Date.parse(body.observedAt)) / 1000)))} ago
-            </span>
-          </p>
-          {stalenessNote(body)}
           <div className="scroller" tabIndex={0} role="group" aria-label="Every curve with activity, sortable">
             <table>
               <caption>
@@ -322,6 +320,15 @@ export function LiveBoardFull(): ReactElement {
               </tbody>
             </table>
           </div>
+          <p className="note note--fine">
+            {formatCount(body.count)} tokens with activity in this window · sorted by{" "}
+            {SORT_LABEL[body.sortedBy]}
+            {" · "}
+            <span className={body.live.stale ? "mono is-stale" : "mono"}>
+              observed {formatAge(Math.max(0, Math.round((Date.now() - Date.parse(body.observedAt)) / 1000)))} ago
+            </span>
+          </p>
+          {stalenessNote(body)}
           {body.rows.length === 0 ? (
             <p className="note note--fine">No launch has activity in the indexed window.</p>
           ) : null}

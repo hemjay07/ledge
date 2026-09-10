@@ -198,19 +198,13 @@ const exFastOneIn =
           <Lookup />
         </LedgerEntry>
 
+        {/* The ~150-word entry this used to be named our own constraints back at a
+            reader who does not care what we refuse to do (design critique,
+            2026-09-10). What it measures and how is one line, linked, on
+            /method instead. */}
         <LedgerEntry id="h-what" heading="What this is">
-          <p className="lede">
-            LEDGE reads the Pons factory contract every hour, records every launch it finds, and
-            counts how many graduated — in the last 24 hours and over the indexed record, split by
-            pair token and by creator tax. Every figure on this page is printed with the number of
-            launches it was counted from.
-          </p>
           <p className="note">
-            It will never rank a token, never name a wallet, and never print a rate without its
-            denominator.
-          </p>
-          <p className="note">
-            No public tool publishes the graduation rate of launches by configuration; this does.
+            How LEDGE measures every figure here is on <Link href="/method">the method page</Link>.
           </p>
         </LedgerEntry>
 
