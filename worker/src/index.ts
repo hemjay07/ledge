@@ -12,7 +12,7 @@ import { tokenShell } from "./html";
 import { headline } from "./text";
 import { numberText } from "./text";
 import { tokenResponseSchema, liveResponseSchema, SCHEMA_VERSION, type ErrorCode } from "./schema";
-import { loadNumber, KV_NUMBER } from "./numberFile";
+import { loadNumber, loadPairTokens, KV_NUMBER } from "./numberFile";
 import { liveStale, type CursorRow } from "./lookup";
 import { BOARD_QUERY, BOARD_SORT_KEYS, buildBoardRows, isBoardSortKey, type BoardDbRow } from "./board";
 import { ageSeconds, formatAge, normaliseAddress, toIso } from "./format";
@@ -132,15 +132,22 @@ async function handleLive(env: Env, nowMs: number, url: URL): Promise<Response> 
     );
   }
 
-  const [rowsResult, cursorResult] = await env.LEDGE_DB.batch([
+  /* The pair-token map, for units only: it is already in KV and already read
+     once a minute by the tick, and it lets a row say "4.2 ETH" instead of
+     4200000000000000000. No decimals() call per row -- 121 rows could never
+     afford one, and decimals.ts forbids guessing the exponent. */
+  const [[rowsResult, cursorResult], pairTokens] = await Promise.all([
+    env.LEDGE_DB.batch([
     env.LEDGE_DB.prepare(BOARD_QUERY),
     env.LEDGE_DB.prepare(
       "SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1",
     ),
+    ]),
+    loadPairTokens(env, nowMs),
   ]);
   const cursor = (cursorResult?.results[0] as CursorRow | undefined) ?? null;
   const dbRows = (rowsResult?.results ?? []) as unknown as BoardDbRow[];
-  const rows = buildBoardRows(dbRows, cursor, nowSeconds, sortParam);
+  const rows = buildBoardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens);
 
   const payload = {
     schemaVersion: SCHEMA_VERSION,

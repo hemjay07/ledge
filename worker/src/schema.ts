@@ -332,6 +332,12 @@ export const liveRowSchema = z.object({
   lastActivityAt: z.string(),
   window: boardWindow,
   fill: boardFill.nullable(),
+  /* The pair token's own units, so a quantity is legible: 8090000000 is
+     8,090 USDG. Null decimals means the units are not known, and the reader
+     is shown the raw integer and told so -- never a guessed exponent, which
+     would move the figure by orders of magnitude. */
+  pairDecimals: z.number().int().min(0).max(36).nullable(),
+  pairSymbol: z.string().nullable(),
 });
 
 export const liveResponseSchema = z.object({

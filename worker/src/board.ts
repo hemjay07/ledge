@@ -28,7 +28,9 @@
    a rate over a population. */
 
 import type { CursorRow } from "./lookup";
+import type { PairTokenEntry } from "./buckets";
 import { toIso } from "./format";
+import { ETH_DECIMALS, ZERO_ADDRESS, pairSymbolOf } from "./decimals";
 
 /* Every key orders biggest-value-first, so the direction never has to be
    guessed at: most buys, most recent activity, greatest age, largest net
@@ -125,6 +127,29 @@ export interface BoardRow {
   /** Null when the launch carries no threshold (enrichment failed): a guessed
       fill is worse than none, so the row renders no fill at all. */
   fill: BoardFill | null;
+  /** The pair token's own units, so a reader sees "4.2 ETH" rather than
+      4200000000000000000. Resolved WITHOUT a chain call: the zero address is
+      ETH at 18 by the factory's own definition, and anything else comes from
+      the pair-token map already in KV. A pair the map has not classified
+      resolves to null, and the reader is then shown the raw integer and told
+      the units are not known -- decimals.ts's rule, which exists because a
+      guessed exponent moves a figure by orders of magnitude. Reading 121 rows
+      could never afford a decimals() call each. */
+  pairDecimals: number | null;
+  pairSymbol: string | null;
+}
+
+/** Decimals and symbol from the map alone. No RPC, no KV read per row. */
+export function pairUnits(
+  pairToken: string,
+  map: Record<string, PairTokenEntry> | null,
+): { pairDecimals: number | null; pairSymbol: string | null } {
+  const address = pairToken.toLowerCase();
+  const symbol = pairSymbolOf(pairToken, map);
+  if (address === ZERO_ADDRESS) return { pairDecimals: ETH_DECIMALS, pairSymbol: symbol ?? "ETH" };
+  const decimals = (map?.[address] as (PairTokenEntry & { decimals?: number }) | undefined)
+    ?.decimals;
+  return { pairDecimals: typeof decimals === "number" ? decimals : null, pairSymbol: symbol };
 }
 
 /** Every reader of this figure is owed the same sentence the module comment
@@ -154,7 +179,12 @@ function windowOf(row: BoardDbRow, toBlock: number): BoardWindow {
   };
 }
 
-function rowOf(row: BoardDbRow, toBlock: number, nowSeconds: number): BoardRow {
+function rowOf(
+  row: BoardDbRow,
+  toBlock: number,
+  nowSeconds: number,
+  pairTokens: Record<string, PairTokenEntry> | null,
+): BoardRow {
   return {
     token: row.token,
     pairClass: row.pair_class,
@@ -175,6 +205,7 @@ function rowOf(row: BoardDbRow, toBlock: number, nowSeconds: number): BoardRow {
       row.graduation_threshold === null
         ? null
         : { graduationThresholdWei: row.graduation_threshold, label: NET_QUOTE_LABEL },
+    ...pairUnits(row.pair_token, pairTokens),
   };
 }
 
@@ -213,9 +244,10 @@ export function buildBoardRows(
   nowSeconds: number,
   sort: BoardSortKey,
   limit = 200,
+  pairTokens: Record<string, PairTokenEntry> | null = null,
 ): BoardRow[] {
   const toBlock = cursor ? cursor.last_indexed_block : 0;
   return sortDbRows(dbRows, sort)
     .slice(0, limit)
-    .map((row) => rowOf(row, toBlock, nowSeconds));
+    .map((row) => rowOf(row, toBlock, nowSeconds, pairTokens));
 }

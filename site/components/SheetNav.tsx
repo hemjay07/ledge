@@ -10,14 +10,15 @@ import Link from "next/link";
    a button: they are links, underlined by a rule like every other link on the
    sheet. */
 
-export type SheetPage = "number" | "cohorts" | "cockpit" | "method" | "card";
+export type SheetPage = "home" | "live" | "cohorts" | "cockpit" | "method" | "card";
 
 const PAGES: { key: SheetPage; href: string; label: string }[] = [
-  { key: "number", href: "/", label: "The number" },
+  { key: "home", href: "/", label: "Home" },
+  { key: "live", href: "/live", label: "Live board" },
   { key: "cohorts", href: "/cohorts", label: "Cohorts" },
   { key: "cockpit", href: "/cockpit", label: "Configurations" },
   { key: "method", href: "/method", label: "Method" },
-  { key: "card", href: "/number", label: "Card" },
+  { key: "card", href: "/number", label: "The number" },
 ];
 
 export function SheetNav({ current }: { current: SheetPage }): ReactElement {

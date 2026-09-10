@@ -103,6 +103,16 @@ function Result({ result, typed }: { result: LookupResult; typed: string }): Rea
       ))}
       {lines.placement ? <p className="note">{lines.placement}</p> : null}
       {lines.fill ? <p className="note note--fine">{lines.fill}</p> : null}
+      {/* This token's own indexed activity, in the API's own sentences: its
+          buys and sells with the window they were counted over, its first buy
+          and last activity, and the distinct buyers in its own launch block.
+          Rendered verbatim so the lookup, the /t page and the Telegram bot
+          cannot say three different things about one token. */}
+      {lines.activity.map((sentence) => (
+        <p className="note note--fine" key={sentence}>
+          {sentence}
+        </p>
+      ))}
       {lines.staleNote ? <p className="note note--fine is-stale">{lines.staleNote}</p> : null}
 
       <p className="lookup-foot mono">

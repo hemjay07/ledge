@@ -114,6 +114,7 @@ describe("the sentences, taken back apart", () => {
       ...lines.cohort,
       lines.placement,
       lines.fill,
+      ...lines.activity,
       lines.stamp,
       lines.staleNote,
       lines.methodUrl,

@@ -51,6 +51,12 @@
   --rule-heavy: #16130f;
   --stale: #b3321c;
   --stale-ink: #ffffff;
+  /* The discovery pages' one other hue (CONSTRAINTS.md "Design posture"): a
+     progress rule against a launch's own threshold. A cool blue, well clear
+     of --stale's warm red-orange, and off the banned end of the wheel
+     entirely (CONSTRAINTS.md's NOT-THIS list), so the two things this site
+     spends colour on can never be mistaken for each other on the same row. */
+  --fill: #2f6690;
   --pad-x: 1.25rem;
 }
 @media (prefers-color-scheme: dark) {
@@ -66,6 +72,7 @@
     --rule-heavy: #e8e3d8;
     --stale: #f2704a;
     --stale-ink: #121110;
+    --fill: #6fa8d8;
   }
 }
 :root[data-theme="dark"] {
@@ -80,6 +87,7 @@
   --rule-heavy: #e8e3d8;
   --stale: #f2704a;
   --stale-ink: #121110;
+  --fill: #6fa8d8;
 }
 
 *,
@@ -1259,4 +1267,97 @@ footer {
   .config-grids .at-narrow {
     color: var(--ink-3);
   }
+}
+
+/* ================= THE DISCOVERY REGISTER (REPOSITION.md Phase B) =================
+   /live and the "/" extract. Dense, live, and the one place besides the fold
+   itself that is permitted to spend colour on something other than the stale
+   state (CONSTRAINTS.md "Design posture"). Ruled and tabular like the rest of
+   the sheet: flat fills and rule weight only -- nothing softened, nothing
+   radiused, nothing lifted off the page with a shadow. */
+
+/* The lead on "/": live activity ahead of the Number, inside the same
+   screenshot crop the Number's fold opens. Indented with the fold's own
+   kicker and figure so it reads as part of the same band, not a separate
+   module bolted above it. */
+.discovery-lead {
+  margin: var(--s-6) 0 0;
+}
+.discovery-lead .kicker {
+  margin-left: 6%;
+  margin-bottom: var(--s-2);
+}
+@media (min-width: 48rem) {
+  .discovery-lead .kicker {
+    margin-left: 12%;
+  }
+}
+.discovery-headline {
+  font-family: var(--font-body);
+  font-size: var(--fs-note);
+  color: var(--ink-2);
+  max-width: 52ch;
+  margin-top: var(--s-3);
+  text-wrap: pretty;
+}
+
+.live-now-count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-fine);
+  color: var(--ink-3);
+  margin-top: var(--s-2);
+}
+.live-now-link {
+  font-family: var(--font-mono);
+  font-size: var(--fs-fine);
+  margin-top: var(--s-3);
+}
+
+/* The sort control on /live: the same ruled-index vocabulary as .sheet-nav,
+   not a control panel. The active sort is set plain and bold rather than in
+   colour — CONSTRAINTS 1 permits the ordering, not a highlight that reads as
+   a verdict on the column itself. */
+.live-sort {
+  padding-top: 0;
+}
+.live-sort-current {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.window-cell {
+  white-space: normal;
+  max-width: 26rem;
+}
+.is-partial {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* The fill rule. A launch's own net quote against its own threshold — never
+   a borrowed constant, never a lone percentage: the two base-unit figures
+   stand beside the bar, the percentage (when the threshold parses) beside
+   them. --fill is the only colour this bar spends, and it never appears on
+   the "updated ... ago" text or the live.stale note, which keep --stale —
+   the two cannot compete on the same row because they are never the same
+   property on the same element. */
+.fill-cell {
+  min-width: 14rem;
+  white-space: normal;
+}
+.fill-track {
+  height: 0.5rem;
+  background: var(--ground-alt);
+  border: var(--rw-hair) solid var(--rule-mid);
+  overflow: hidden;
+}
+.fill-bar {
+  height: 100%;
+  background: var(--fill);
+}
+.fill-figures {
+  margin: var(--s-1) 0 0;
+  font-size: var(--fs-fine);
+  color: var(--ink-2);
+  white-space: nowrap;
 }

@@ -29,7 +29,9 @@
       "fill": {
         "graduationThresholdWei": "4200000000000000000",
         "label": "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure is an upper bound on the curve's real reserve, not the reading /t/{address} shows."
-      }
+      },
+      "pairDecimals": 18,
+      "pairSymbol": "ETH"
     },
     {
       "token": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -55,7 +57,9 @@
       "fill": {
         "graduationThresholdWei": "4200000000000000000",
         "label": "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure is an upper bound on the curve's real reserve, not the reading /t/{address} shows."
-      }
+      },
+      "pairDecimals": 18,
+      "pairSymbol": "ETH"
     },
     {
       "token": "0xcccccccccccccccccccccccccccccccccccccccc",
@@ -81,7 +85,9 @@
       "fill": {
         "graduationThresholdWei": "8090000000",
         "label": "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure is an upper bound on the curve's real reserve, not the reading /t/{address} shows."
-      }
+      },
+      "pairDecimals": null,
+      "pairSymbol": null
     },
     {
       "token": "0xdddddddddddddddddddddddddddddddddddddddd",
@@ -104,7 +110,9 @@
         "label": "counted over blocks 56168488 to 56172588 -- partial: this launch's own block predates LEDGE's indexed record, so trades before block 56168488 are not counted",
         "partial": true
       },
-      "fill": null
+      "fill": null,
+      "pairDecimals": null,
+      "pairSymbol": null
     }
   ],
   "live": {

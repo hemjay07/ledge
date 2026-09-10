@@ -99,20 +99,29 @@ describe("a full lookup", () => {
     const container = await lookUp(ok);
     await waitFor(() => expect(container.textContent).toContain("minute 13"));
     const text = (container.textContent ?? "").toLowerCase();
-    for (const word of [
-      "score",
-      "risk",
-      "safe",
-      "rug",
-      "likely",
-      "predict",
-      "odds",
-      "chance",
-      "buy",
-      "sell",
-      "ape",
-    ]) {
+    for (const word of ["score", "risk", "safe", "rug", "likely", "predict", "odds", "chance"]) {
       expect(text).not.toContain(word);
+    }
+
+    /* "buy" and "sell" were banned here as bare substrings until the lookup
+       started stating a token's own indexed activity, which counts its buys
+       and its sells. "41 buys" is a count of what happened, which CONSTRAINTS
+       1 explicitly permits a per-token page to state; "buy this" would be the
+       instruction it bans. The substring ban could not tell those apart and
+       failed on the count, so it is replaced by patterns that match the
+       instruction and not the noun. These are narrower in what they match and
+       stricter about what they forbid: an imperative, a second person, or any
+       sentence aimed at the reader. */
+    for (const instruction of [
+      /\bbuy (this|it|in|now)\b/,
+      /\bsell (this|it|now)\b/,
+      /\bape\b/,
+      /\byou (should|can|could|might|will)\b/,
+      /\b(don'?t|do not) (buy|sell|touch)\b/,
+      /\bworth (buying|a buy|holding)\b/,
+      /\b(avoid|consider|recommend)\b/,
+    ]) {
+      expect(text).not.toMatch(instruction);
     }
   });
 });

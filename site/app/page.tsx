@@ -5,6 +5,7 @@ import { Fold } from "../components/Fold";
 import { Footer } from "../components/Footer";
 import { LedgerEntry } from "../components/LedgerEntry";
 import { LiveBoard } from "../components/LiveBoard";
+import { LiveNow } from "../components/Live";
 import { Lookup } from "../components/Lookup";
 import { Register } from "../components/Register";
 import { Scale } from "../components/Scale";
@@ -103,9 +104,31 @@ export default function Home(): ReactElement {
       <StaleBanner crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
 
       <main className="sheet">
-        <SheetNav current="number" />
+        <SheetNav current="home" />
         {/* the fold — everything a phone screenshot must carry */}
         <RunningHead mark="LEDGE" win="Trailing 24 hours · 01" />
+
+        {/* the discovery lead: what is happening right now, ahead of the
+            Number. The Number stays in the same crop, immediately below —
+            present and prominent, no longer the only thing here. */}
+        <div className="discovery-lead">
+          <h2 className="kicker">What&rsquo;s happening now</h2>
+          <LiveNow />
+          <p className="discovery-headline">
+            <Stat
+              className="mono"
+              name="pons-number-lead"
+              value={h24.rate}
+              n={h24.launches}
+              window="24h"
+              updatedAt={crawledAt}
+              insufficient={h24.insufficient}
+            />{" "}
+            of <span className="mono">{formatCount(h24.launches)}</span> Pons launches in the
+            last 24&nbsp;hours graduated — the Pons Number, in full on{" "}
+            <Link href="/number">/number</Link>.
+          </p>
+        </div>
 
         <Fold
           w={h24}

@@ -21,6 +21,7 @@ import {
   tokenResponseSchema,
   type ErrorCode,
   type LiveResponse,
+  type LiveSortKey,
   type TokenResponse,
 } from "./api-schema";
 
@@ -111,6 +112,11 @@ export interface LookupLines {
   placement: string | null;
   /** the quote-side fill, or the note saying why there is none */
   fill: string | null;
+  /** this token's own indexed curve activity: its buys and sells with the
+      window they were counted over, its first buy and last activity, and the
+      distinct buyers in its own launch block. Empty when the API sent no
+      activity block, which is a different silence from a zero. */
+  activity: string[];
   /** when the cohort figures were measured */
   stamp: string | null;
   /** the live layer's own staleness, in the API's words */
@@ -126,6 +132,7 @@ const EMPTY: LookupLines = {
   cohort: [],
   placement: null,
   fill: null,
+  activity: [],
   stamp: null,
   staleNote: null,
   methodUrl: null,
@@ -140,7 +147,7 @@ export function splitLookupText(body: TokenResponse): LookupLines {
   let i = 0;
   const next = (): string | null => (i < lines.length ? (lines[i++] as string) : null);
 
-  const out: LookupLines = { ...EMPTY, cohort: [] };
+  const out: LookupLines = { ...EMPTY, cohort: [], activity: [] };
   out.identity = next();
   out.config = next();
   out.headline = next();
@@ -162,6 +169,16 @@ export function splitLookupText(body: TokenResponse): LookupLines {
 
   out.placement = next();
   out.fill = next();
+  /* worker/src/text.ts `activitySentences` writes exactly three lines when the
+     response carries an activity block and none at all when it does not, so
+     the count is read off the same field the Worker branched on rather than
+     matched against the text. */
+  if (body.activity !== null) {
+    for (let n = 0; n < 3; n += 1) {
+      const line = next();
+      if (line !== null) out.activity.push(line);
+    }
+  }
   if (body.cohort !== null) out.stamp = next();
   if (body.live.stale) out.staleNote = next();
   out.methodUrl = next();
@@ -174,18 +191,32 @@ export type LiveResult =
   | { kind: "live"; body: LiveResponse }
   | { kind: "error"; message: string };
 
+/** The response, classified -- exported so a render can be tested against a
+    fixture without a network, the same reason readLookup is exported. A
+    payload the Worker sent as an objection (bad_sort, rate_limited, ...)
+    still carries its own words rather than falling through to UNREADABLE. */
+export function readLive(payload: unknown): LiveResult {
+  const live = liveResponseSchema.safeParse(payload);
+  if (live.success) return { kind: "live", body: live.data };
+
+  const failure = errorResponseSchema.safeParse(payload);
+  if (failure.success) return { kind: "error", message: failure.data.message };
+
+  return { kind: "error", message: UNREADABLE };
+}
+
 export async function fetchLive(
   fetchImpl: typeof fetch = fetch,
   signal?: AbortSignal,
+  sort?: LiveSortKey,
 ): Promise<LiveResult> {
+  const query = sort ? `?sort=${encodeURIComponent(sort)}` : "";
   try {
-    const response = await fetchImpl(`${API_BASE}/api/live`, {
+    const response = await fetchImpl(`${API_BASE}/api/live${query}`, {
       signal,
       headers: { Accept: "application/json" },
     });
-    const parsed = liveResponseSchema.safeParse(await response.json());
-    if (!parsed.success) return { kind: "error", message: UNREADABLE };
-    return { kind: "live", body: parsed.data };
+    return readLive(await response.json());
   } catch {
     return { kind: "error", message: UNREADABLE };
   }
@@ -199,4 +230,5 @@ export function stripAddresses(value: string): string {
   return value.replace(/0x[0-9a-f]{40}/gi, "");
 }
 
-export type { LiveResponse, TokenResponse, ErrorCode };
+export { LIVE_SORT_KEYS } from "./api-schema";
+export type { LiveResponse, LiveSortKey, TokenResponse, ErrorCode };
