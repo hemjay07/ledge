@@ -109,49 +109,59 @@ exist.
 
 ---
 
-## Phase 2 — the agent, narrow (gated on 0.1)
+## Phase 2 — the token (revised 2026-09-11)
 
-**Not a product. One rule, one trigger, one execution, a hard spend ceiling and
-an expiry.** Something that can be run in front of a room and seen to fire.
+**Revised.** An earlier draft put the token after a working agent, on the
+grounds that launching first would be selling a promise. That was wrong, and it
+was wrong because it treated build time as free. It is not free: building the
+agent costs money and weeks that a solo developer does not have spare, and the
+token launch is the cheapest available test of whether anyone wants this at all.
+An independent model on 2026-09-10 put roughly a 94% chance of the token earning
+under $100, which is a further argument for finding out early and cheaply rather
+than after months of work.
 
-- **2.1 The rule the user writes.** The user authors it. We supply triggers and
+So: **launch on what exists.** A live tool publishing figures nobody else has.
+If it converts, the fees fund the agent. If it does not, we learned that in days
+and no time was sunk into building for nobody.
+
+**The one line that may not be crossed.** The token is sold on what exists. The
+agent may be stated as what the money would build — that is a statement of
+intent and it is true. It may never be stated as owed, dated, or nearly done.
+The test is simple: **if the agent is never built, nobody who bought should have
+been misled.** They bought a working thing and funded an attempt at more. What
+that rules out is one sentence in the launch post, anything shaped like "agent
+coming soon, buy now", and `CONSTRAINTS.md`'s copy list already bans it.
+
+Everything for the launch itself is written: `LAUNCH.md` has the form fields and
+the description, `PITCH.md` has the case for the operator.
+
+**DONE means:** launched on what exists, with no claim about the agent that
+would embarrass us if it never shipped.
+
+## Phase 3 — the agent, narrow (gated on 0.1 and on Phase 2 converting)
+
+**Not a product. One rule, one trigger, one execution, a hard ceiling and an
+expiry.** Something that can be run in front of a room and seen to fire. Built
+with what Phase 2 raised, and only if Phase 2 raised something.
+
+- **3.1 The rule the user writes.** The user authors it. We supply triggers and
   execution and never a default strategy, a preset, or a leaderboard of winning
   rules. The moment we ship a suggested rule we are recommending tokens and
   every honest figure on the site stops counting for anything. This will feel
   unfriendly in onboarding and that is the price.
-- **2.2 Scoped delegation only.** No key ever touches our infrastructure. A hard
-  maximum spend and an expiry, both set by the user, both enforced on-chain.
-- **2.3 Failure paths first.** What happens on a reverted transaction, a
-  reorganisation, a stale trigger, an RPC outage, a token that graduates between
-  trigger and execution. These get designed before the happy path, not after.
+- **3.2 Prepare-and-sign by default.** No key on our side, no delegated spending
+  authority. Fully automatic only if 0.1 turns up a session-key provider live on
+  this chain.
+- **3.3 Failure paths first.** A reverted transaction, a reorganisation, a stale
+  trigger, an RPC outage, a token that graduates between trigger and execution.
+  Designed before the happy path, not after.
 
-**DONE means:** it fires, on-chain, inside its ceiling, in front of a witness,
-and every way it can fail has been written down and tested.
-
----
-
-## Phase 3 — the token (gated on Phase 2 being real)
-
-**The token launches when the agent is demonstrably real, not when it is
-finished.** Those are different bars and the distinction is the whole point.
-
-Launching before is selling a promise. `CONSTRAINTS.md` bans "coming soon"
-outright, and the reason is not squeamishness: the single asset this project has
-is that nothing on it has ever been overstated. Announcing an agent to give
-people something to look forward to, taking their money, and then finding the
-agent is harder than we thought would be exactly the behaviour the site exists
-to measure other people doing.
-
-Everything for the launch itself is already written: `LAUNCH.md` has the form
-fields and the description, `PITCH.md` has the case for the operator.
-
-**DONE means:** the token is launched with something working behind it.
-
----
+**DONE means:** it fires, in front of a witness, inside its ceiling, and every
+way it can fail is written down and tested.
 
 ## Phase 4 — the agent proper
 
-Only after Phase 3 has told us whether anyone wants this. Scope to be written
+Only after Phase 3 has shipped something narrow and someone has used it. Scope to be written
 then, from what people actually asked for in Phase 2, not from what we imagine
 now.
 
@@ -194,7 +204,7 @@ now.
 
 Only three things, and this list is the point of the file:
 
-1. **Phase 0 comes back with an answer**, which sets or removes Phase 2.
+1. **Phase 0 comes back with an answer**, which sets or removes Phase 3.
 2. **The operator says what is missing**, because he holds the distribution and
    his criteria are the closest thing to a spec this project has.
 3. **A measurement contradicts something in here.** Not an opinion, not a mood,
