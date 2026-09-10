@@ -11,10 +11,24 @@ crons = ["* * * * *"]
 [vars]
 FACTORY_ADDRESS = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
 CHAIN_ID = "4663"
-RPC_URL = "https://rpc.mainnet.chain.robinhood.com"
-# Fallback used only when RPC_URL answers with a transport fault. Left equal to
-# RPC_URL until a second endpoint exists (risk register, "two indexers").
-RPC_URL_FALLBACK = "https://rpc.ordofi.network"
+# Order swapped 2026-09-11, and the order is the whole point.
+#
+# The official endpoint rate-limits Cloudflare's egress hard -- DEPLOY.md has
+# said so since the first deploy -- while answering fine from a laptop. With it
+# first, every tick spent its whole subrequest budget retrying an endpoint that
+# was never going to answer, and reached the fallback with nothing left. The
+# indexer sat at "subrequest budget spent" at the head of the chain, doing no
+# work at all, and the health endpoint reported a budget problem rather than the
+# rate-limiting underneath it.
+#
+# So the endpoint that actually answers from this datacentre goes first. The
+# official one stays as the fallback, where it costs one wasted call instead of
+# four when it refuses. This is a deployment fact about where the Worker runs,
+# not a judgement about which endpoint is better: the Python crawl runs from
+# GitHub's runners and keeps the official endpoint first, because from there it
+# works.
+RPC_URL = "https://rpc.ordofi.network"
+RPC_URL_FALLBACK = "https://rpc.mainnet.chain.robinhood.com"
 # The live site. These were "https://ledge.tools" -- a domain that was never
 # bought and does not resolve -- so the canonical config pointed at a dead
 # host and only a `wrangler deploy --var` override kept the card and the
