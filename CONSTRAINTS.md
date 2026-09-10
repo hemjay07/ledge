@@ -22,9 +22,13 @@ Amended 2026-09-09 by `REPOSITION.md`. Four clauses were relaxed because they we
 
 7. **Never let a stale number look fresh.** Every figure shows its age. Past the published `staleAfterSeconds` the page says so plainly and the card renders the age.
 
-8. **Never require a wallet or an account to see anything.** No connect-wallet gate, no paywall, no sign-in. `/number.json` stays public and unkeyed.
+8. **Never require a wallet or an account to see a figure.** No connect-wallet gate, no paywall, no sign-in on any number. `/number.json` stays public and unkeyed. Every rate, count, cohort, distribution and per-token fact is readable by anyone, for ever, without identifying themselves. *This is the clause the whole project rests on: an instrument that checks who you are before it answers is not an instrument.*
 
-   **An optional email field is permitted** for the weekly dispatch. There is no integrity content in refusing to let a reader subscribe, and refusing it left us with no way to tell anyone anything.
+   **An optional email field is permitted** for the weekly dispatch. There is no integrity content in refusing to let a reader subscribe.
+
+   **Automation may be conditioned; information may not.** A push alert, the bot added to someone's own group, a saved watchlist — these deliver no figure that is not already free and unkeyed on the site, and conditioning one of them on holding the token hides nothing from anyone. The test is exact and it is not a matter of judgement: *if a person without the token cannot reach that figure by looking, the gate is illegal.* Convenience may be earned. Knowing may not.
+
+   The distinction is not a loophole and the difference between the two is the difference between this project and a signal service. A gated alert says "here is a thing you could have seen"; a gated number says "you may not see". The first is a courier. The second is what this clause exists to forbid.
 
 9. **Never move a threshold, a band, or a constraint quietly.** Any change to a definition — window, cutoff, bucket edges — or to this file is a dated entry on `/method` and in the changelog below.
 
@@ -61,5 +65,7 @@ Two registers under one roof.
 - The independent recompute in CI must match the rendered numbers exactly, or the deploy fails.
 
 ## Changelog
+
+- **2026-09-10** — clause 8 split into information and automation. Every figure stays free and unkeyed to anyone for ever, which is unchanged and is now stated more strongly than before. What changes is that a convenience which *delivers* a figure — an alert, the bot in someone's own group, a watchlist — may be conditioned on holding the token, because it withholds no information from anyone: the test is whether a person without the token can still reach that figure by looking, and if they cannot, the gate is not permitted. Reason: the token had no honest reason to exist. `LAUNCH.md` said in as many words that holders get nothing, four independent assessments on 2026-09-10 called that the critical defect, and the operator who will launch it said the same unprompted. The alternatives were both worse: gating a number would end the project's only real claim, and promising a return would make the token a security-shaped thing a solo developer should not be issuing. This is the one relaxation that unlocks a reason to hold without touching what anyone can know. The design posture is also relaxed in the same pass: one accent colour is now permitted for live activity, provided it stays unambiguous against the stale colour, because "colour is reserved for the stale state" was making the discovery pages inert and protected nothing about whether a number is true.
 
 - **2026-09-09** — clause 1 split: scoring, predicting and recommending stay banned; ranking by a shown measured quantity is permitted, and a per-token page may state that token's own facts. Clause 8 relaxed to permit an optional email field. Clause 11 added for external figures. Clause 10 rewritten from "never negotiate position relative to pons" to a concrete non-affiliation rule matching their published guidance. The copy list narrowed to claims that cannot be supported; the ban on energetic writing is lifted. Design posture split into instrument and discovery registers. Reason, in full, in `REPOSITION.md`: the relaxed clauses were costing the acquisition, retention and conversion surfaces while protecting nothing about whether a number is true.
