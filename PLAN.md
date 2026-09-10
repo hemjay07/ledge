@@ -29,24 +29,52 @@ Information is free. Automation is what the token buys. That distinction is
 Nothing below can be estimated until these are answered. Both are for the
 operator, not for us.
 
-**0.1 Whose execution layer?** An agent has to sign transactions. There are two
-worlds and they differ by an order of magnitude:
+**0.1 How does the agent get authority to spend?** An agent has to sign
+transactions with someone's money. This is the hard problem and the dangerous
+one, and it has three answers, not two.
 
-- *His.* CHIT is described in its own documentation as a gas-sponsorship layer
-  running scoped sessions across programmable accounts, each with a finite
-  budget, an expiry and a tight policy. That is exactly the primitive a safe
-  agent needs, and it means **neither project ever holds a user's key.** If this
-  is available, the agent is weeks.
-- *Ours.* Building scoped delegation, key handling, execution and failure paths
-  from nothing is months, and it puts custody risk on one solo developer. If
-  this is the answer, the honest recommendation is not to build the agent at all
-  and to find a third-party execution layer instead.
+*Correction, 2026-09-10:* an earlier draft of this file assumed CHIT could
+supply the primitive, on the strength of its documentation mentioning "a finite
+ETH gas budget, an expiry, and a tightly scoped session policy". That was a
+misreading and it has been checked. **CHIT is a gas-sponsorship layer**: it pays
+transaction FEES. Its budget is a gas budget. Its documentation mentions no
+spending authority, no trading, no swaps and no DEX execution, and it states it
+is a private-beta prototype on Sepolia and **not live on Robinhood Chain**. It
+answers "who pays the gas", which is real and small. It does not answer "what is
+allowed to spend the user's money", which is everything.
+
+The three real options:
+
+- **Non-custodial: the agent prepares, the user signs.** LEDGE watches for the
+  user's rule, builds the transaction, and hands it over for a one-click signature
+  in their own wallet. **No key ever exists on our side and no spending authority
+  is ever delegated, so the entire category of risk that could ruin Mujeeb
+  personally does not arise.** The cost is that it does not fire while the user
+  sleeps. The thing worth noticing is that the hard part of this product is
+  *noticing*, not *clicking*: on an 18,000-launch-a-day venue nobody can watch,
+  and the value is in the watching. This is days to weeks and it is available now.
+- **Delegated, via a third-party account-abstraction provider with session keys.**
+  Fully automatic and safe if the provider is sound. The open question is whether
+  any such provider supports Robinhood Chain, which is new. **Unverified — needs
+  checking before it is counted on.**
+- **Build scoped delegation ourselves.** Months, and it puts custody risk on one
+  solo developer. The honest recommendation if it comes to this is not to build
+  the agent at all.
+
+**The default is the first one** unless the second turns out to be available,
+because it delivers most of the value with none of the risk, and because it can
+start now. Only ever describe it as what it is: it does not trade for you while
+you sleep.
 
 **0.2 What does the agent trade?** Curves on pons only, or graduated tokens in
 their Uniswap v4 pools as well? Different integration, different risk, different
 timeline. Curves-only is smaller and is the obvious v1.
 
-**Until 0.1 is answered, Phase 2 has no estimate and will not be started.**
+**Until 0.1 is answered, Phase 2 has no estimate and will not be started.** The
+question to put to the operator is not "can we use CHIT" — it cannot do this —
+but "do you know of an account-abstraction provider with session keys live on
+Robinhood Chain", and failing that, whether a prepare-and-sign agent is enough
+for what he had in mind.
 
 ---
 
