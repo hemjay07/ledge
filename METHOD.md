@@ -76,6 +76,20 @@ The marks are a definition. They exist so that anything asking "where does this 
 
 ## Changelog of definitions
 
+- 2026-09-10 — no new figure and no definition changed. This entry records an **analysis whose result was weaker than it first appeared**, because the figures it concerns are already published on `/cohorts` and a reader is owed what is known about them.
+
+  The question was whether the hour of day a launch is made relates to whether it graduates. Across 143,899 launches in hours with at least 200 launches each, the rate excluding graduations that completed inside five minutes ranges from 1.03% in the 02:00 UTC hour, one in 97, to 0.43% in the 23:00 hour, one in 232. That is a spread of about 2.4 times, and the two extremes are further from the pooled rate of 0.68% than sampling alone at that rate would ordinarily produce. By day of week the spread is about 1.7 times, from 0.86% on Sunday to 0.52% on Tuesday.
+
+  **Three things then made it much less useful than that sounds, and all three are the reason no "when to launch" page was built.**
+
+  First, ranking the hours by raw graduation rate and by the rate excluding fast graduations produces almost unrelated orderings: the rank correlation between them is 0.15 across the 24 hours. The 23:00 hour has one of the *highest* raw rates and the *lowest* organic rate. Any reading taken from raw hourly rates, here or anywhere else, is therefore close to uninformative about organic outcomes.
+
+  Second, the obvious mechanism does not carry it. Launch volume per hour correlates with the organic rate at about −0.46, so crowding accounts for roughly a fifth of the variation. Pooling the twelve quietest hours against the twelve busiest gives one in 140 against one in 152, a difference far too small to act on.
+
+  Third, and decisively: this is an association in a record of what was launched, not a mechanism. It may reflect *who* launches at 02:00 rather than anything about 02:00. Nothing here separates the hour from the population of deployers active in it, and the site does not have the data to.
+
+  So the hourly and daily cohorts stay exactly where they are on `/cohorts`, each carrying its own n, described as what launches made in that hour did. They are not presented as a choice a launcher should make, and no page ranks hours as better or worse to launch in. Publishing a 2.4-times figure as guidance would be a prediction wearing a denominator, which CONSTRAINTS 1 forbids and which the evidence above does not support.
+
 - 2026-09-10 — one new published figure, no existing definition changed: the **distribution of times to graduation**, in fourteen buckets that each roughly double the last, published as `allTime.ttg.histogram` and `h24.ttg.histogram` beside the ladder that was already there. The edges are 0, 2, 5, 10, 20, 40, 80, 160, 320, 640, 1,280, 2,560, 5,120 and 10,240 seconds; the last bucket is open-ended and holds everything slower. Each bucket is half-open, `[fromSeconds, toSeconds)`, the same convention the windows use, so a graduation landing exactly on an edge belongs to the bucket above and is never counted twice. The buckets therefore sum to `n`, which is what separates this from the ladder: the ladder's last rung can sit below `n` because graduations slower than its final mark are counted in no rung, and that is correct there. Moving any edge here moves a published figure and takes its own entry, exactly as moving a ladder mark does.
 
   Why doubling rather than equal width: graduation times run from under a second to over four days, so on an equal-width axis effectively the whole record is one bar and the drawing says nothing. Why the first edge is 0 rather than 1: a launch and a graduation in the same block differ by zero seconds, and a first bucket that could not hold them would omit the case the figure most exists to show.
