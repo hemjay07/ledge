@@ -139,7 +139,14 @@ describe("the live pulse", () => {
     expect(container.textContent).toContain(`of ${formatCount(live.count)}`);
   });
 
-  it("says the board did not answer rather than showing a stale pulse as though it were live", async () => {
+  /* The guarantee under test is that an unreachable live layer is SAID, never
+     filled in with a stale reading dressed as a live one. The exact wording
+     changed on 2026-09-10 because the old copy came from the token lookup and
+     opened "The lookup did not answer" -- the wrong noun, and a failure as the
+     first sentence a visitor reads. The assertion is now on the behaviour
+     rather than on the sentence: no figure is shown, and the absence is
+     stated. */
+  it("states the absence rather than showing a stale pulse as though it were live", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -147,6 +154,9 @@ describe("the live pulse", () => {
       }),
     );
     const { container } = render(<LivePulse />);
-    await waitFor(() => expect(container.textContent).toContain("did not answer"));
+    await waitFor(() => expect(container.querySelector(".pulse-quiet")).not.toBeNull());
+    expect(container.querySelectorAll(".pulse-figure").length).toBe(0);
+    expect(container.textContent).toMatch(/not reachable/i);
+    expect(container.textContent).toMatch(/unaffected/i);
   });
 });

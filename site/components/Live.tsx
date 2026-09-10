@@ -105,8 +105,19 @@ export function LivePulse(): ReactElement {
   const result = useLiveBoard(DEFAULT_SORT);
   const body = result?.kind === "live" ? result.body : null;
 
+  /* The failure state is the first line a visitor reads when the live layer is
+     unreachable, so it says which reading is missing and nothing else. It used
+     to print the API's own message, which is written for the token lookup and
+     opens "The lookup did not answer" -- the wrong noun, and a failure as the
+     first sentence on the page. The rest of the page is static and correct
+     without this, so nothing here is estimated and nothing is filled in. */
   if (result !== null && result.kind === "error") {
-    return <p className="lookup-line-plain">{result.message}</p>;
+    return (
+      <p className="pulse-quiet">
+        The live count is not reachable right now. Every figure below is from the last
+        indexed measurement and is unaffected.
+      </p>
+    );
   }
   if (body === null) {
     return <div className="hairline-pulse" />;

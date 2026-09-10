@@ -629,6 +629,16 @@ a:focus-visible,
   white-space: nowrap;
 }
 
+/* The pulse's own quiet state. Not the stale colour: nothing here is stale,
+   one live reading is simply absent, and spending --stale on it would make the
+   one colour that means something mean two things. */
+.pulse-quiet {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  max-width: 52ch;
+}
+
 /* The shape of the record. Ink, like every other mark on an instrument page:
    the bars carry no meaning in their colour, and --stale stays the only
    colour on this site that means anything. */
