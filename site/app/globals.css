@@ -1626,3 +1626,75 @@ footer {
   color: var(--ink-2);
   white-space: nowrap;
 }
+
+/* ---- the live board below the table's breakpoint (REVAMP.md 1.2) ----
+
+   Thirteen columns do not fit a phone, so under 50rem -- the same measure
+   config-grids reflows at above -- the table steps aside and one ruled card
+   per token takes over. Same rules and hues as the table it replaces: no
+   radius, no shadow, no lift off the page, --fill the only accent, --stale
+   the only colour that means "this reading is old". Above 50rem the reverse:
+   the table is what analysts use and it is unchanged. */
+.live-cards {
+  display: none;
+}
+@media (max-width: 50rem) {
+  .live-table-wrap {
+    display: none;
+  }
+  .live-cards {
+    display: block;
+    list-style: none;
+    margin: var(--s-3) 0 0;
+    padding: 0;
+  }
+}
+.live-card {
+  padding: var(--s-4) 0;
+  border-bottom: var(--rw-hair) solid var(--rule-hair);
+}
+.live-card:first-child {
+  border-top: var(--rw-hair) solid var(--rule-mid);
+}
+/* The door. Set at the head of the card, in the register's own mono voice,
+   because this is the one thing on the card that is also a link. */
+.live-card-token {
+  display: block;
+  font-size: var(--fs-note);
+  font-weight: 600;
+  color: var(--ink);
+}
+.live-card .fill {
+  margin-top: var(--s-3);
+}
+.live-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4) var(--s-8);
+  margin-top: var(--s-4);
+}
+.live-card-stat {
+  min-width: 5.5rem;
+}
+.live-card-stat-v {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: 500;
+}
+.live-card-stat-k {
+  display: block;
+  font-size: var(--fs-fine);
+  color: var(--ink-3);
+  margin-top: 0.125rem;
+}
+.live-card > .note {
+  margin-top: var(--s-3);
+}
+/* The analyst columns, carried onto the card rather than dropped: launch
+   block and the counted-over window (with its own partial marker) — quieter
+   than the stats above, .note--fine's own voice, never .thin's italic, which
+   this register reserves for "not a figure" rather than "a figure, but a
+   quiet one". */
+.live-card-analyst {
+  color: var(--ink-3);
+}

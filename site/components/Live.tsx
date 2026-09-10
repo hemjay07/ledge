@@ -160,10 +160,15 @@ export function LivePulse(): ReactElement {
   );
 }
 
+/* null and 0 are different findings: the launch block was never indexed,
+   versus it was indexed and nobody bought in it. Collapsing them to the
+   same reading would erase that difference. Shared by the table cell and the
+   card stat, so both faces of the board read it the same way. */
+function firstBlockBuyersText(value: number | null): ReactElement {
+  return value === null ? <>not indexed</> : <>{formatCount(value)}</>;
+}
+
 function firstBlockBuyersCell(value: number | null): ReactElement {
-  /* null and 0 are different findings: the launch block was never indexed,
-     versus it was indexed and nobody bought in it. Collapsing them to the
-     same cell would erase that difference. */
   return value === null ? (
     <td className="thin">not indexed</td>
   ) : (
@@ -171,17 +176,15 @@ function firstBlockBuyersCell(value: number | null): ReactElement {
   );
 }
 
-/* The progress rule: a launch's own net quote against its own threshold,
-   never a borrowed constant. Both figures stand beside the bar -- the raw
-   base-unit integers LEDGE indexed, since this payload carries no decimals
-   to scale them by and guessing would be exactly the fake precision
-   CONSTRAINTS 4 bans. A percentage may stand beside them; it never stands
-   alone. A row with no threshold renders no bar at all. */
-function FillCell({ row }: { row: Row }): ReactElement {
-  if (row.fill === null) {
-    return <td className="thin">no threshold indexed</td>;
-  }
-  const pct = fillPercent(row.netQuoteWei, row.fill.graduationThresholdWei);
+/* The progress rule's own figures, shared by the table cell and the card:
+   a launch's own net quote against its own threshold, never a borrowed
+   constant. Both figures stand beside the bar -- the raw base-unit integers
+   LEDGE indexed, since this payload carries no decimals to scale them by and
+   guessing would be exactly the fake precision CONSTRAINTS 4 bans. A
+   percentage may stand beside them; it never stands alone. A row with no
+   threshold renders no bar at all. */
+function FillBody({ row }: { row: Row }): ReactElement {
+  const pct = fillPercent(row.netQuoteWei, row.fill!.graduationThresholdWei);
   const width = pct === null ? 0 : Math.min(100, Math.max(0, pct));
   /* In the pair token's own units where they are known -- "1.5232 of 4.2 ETH"
      rather than two 19-digit integers. Where they are not known the raw base
@@ -189,37 +192,57 @@ function FillCell({ row }: { row: Row }): ReactElement {
      guessing an exponent: a wrong one moves the figure by orders of
      magnitude. The threshold is this launch's OWN, never 4.2 assumed. */
   const net = pairQuantity(row.netQuoteWei, row.pairDecimals, null);
-  const threshold = pairQuantity(row.fill.graduationThresholdWei, row.pairDecimals, row.pairSymbol);
+  const threshold = pairQuantity(row.fill!.graduationThresholdWei, row.pairDecimals, row.pairSymbol);
   const figures = `${net.text} of ${threshold.text}`;
   return (
-    <td className="fill-cell">
-      <div className="fill" role="img" aria-label={`${figures} against this launch's own threshold`}>
-        <div className="fill-track">
-          <div className="fill-bar" style={{ width: `${width}%` }} />
-        </div>
-        <p className="fill-figures mono">
-          {figures}
-          {pct === null ? null : <> · {pct.toFixed(1)}%</>}
-        </p>
-        {threshold.scaled ? null : (
-          <p className="note note--fine">
-            Raw base units. This pair token&rsquo;s decimals are not known, so the figures are not
-            scaled.
-          </p>
-        )}
+    <div className="fill" role="img" aria-label={`${figures} against this launch's own threshold`}>
+      <div className="fill-track">
+        <div className="fill-bar" style={{ width: `${width}%` }} />
       </div>
-      <p className="note note--fine">{row.fill.label}</p>
+      <p className="fill-figures mono">
+        {figures}
+        {pct === null ? null : <> · {pct.toFixed(1)}%</>}
+      </p>
+      {threshold.scaled ? null : (
+        <p className="note note--fine">
+          Raw base units. This pair token&rsquo;s decimals are not known, so the figures are not
+          scaled.
+        </p>
+      )}
+      <p className="note note--fine">{row.fill!.label}</p>
+    </div>
+  );
+}
+
+function FillCell({ row }: { row: Row }): ReactElement {
+  if (row.fill === null) {
+    return <td className="thin">no threshold indexed</td>;
+  }
+  return (
+    <td className="fill-cell">
+      <FillBody row={row} />
     </td>
   );
 }
 
-function windowCell(row: Row): ReactElement {
+function windowLine(row: Row): ReactElement {
   return (
-    <td className="thin window-cell">
+    <>
       {row.window.label}
       {row.window.partial ? <span className="mono is-partial"> · partial</span> : null}
-    </td>
+    </>
   );
+}
+
+function windowCell(row: Row): ReactElement {
+  return <td className="thin window-cell">{windowLine(row)}</td>;
+}
+
+/* The address, shortened the way Graduated.tsx and worker/src/text.ts shorten
+   it, so the same token reads identically on every board. The full address
+   is the link target and the title, so nothing is lost. */
+function shortAddress(address: string): string {
+  return `${address.slice(0, 10)}…${address.slice(-6)}`;
 }
 
 function lastActivityAgo(row: Row, observedAt: string): string {
@@ -227,6 +250,51 @@ function lastActivityAgo(row: Row, observedAt: string): string {
   const at = Date.parse(row.lastActivityAt);
   if (Number.isNaN(observed) || Number.isNaN(at)) return "unreadable";
   return formatAge(Math.max(0, Math.round((observed - at) / 1000)));
+}
+
+/* ---- the card: below the table's breakpoint, one per token -------------
+
+   Thirteen columns do not fit a phone (REVAMP.md 1.2), so below globals.css's
+   table breakpoint the board stops being a table and becomes one card per
+   token. The card leads with what answers "is anything real here" -- the
+   link to the token's own page, the fill rule against its own threshold,
+   buys, sells, distinct first-block buyers -- then age and state, then the
+   analyst columns (launch block, the counted-over window) quieter, as fine
+   print rather than dropped. CONSTRAINTS 3 requires every count to carry its
+   window; on the table that window is its own column, once per row, so here
+   it is its own line, once per card. The partial marker travels with it. */
+function LiveCard({ row, observedAt }: { row: Row; observedAt: string }): ReactElement {
+  return (
+    <li className="live-card">
+      <a className="live-card-token mono" href={`/t/${row.token}`} title={row.token}>
+        {shortAddress(row.token)}
+      </a>
+      {row.fill === null ? <p className="thin">no threshold indexed</p> : <FillBody row={row} />}
+      <div className="live-card-stats">
+        <div className="live-card-stat">
+          <span className="live-card-stat-v mono">{formatCount(row.buys)}</span>
+          <span className="live-card-stat-k">buys</span>
+        </div>
+        <div className="live-card-stat">
+          <span className="live-card-stat-v mono">{formatCount(row.sells)}</span>
+          <span className="live-card-stat-k">sells</span>
+        </div>
+        <div className="live-card-stat">
+          <span className="live-card-stat-v mono">{firstBlockBuyersText(row.firstBlockBuyers)}</span>
+          <span className="live-card-stat-k">first-block buyers</span>
+        </div>
+      </div>
+      <p className="note">
+        {formatAge(row.ageSeconds)} old · last activity {lastActivityAgo(row, observedAt)} ago ·{" "}
+        {row.graduated ? "graduated" : "on the curve"}
+      </p>
+      <p className="note note--fine live-card-analyst">
+        {stripAddresses(pairLabel(row.pairClass))} · creator tax{" "}
+        {row.creatorTaxBps === null ? "not read" : `${row.creatorTaxBps} bps`} · launch block{" "}
+        {formatCount(row.launchBlock)} · {windowLine(row)}
+      </p>
+    </li>
+  );
 }
 
 /* ---- the full board: /live ------------------------------------------- */
@@ -272,7 +340,15 @@ export function LiveBoardFull(): ReactElement {
 
       {body !== null ? (
         <>
-          <div className="scroller" tabIndex={0} role="group" aria-label="Every curve with activity, sortable">
+          {/* Below globals.css's table breakpoint this is display:none and
+              .live-cards takes over; above it, the reverse. Both read the
+              same rows -- no second fetch, no divergent figures. */}
+          <div
+            className="scroller live-table-wrap"
+            tabIndex={0}
+            role="group"
+            aria-label="Every curve with activity, sortable"
+          >
             <table>
               <caption>
                 One row per token, ranked only by a column printed on the row itself. Every cell
@@ -299,7 +375,9 @@ export function LiveBoardFull(): ReactElement {
                 {body.rows.map((row) => (
                   <tr key={row.token}>
                     <th scope="row" className="mono">
-                      {row.token}
+                      <a href={`/t/${row.token}`} title={row.token}>
+                        {shortAddress(row.token)}
+                      </a>
                     </th>
                     <td className="fig n">{stripAddresses(pairLabel(row.pairClass))}</td>
                     <td className="fig n">
@@ -320,6 +398,13 @@ export function LiveBoardFull(): ReactElement {
               </tbody>
             </table>
           </div>
+
+          <ul className="live-cards" aria-label="Every curve with activity, sortable">
+            {body.rows.map((row) => (
+              <LiveCard key={row.token} row={row} observedAt={body.observedAt} />
+            ))}
+          </ul>
+
           <p className="note note--fine">
             {formatCount(body.count)} tokens with activity in this window · sorted by{" "}
             {SORT_LABEL[body.sortedBy]}

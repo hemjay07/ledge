@@ -24,12 +24,14 @@ afterEach(() => {
 });
 
 describe("the live board's own row model", () => {
-  it("renders one row per token, with the token itself printed (CONSTRAINTS 2 permits it)", async () => {
+  it("renders one row per token, with the token's own address as the link target and title (CONSTRAINTS 2 permits it)", async () => {
     answerWith(live);
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(live.rows.length));
     for (const row of live.rows) {
-      expect(container.textContent ?? "").toContain(row.token);
+      const link = container.querySelector(`tbody th a[href="/t/${row.token}"]`);
+      expect(link).not.toBeNull();
+      expect(link?.getAttribute("title")).toBe(row.token);
     }
   });
 
@@ -205,6 +207,111 @@ describe("the live board's own row model", () => {
     );
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.textContent).toContain("unrecognised sort key"));
+  });
+});
+
+/* The board is a dead end no longer: every row, table or card, is a door to
+   /t/{address} (REVAMP.md 1.2). Both faces render at once — CSS decides which
+   is visible at a given width, jsdom has no layout — so these assertions
+   target ".live-table-wrap" and ".live-cards" independently rather than
+   relying on which one happens to be on screen. */
+describe("the live board's own door — every row links to its token page", () => {
+  it("links every table row to its own token page, shortened the way Graduated.tsx shortens it", async () => {
+    answerWith(live);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(live.rows.length));
+    for (const row of live.rows) {
+      const link = container.querySelector(`.live-table-wrap a[href="/t/${row.token}"]`);
+      expect(link).not.toBeNull();
+      expect(link?.textContent).toBe(`${row.token.slice(0, 10)}…${row.token.slice(-6)}`);
+      expect(link?.getAttribute("title")).toBe(row.token);
+    }
+  });
+});
+
+/* The card layout: one token per card below the table's breakpoint
+   (REVAMP.md 1.2). Every assertion the table carries for a CONSTRAINT —
+   the window, the partial marker, the null-vs-zero distinction, the door,
+   no verdict — is carried onto the card here too, not just the table. */
+describe("the live board's card layout (below the table's breakpoint)", () => {
+  it("renders one card per token, each a door to its own page", async () => {
+    answerWith(live);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll(".live-card").length).toBe(live.rows.length));
+    for (const row of live.rows) {
+      const link = container.querySelector(`.live-card a[href="/t/${row.token}"]`);
+      expect(link).not.toBeNull();
+      expect(link?.textContent).toBe(`${row.token.slice(0, 10)}…${row.token.slice(-6)}`);
+      expect(link?.getAttribute("title")).toBe(row.token);
+    }
+  });
+
+  it("carries buys, sells and first-block buyers on every card", async () => {
+    answerWith(live);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll(".live-card").length).toBe(4));
+    for (const card of [...container.querySelectorAll(".live-card")]) {
+      const text = card.textContent ?? "";
+      expect(text).toContain("buys");
+      expect(text).toContain("sells");
+      expect(text).toContain("first-block buyers");
+    }
+  });
+
+  it("tells apart a first block never indexed from one indexed with no buyers, on the card too", async () => {
+    answerWith({
+      ...live,
+      rows: [
+        { ...live.rows[0], token: "0x1111111111111111111111111111111111111111", firstBlockBuyers: 0 },
+        { ...live.rows[3], token: "0x2222222222222222222222222222222222222222" },
+      ],
+      count: 2,
+    });
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll(".live-card").length).toBe(2));
+    const cards = [...container.querySelectorAll(".live-card")];
+    expect(cards[0]?.textContent).toContain("0");
+    expect(cards[1]?.textContent).toContain("not indexed");
+  });
+
+  it("carries the counted-over window and its partial marker on every card (CONSTRAINTS 3)", async () => {
+    answerWith(live);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll(".live-card").length).toBe(4));
+    const cards = [...container.querySelectorAll(".live-card")];
+    live.rows.forEach((row, i) => {
+      expect(cards[i]!.textContent).toContain(row.window.label);
+    });
+    const partialIndex = live.rows.findIndex((r) => r.window.partial);
+    expect(partialIndex).toBeGreaterThanOrEqual(0);
+    expect(cards[partialIndex]!.querySelector(".is-partial")).not.toBeNull();
+  });
+
+  it("renders the fill rule against each launch's OWN threshold on the card, both figures, never a lone percentage", async () => {
+    answerWith(live);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll(".live-card").length).toBe(4));
+    const cards = [...container.querySelectorAll(".live-card")];
+    live.rows.forEach((row, i) => {
+      if (row.fill === null) {
+        expect(cards[i]!.textContent).toContain("no threshold indexed");
+        return;
+      }
+      const net = pairQuantity(row.netQuoteWei, row.pairDecimals, null).text;
+      const threshold = pairQuantity(row.fill.graduationThresholdWei, row.pairDecimals, row.pairSymbol).text;
+      expect(cards[i]!.textContent).toContain(net);
+      expect(cards[i]!.textContent).toContain(threshold);
+    });
+  });
+
+  it("prints no per-token score, grade or verdict word on any card", async () => {
+    answerWith(live);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll(".live-card").length).toBe(4));
+    const lower = (container.querySelector(".live-cards")?.textContent ?? "").toLowerCase();
+    for (const banned of ["score", "grade", "rating", "safe", "rug", "likely", "trending"]) {
+      expect(lower.includes(banned), `"${banned}" is on a live card`).toBe(false);
+    }
   });
 });
 
