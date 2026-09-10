@@ -1,6 +1,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "../app/page";
+import NumberCard from "../app/number/page";
 import Cohorts from "../app/cohorts/page";
 import { h24 } from "../lib/number";
 import { fastShareFacts } from "../lib/summary";
@@ -39,9 +40,14 @@ function registers(container: HTMLElement): string[] {
   );
 }
 
+/* These assertions moved on 2026-09-10 from <Home /> to the pages that now
+   carry what they guarantee. The home page stopped reprinting the whole
+   instrument; nothing about the guarantees changed, so none of them were
+   dropped. The finding is on /number with the fold it belongs to, and the pair
+   register is on /cohorts with the other registers. */
 describe("the fast-graduation finding, in the fold", () => {
   it("renders as one sentence beneath the second figure", () => {
-    const { container } = render(<Home />);
+    const { container } = render(<NumberCard />);
     const finding = container.querySelector(".finding");
     expect(finding).not.toBeNull();
 
@@ -56,13 +62,13 @@ describe("the fast-graduation finding, in the fold", () => {
   });
 
   it("stands inside the crop — above the colophon strip", () => {
-    const { container } = render(<Home />);
+    const { container } = render(<NumberCard />);
     const nodes = [...container.querySelectorAll(".finding, .colophon")];
     expect(nodes[0]?.className).toContain("finding");
   });
 
   it("carries both shares through Stat, with n, window and measurement", () => {
-    const { container } = render(<Home />);
+    const { container } = render(<NumberCard />);
     const fast = fastShareFacts(h24);
     for (const name of ["fast-under-cutoff", "fast-under-60"]) {
       const el = container.querySelector(`[data-stat="${name}"]`) as HTMLElement | null;
@@ -73,7 +79,7 @@ describe("the fast-graduation finding, in the fold", () => {
   });
 
   it("has no separate Fast graduations entry left on the sheet", () => {
-    const { container } = render(<Home />);
+    const { container } = render(<NumberCard />);
     expect(container.querySelector("#h-fast")).toBeNull();
   });
 });
@@ -87,11 +93,14 @@ describe("the registers that moved to /cohorts", () => {
     expect(labels).not.toMatch(/launches per deployer/i);
   });
 
-  it("keeps the pair register on the sheet, beneath the pair finding", () => {
-    const { container } = render(<Home />);
+  it("keeps the pair register, now on /cohorts with the others", () => {
+    const { container } = render(<Cohorts />);
     expect(registers(container).join(" | ")).toMatch(/by pair token/i);
-    const entry = container.querySelector("#h-pair")?.closest(".entry");
-    expect(plain(entry)).toContain("the pair token makes no difference");
+  });
+
+  it("leaves no register stranded: the sheet points at the page that holds them", () => {
+    const { container } = render(<Home />);
+    expect(container.querySelector('a[href="/cohorts"]')).not.toBeNull();
   });
 
   it("finds all three on /cohorts", () => {

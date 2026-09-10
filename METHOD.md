@@ -76,6 +76,16 @@ The marks are a definition. They exist so that anything asking "where does this 
 
 ## Changelog of definitions
 
+- 2026-09-10 — **a published finding has partially reversed, and this entry is the reversal.** No definition changed; the data moved.
+
+  On 2026-09-07 the front page stated that, once graduations completed inside five minutes are excluded, the pair token makes no difference. On the record as it stood that was right, and it was the correction of an earlier artifact: the raw rates differed by pair while the organic rates did not.
+
+  Measured today over the whole indexed record, the ETH and stablecoin halves of that claim still hold and the third does not. Excluding graduations inside five minutes: ETH 0.82% of 66,713 launches, stablecoin 0.81% of 18,119, **tokenized stock 0.47% of 58,106**, other 0.73% of 961. ETH and stablecoin remain indistinguishable from each other. Tokenized stock is running at roughly half their rate, on a sample large enough that this is not sampling noise.
+
+  Counting every graduation rather than only the organic ones, the same buckets read ETH 1.68%, stablecoin 3.00% and tokenized stock 1.36%, so the ordering is different again depending on which rate is read. That is the same trap the 2026-09-07 entry describes and it has not gone away.
+
+  The superseded claim is kept here rather than edited away, per CONSTRAINTS 5. The sentence "the pair token makes no difference" has been removed from the site, because it is no longer true as stated. Nothing replaces it as a headline: the four pair cohorts are on `/cohorts` with their own sample sizes, and a reader can see the split without being told what it means. No mechanism is offered for why tokenized stock differs, because none is known.
+
 - 2026-09-10 — no new figure and no definition changed. This entry records an **analysis whose result was weaker than it first appeared**, because the figures it concerns are already published on `/cohorts` and a reader is owed what is known about them.
 
   The question was whether the hour of day a launch is made relates to whether it graduates. Across 143,899 launches in hours with at least 200 launches each, the rate excluding graduations that completed inside five minutes ranges from 1.03% in the 02:00 UTC hour, one in 97, to 0.43% in the 23:00 hour, one in 232. That is a spread of about 2.4 times, and the two extremes are further from the pooled rate of 0.68% than sampling alone at that rate would ordinarily produce. By day of week the spread is about 1.7 times, from 0.86% on Sunday to 0.52% on Tuesday.

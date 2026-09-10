@@ -9,17 +9,19 @@
                         the column they order by, and the fill rule against
                         each launch's own graduation threshold.
 
-     LiveNow        -- the tight extract that leads "/" (REPOSITION.md
-                        Build order B): the same rows, fewer columns, no sort
-                        control, fixed to the API's own default order, with a
-                        line to the full board.
+     LivePulse      -- the two-number pulse that leads "/" (the 2026-09
+                        front-door rebuild): how many of the tracked curves
+                        are taking buys right now, and how many launched in
+                        the last hour. No table, no sort control -- the rows
+                        are read down to two counts, because the front door's
+                        job is to show that something is happening, not to be
+                        a second copy of the board underneath it.
 
    Neither face ranks, scores or grades a token. Every sortable quantity is a
    plain column on the same row a reader can already see (CONSTRAINTS 1);
    nothing here composes a verdict out of them. */
 
 import { useEffect, useState, type MouseEvent, type ReactElement } from "react";
-import Link from "next/link";
 import { fetchLive, stripAddresses, type LiveResult, type LiveSortKey } from "../lib/api";
 import { LIVE_SORT_KEYS } from "../lib/api-schema";
 import type { LiveResponse } from "../lib/api-schema";
@@ -84,6 +86,59 @@ function stalenessNote(body: LiveResponse): ReactElement | null {
       The live index has not completed a run recently. These rows are the last it read, not a
       current reading.
     </p>
+  );
+}
+
+/* ---- the pulse: leads "/" ----------------------------------------------
+   Two readings off the same rows the board already fetches -- no second
+   fetcher, per REPOSITION.md. Both are plain counts, not rates, so neither
+   needs a denominator to be a legal figure (CONSTRAINTS 3 requires a window,
+   which a plain count still carries); the first prints one anyway, because
+   the live board's own population is right there in body.count. The one hue
+   this site spends on liveness (globals.css `--fill`, the same accent the
+   fill bar uses) marks both numbers so the reader's eye lands on the thing
+   that is moving before it lands on anything else. */
+
+const HOUR_SECONDS = 3600;
+
+export function LivePulse(): ReactElement {
+  const result = useLiveBoard(DEFAULT_SORT);
+  const body = result?.kind === "live" ? result.body : null;
+
+  if (result !== null && result.kind === "error") {
+    return <p className="lookup-line-plain">{result.message}</p>;
+  }
+  if (body === null) {
+    return <div className="hairline-pulse" />;
+  }
+
+  const takingBuys = body.rows.filter((r) => r.buys > 0).length;
+  const lastHour = body.rows.filter((r) => r.ageSeconds <= HOUR_SECONDS).length;
+  const ageSeconds = Math.max(0, Math.round((Date.now() - Date.parse(body.observedAt)) / 1000));
+
+  return (
+    <div className="live-pulse">
+      <div className="pulse-reading">
+        <span className="pulse-figure mono">{formatCount(takingBuys)}</span>
+        <p className="pulse-caption">
+          of <span className="mono">{formatCount(body.count)}</span> tracked curves taking buys
+          right now
+        </p>
+      </div>
+      <div className="pulse-reading">
+        <span className="pulse-figure mono">{formatCount(lastHour)}</span>
+        <p className="pulse-caption">launched in the last hour</p>
+      </div>
+      <p className="note note--fine pulse-age">
+        {body.live.stale ? (
+          <span className="mono is-stale">the live index has not run recently</span>
+        ) : (
+          <>
+            as of <span className="mono">{formatAge(ageSeconds)}</span> ago · updates every 15s
+          </>
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -265,70 +320,3 @@ export function LiveBoardFull(): ReactElement {
   );
 }
 
-/* ---- the tight extract: leads "/" -------------------------------------- */
-
-const EXTRACT_ROWS = 6;
-
-export function LiveNow(): ReactElement {
-  const result = useLiveBoard(DEFAULT_SORT);
-  const body = result?.kind === "live" ? result.body : null;
-  const rows = body === null ? [] : body.rows.slice(0, EXTRACT_ROWS);
-
-  return (
-    <div className="live-now">
-      {result === null ? <div className="hairline-pulse" /> : null}
-      {result !== null && result.kind === "error" ? (
-        <p className="lookup-line-plain">{result.message}</p>
-      ) : null}
-
-      {body !== null ? (
-        <>
-          <p className="live-now-count">
-            <span className="mono">{formatCount(body.count)}</span> tokens with activity right
-            now
-            {body.live.stale ? (
-              <span className="mono is-stale"> · the live index has not run recently</span>
-            ) : null}
-          </p>
-
-          <div className="scroller" tabIndex={0} role="group" aria-label="The last launches with activity">
-            <table>
-              <caption>Sorted by most recent activity. The full board is on /live.</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Token</th>
-                  <th scope="col">Pair</th>
-                  <th scope="col">Buys</th>
-                  <th scope="col">Sells</th>
-                  <th scope="col">Fill against own threshold</th>
-                  <th scope="col">State</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.token}>
-                    <th scope="row" className="mono">
-                      {row.token}
-                    </th>
-                    <td className="fig n">{stripAddresses(pairLabel(row.pairClass))}</td>
-                    <td className="fig n">{formatCount(row.buys)}</td>
-                    <td className="fig n">{formatCount(row.sells)}</td>
-                    <FillCell row={row} />
-                    <td className="thin">{row.graduated ? "graduated" : "on the curve"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {rows.length === 0 ? (
-            <p className="note note--fine">No launch has activity in the indexed window.</p>
-          ) : null}
-        </>
-      ) : null}
-
-      <p className="live-now-link">
-        <Link href="/live">Every column, sortable, on the live board</Link>
-      </p>
-    </div>
-  );
-}

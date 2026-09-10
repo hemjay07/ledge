@@ -142,9 +142,27 @@ describe("the sample, in the fold", () => {
 });
 
 describe("the sample, on both surfaces", () => {
-  it("is on the sheet", () => {
+  /* The sample used to be printed in full on the home page as well. It moved
+     to /number on 2026-09-10 when the home page stopped reprinting the whole
+     instrument, and CONSTRAINTS 5 is the reason this test did not simply lose
+     the assertion: never hiding an unflattering number is a guarantee about
+     REACHABILITY, not about which page leads. So the home page must still
+     carry the figure and a way to the full treatment, and that is asserted
+     here rather than deleted. */
+  it("is reachable from the sheet, which states the rate and links to it", () => {
     const { container } = render(<Home />);
-    expect(plain(container.querySelector(".sample-line"))).toBe(sampleSentence(S));
+    /* The value itself is not pinned here: this page renders the LIVE file
+       while this suite's fixture is frozen, and pinning a live figure is what
+       has broken these tests before. What is pinned is the guarantee — the
+       rate is stated with the window and the denominator it was counted over,
+       and both the full treatment and the method are one click away. */
+    const stated = container.querySelector(".headline-rate");
+    expect(stated).not.toBeNull();
+    const text = plain(stated);
+    expect(text).toMatch(/launches in the last 24 hours/);
+    expect(text).toMatch(/\d/);
+    expect(container.querySelector('a[href="/number"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/method"]')).not.toBeNull();
   });
 
   it("is on the card page, which is what travels", () => {

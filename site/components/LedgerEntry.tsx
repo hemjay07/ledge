@@ -1,8 +1,11 @@
 import type { ReactElement, ReactNode } from "react";
 
 export interface LedgerEntryProps {
-  /** folio number in the margin, e.g. "04" */
-  folio: string;
+  /** folio number in the margin, e.g. "04". Omitted on the front door
+      (app/page.tsx), which does not number its entries: the rule ladder
+      still carries the eye, and attr(data-folio) prints nothing when the
+      attribute is absent. */
+  folio?: string;
   heading: string;
   /** the entry's own denominator, printed beside the heading */
   headingNote?: ReactNode;

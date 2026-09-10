@@ -52,10 +52,13 @@
   --stale: #b3321c;
   --stale-ink: #ffffff;
   /* The discovery pages' one other hue (CONSTRAINTS.md "Design posture"): a
-     progress rule against a launch's own threshold. A cool blue, well clear
-     of --stale's warm red-orange, and off the banned end of the wheel
-     entirely (CONSTRAINTS.md's NOT-THIS list), so the two things this site
-     spends colour on can never be mistaken for each other on the same row. */
+     progress rule against a launch's own threshold, and — since the 2026-09
+     front-door rebuild — the live pulse's two figures on "/". One accent,
+     spent on both things this site calls "live". A cool blue, well clear of
+     --stale's warm red-orange (readable apart under deuteranopia and
+     protanopia simulation, not just by hue name), and off the banned end of
+     the wheel entirely (CONSTRAINTS.md's NOT-THIS list), so the two things
+     this site spends colour on can never be mistaken for each other. */
   --fill: #2f6690;
   --pad-x: 1.25rem;
 }
@@ -1320,6 +1323,104 @@ footer {
   max-width: 52ch;
   margin-top: var(--s-3);
   text-wrap: pretty;
+}
+
+/* The live pulse: two counts, large, off the same rows the board already
+   fetches -- no second fetcher (REPOSITION.md, Live.tsx `LivePulse`). The one
+   hue this site spends on liveness -- the same accent the fill bar uses on
+   /live -- marks the figures, so the reader's eye lands on what is moving
+   before it lands on anything else. Neither reading is a rate, so neither
+   needs a denominator to be a legal count (CONSTRAINTS 3 asks only for the
+   window); the first prints one anyway because the population is on hand. */
+.live-pulse {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-6) var(--s-8);
+  margin: var(--s-2) 0 0 6%;
+}
+@media (min-width: 48rem) {
+  .live-pulse {
+    margin-left: 12%;
+  }
+}
+.pulse-reading {
+  min-width: 9rem;
+}
+.pulse-figure {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.25rem, 8vw, 3.75rem);
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  color: var(--fill);
+}
+.pulse-caption {
+  font-family: var(--font-body);
+  font-size: var(--fs-note);
+  color: var(--ink-2);
+  margin-top: var(--s-1);
+  max-width: 20ch;
+}
+.pulse-age {
+  flex-basis: 100%;
+  margin-top: var(--s-1);
+}
+
+/* The capability line and the facts behind it: what LEDGE lets a reader do,
+   set ahead of the shape that proves it. Indented with the pulse and the
+   fold's own kicker, so the three read as one band. */
+.capability {
+  margin: var(--s-6) 0 0 6%;
+  max-width: 56ch;
+}
+@media (min-width: 48rem) {
+  .capability {
+    margin-left: 12%;
+  }
+}
+.capability-line {
+  font-family: var(--font-body);
+  font-size: var(--fs-lede);
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.capability-facts {
+  font-family: var(--font-body);
+  font-size: var(--fs-note);
+  color: var(--ink-2);
+  margin-top: var(--s-2);
+  text-wrap: pretty;
+}
+
+/* The shape, ahead of the Number: the record's own proof that "graduated" is
+   not one thing, printed before the population figures rather than after. */
+.shape-lead {
+  margin-top: var(--s-8);
+}
+.shape-lead .kicker {
+  margin-left: 6%;
+}
+@media (min-width: 48rem) {
+  .shape-lead .kicker {
+    margin-left: 12%;
+  }
+}
+
+/* The three paths onward: plain links in the sheet-nav vocabulary, not
+   buttons -- nothing here is a call to action, only a place to go next. */
+.paths-on {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-6) 0 0 6%;
+  font-family: var(--font-mono);
+  font-size: var(--fs-note);
+}
+@media (min-width: 48rem) {
+  .paths-on {
+    margin-left: 12%;
+  }
 }
 
 .live-now-count {

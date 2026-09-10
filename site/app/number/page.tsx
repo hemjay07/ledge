@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Fold } from "../../components/Fold";
+import { Stat } from "../../components/Stat";
 import { Footer } from "../../components/Footer";
 import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { h24, numberFile, SITE_URL } from "../../lib/number";
-import { formatDurationLong, formatStamp, renderableSample } from "../../lib/format";
-import { shareSummary } from "../../lib/summary";
+import { formatCount, formatDurationLong, formatStamp, renderableSample } from "../../lib/format";
+import { fastShareFacts, shareSummary } from "../../lib/summary";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 
@@ -21,6 +22,7 @@ const cutoffWords = formatDurationLong(exFast.cutoffSeconds);
    alt text, and it is built by the shared formatter: when the rate may not be
    printed, none of the four carries a percentage. */
 const summary = shareSummary(h24, cutoffWords);
+const fast = fastShareFacts(h24);
 
 export const metadata: Metadata = {
   title: "The Pons Number — LEDGE",
@@ -58,6 +60,51 @@ export default function NumberCard(): ReactElement {
           crawledAt={crawledAt}
           staleAfterSeconds={staleAfterSeconds}
           sample={raisedNothing}
+          /* Why the second figure exists: most graduations are the fast ones.
+             This sentence used to sit on the home page. When the home page
+             stopped reprinting the whole instrument on 2026-09-10 it would
+             otherwise have been left on no page at all, and a finding that
+             exists on no page is hidden, which CONSTRAINTS 5 forbids. It lives
+             here, on the page the figure belongs to and the one that travels. */
+          finding={
+            fast.insufficient ? (
+              <Stat
+                value={null}
+                n={fast.n}
+                window="24h"
+                updatedAt={crawledAt}
+                insufficient
+                name="fast-shares"
+              />
+            ) : (
+              <>
+                <Stat
+                  className="mono"
+                  name="fast-under-cutoff"
+                  value={fast.underCutoff.rate}
+                  n={fast.n}
+                  window="24h"
+                  updatedAt={crawledAt}
+                  insufficient={fast.underCutoff.insufficient}
+                />{" "}
+                of graduations completed inside {cutoffWords};{" "}
+                <Stat
+                  className="mono"
+                  name="fast-under-60"
+                  value={fast.under60.rate}
+                  n={fast.n}
+                  window="24h"
+                  updatedAt={crawledAt}
+                  insufficient={fast.under60.insufficient}
+                />{" "}
+                inside 60 seconds.{" "}
+                <span className="den">
+                  (n&nbsp;=&nbsp;<span className="mono">{formatCount(fast.n)}</span> graduations ·
+                  24 h)
+                </span>
+              </>
+            )
+          }
         />
         <ColophonStrip stamp={formatStamp(crawledAt)} />
 

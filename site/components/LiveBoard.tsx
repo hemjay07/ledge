@@ -37,7 +37,7 @@ function rowsOf(result: LiveResult): Row[] {
   }));
 }
 
-export function LiveBoard({ folio }: { folio: string }): ReactElement {
+export function LiveBoard({ folio }: { folio?: string }): ReactElement {
   const [result, setResult] = useState<LiveResult | null>(null);
   const [observedMs, setObservedMs] = useState<number | null>(null);
   const [ageSeconds, setAgeSeconds] = useState<number | null>(null);

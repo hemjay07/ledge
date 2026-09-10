@@ -1,5 +1,5 @@
 import type { WindowData } from "./schema";
-import { formatCount, formatStamp, isInsufficient, rateText } from "./format";
+import { INSUFFICIENT_BELOW, formatCount, formatStamp, isInsufficient, rateText } from "./format";
 import { LEAD } from "./lead";
 
 /* Every sentence that carries a rate off the page — the accessible text under
@@ -104,4 +104,22 @@ export function fastShareFacts(w: WindowData) {
        half a finding reads as a finding */
     insufficient: isInsufficient(underCutoff) || isInsufficient(under60),
   };
+}
+
+/* ---- the front door's capability line -----------------------------------
+   The share of graduations that finished inside a threshold, read off the
+   published time-to-graduation histogram (lib/schema ttgHistogramBucket)
+   rather than typed as a literal: the fixture is the only place either
+   number is allowed to live, so a re-measurement moves the page and the test
+   that checks it together. Only whole buckets under the threshold are
+   summed -- the histogram's edges are a published definition (Shape.tsx),
+   not a cutoff this function invents. */
+export function underSecondsFact(w: WindowData, thresholdSeconds: number) {
+  const n = w.ttg.n;
+  const insufficient = w.ttg.insufficient || n < INSUFFICIENT_BELOW;
+  const count = w.ttg.histogram
+    .filter((b) => b.toSeconds !== null && b.toSeconds <= thresholdSeconds)
+    .reduce((acc, b) => acc + b.graduations, 0);
+  const rate = insufficient || n === 0 ? null : count / n;
+  return { rate, n, insufficient, count };
 }

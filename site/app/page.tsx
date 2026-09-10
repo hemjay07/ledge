@@ -5,10 +5,11 @@ import { Fold } from "../components/Fold";
 import { Footer } from "../components/Footer";
 import { LedgerEntry } from "../components/LedgerEntry";
 import { LiveBoard } from "../components/LiveBoard";
-import { LiveNow } from "../components/Live";
+import { LivePulse } from "../components/Live";
 import { Lookup } from "../components/Lookup";
 import { Register } from "../components/Register";
 import { Scale } from "../components/Scale";
+import { Shape } from "../components/Shape";
 import { SheetNav } from "../components/SheetNav";
 import { StaleBanner } from "../components/StaleBanner";
 import { Stat } from "../components/Stat";
@@ -21,9 +22,11 @@ import {
   formatStamp,
   pairLabel,
   renderableSample,
+  formatOneIn,
+  insufficientText,
 } from "../lib/format";
 import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow } from "../lib/rows";
-import { fastShareFacts } from "../lib/summary";
+import { fastShareFacts, underSecondsFact } from "../lib/summary";
 import { sameMeasurement } from "../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
@@ -36,6 +39,13 @@ const raisedNothing = renderableSample(numberFile.samples, "raisedNothing");
 /* keyed off the data: while all-time holds exactly what the trailing 24 hours
    holds, the second pair sentence would restate one measurement as two */
 const allTimeIsSameMeasurement = sameMeasurement(h24, allTime);
+
+/* The capability line's own fact, off the whole record rather than the
+   trailing 24 hours: it is a claim about what "graduated" means at all, not
+   about today, so it is measured over the same window the shape below it
+   draws from. */
+const UNDER_TEN_SECONDS_THRESHOLD = 10;
+const underTen = underSecondsFact(allTime, UNDER_TEN_SECONDS_THRESHOLD);
 
 /** A pair bucket, or an empty one standing in its place: a missing bucket has
     measured nothing, so it carries n = 0 and prints its sample size. */
@@ -54,6 +64,13 @@ function pairRow(w: WindowData, bucket: string): CohortRow {
 
 export default function Home(): ReactElement {
   const exFast = h24.excludingFast;
+
+/* "1 in N", or the sample size when the sample cannot support a rate.
+   CONSTRAINTS 4: below the minimum this prints its n, never a ratio. */
+const exFastOneIn =
+  exFast.insufficient || exFast.oneIn === null
+    ? insufficientText(h24.launches)
+    : formatOneIn(exFast.oneIn);
   const cutoffWords = formatDurationLong(exFast.cutoffSeconds);
   const fast = fastShareFacts(h24);
 
@@ -105,172 +122,83 @@ export default function Home(): ReactElement {
 
       <main className="sheet">
         <SheetNav current="home" />
-        {/* the fold — everything a phone screenshot must carry */}
-        <RunningHead mark="LEDGE" win="Trailing 24 hours · 01" />
+        <RunningHead mark="LEDGE" win="Trailing 24 hours" />
 
-        {/* the discovery lead: what is happening right now, ahead of the
-            Number. The Number stays in the same crop, immediately below —
-            present and prominent, no longer the only thing here. */}
+        {/* ---- the front door: live pulse, capability, proof, paths ---- */}
+
         <div className="discovery-lead">
-          <h2 className="kicker">What&rsquo;s happening now</h2>
-          <LiveNow />
-          <p className="discovery-headline">
+          <h2 className="kicker">Live now</h2>
+          <LivePulse />
+        </div>
+
+        <div className="capability">
+          <p className="capability-line">
+            LEDGE times every pons graduation, not just whether one happened.
+          </p>
+          <p className="capability-facts">
+            Of <span className="mono">{formatCount(allTime.graduations)}</span> graduations,{" "}
             <Stat
               className="mono"
-              name="pons-number-lead"
-              value={h24.rate}
-              n={h24.launches}
-              window="24h"
+              name="under-ten-seconds"
+              value={underTen.rate}
+              n={underTen.n}
+              window="all-time"
               updatedAt={crawledAt}
-              insufficient={h24.insufficient}
+              insufficient={underTen.insufficient}
             />{" "}
-            of <span className="mono">{formatCount(h24.launches)}</span> Pons launches in the
-            last 24&nbsp;hours graduated — the Pons Number, in full on{" "}
-            <Link href="/number">/number</Link>.
+            finished in under 10&nbsp;seconds, some in the same block as their own launch.
+            &ldquo;Graduated&rdquo; is not one thing.
           </p>
         </div>
 
-        <Fold
-          w={h24}
-          crawledAt={crawledAt}
-          staleAfterSeconds={staleAfterSeconds}
-          sample={raisedNothing}
-          secondaryCounts
-          dek={
-            <p className="dek">
-              Pons is a token launchpad on Robinhood Chain. A launch graduates when its bonding
-              curve fills to 4.2&nbsp;ETH and the token moves to an open market. LEDGE reads every
-              launch from the factory contract and counts, hourly.
-            </p>
-          }
-          /* why the second figure exists: most graduations are the fast ones */
-          finding={
-            fast.insufficient ? (
-              <Stat
-                value={null}
-                n={fast.n}
-                window="24h"
-                updatedAt={crawledAt}
-                insufficient
-                name="fast-shares"
-              />
-            ) : (
-              <>
-                <Stat
-                  className="mono"
-                  name="fast-under-cutoff"
-                  value={fast.underCutoff.rate}
-                  n={fast.n}
-                  window="24h"
-                  updatedAt={crawledAt}
-                  insufficient={fast.underCutoff.insufficient}
-                />{" "}
-                of graduations completed inside {cutoffWords};{" "}
-                <Stat
-                  className="mono"
-                  name="fast-under-60"
-                  value={fast.under60.rate}
-                  n={fast.n}
-                  window="24h"
-                  updatedAt={crawledAt}
-                  insufficient={fast.under60.insufficient}
-                />{" "}
-                inside 60 seconds.{" "}
-                <span className="den">
-                  (n&nbsp;=&nbsp;<span className="mono">{formatCount(fast.n)}</span> graduations ·
-                  24 h)
-                </span>
-              </>
-            )
-          }
-          fine={
-            <>
-              {h24.lowerBound
-                ? "A launch near the end of the window may still graduate, so the 24-hour figure is a lower bound for the most recent hours. "
-                : ""}
-              {h24.orphans > 0
-                ? `${formatCount(h24.orphans)} graduations had no launch in the record and are excluded from every rate.`
-                : ""}
-            </>
-          }
-        />
-        <ColophonStrip stamp={formatStamp(crawledAt)} />
-        {/* end of fold */}
+        <div className="shape-lead">
+          <h2 className="kicker">The shape of the record</h2>
+          <Shape
+            histogram={allTime.ttg.histogram}
+            n={allTime.ttg.n}
+            insufficient={allTime.ttg.insufficient}
+          />
+          <p className="note note--fine">
+            Time to graduation for every launch LEDGE holds, counted over{" "}
+            <span className="mono">{formatCount(allTime.ttg.n)}</span> graduations. The bars are
+            counts, drawn from zero; no bucket is a label.
+          </p>
+        </div>
 
-        <LedgerEntry
-          folio="02"
-          id="h-lookup"
-          heading="One launch"
-          headingNote="· against the published cohorts"
-        >
+        <nav className="paths-on" aria-label="Go deeper">
+          <Link href="/live">The live board</Link>
+          <Link href="/graduated">Every graduation</Link>
+          <Link href="/graveyard">The graveyard</Link>
+        </nav>
+
+        {/* The population figures, stated and linked rather than reprinted.
+
+            They used to occupy this page in full, identically to /number, which
+            made the home page twice as long and put the most discouraging true
+            thing on the site in front of a first-time reader. CONSTRAINTS 5
+            forbids HIDING an unflattering number; it does not require it to be
+            the first thing anyone reads, and it is not hidden: the figure is
+            stated here with its denominator, /number carries it in full with
+            its card, and /method carries how it was measured. Which true thing
+            leads is a choice, and this is the choice. */}
+        <section className="headline-rate">
+          <p className="lede">
+            Of {formatCount(h24.launches)} launches in the last 24 hours,{" "}
+            {formatCount(h24.excludingFast.graduations)} graduated on demand rather than filling
+            inside {cutoffWords} — {exFastOneIn}. Counting every graduation, {formatCount(h24.graduations)}.
+          </p>
+          <p className="note">
+            <Link href="/number">The Pons Number in full</Link> ·{" "}
+            <Link href="/method">how it is measured</Link>
+          </p>
+        </section>
+        <ColophonStrip stamp={formatStamp(crawledAt)} />
+
+        <LedgerEntry id="h-lookup" heading="One launch" headingNote="· against the published cohorts">
           <Lookup />
         </LedgerEntry>
 
-        <LedgerEntry
-          folio="03"
-          id="h-pair"
-          heading="By pair token"
-          headingNote={`· 24 h · n = ${formatCount(h24.launches)} launches`}
-        >
-          <p className="lede">
-            Excluding launches that graduated inside {cutoffWords}, the pair token makes no
-            difference: stablecoin {pairSlowRate(stableAll, "pair-stable-slow", "all-time")},
-            ETH {pairSlowRate(ethAll, "pair-eth-slow", "all-time")}, over{" "}
-            {counts(stableAll)} and {counts(ethAll)}.
-          </p>
-          <p className="note">
-            Counting every graduation the same buckets read{" "}
-            {pairRate(stableAll, "pair-stable-all-time", "all-time")} and{" "}
-            {pairRate(ethAll, "pair-eth-all-time", "all-time")}. The whole of that difference is
-            graduations that completed inside {cutoffWords}.
-          </p>
-          <Register
-            ariaLabel="Graduation rate by pair token"
-            caption="Graduations of launches, by the token the pool is paired against."
-            columns={COHORT_COLUMNS("Pair token")}
-            rows={h24.cohorts.pair.map((r) => cohortRegisterRow(pairLabel(r.bucket), r))}
-            foot={cohortFooting(h24)}
-            note={excludedNote(h24.cohortsExcluded.pair)}
-          />
-        </LedgerEntry>
-
-        <LedgerEntry
-          folio="04"
-          id="h-ttg"
-          heading="Time to graduation"
-          headingNote={`· n = ${formatCount(h24.ttg.n)} graduations · 24 h`}
-        >
-          {h24.ttg.p90 !== null && h24.ttg.p50 !== null ? (
-            <p className="lede">
-              9 in 10 graduations happened within {formatDuration(h24.ttg.p90)}. Median{" "}
-              {formatDuration(h24.ttg.p50)}.
-            </p>
-          ) : null}
-
-          <Scale ttg={h24.ttg} cutoffSeconds={exFast.cutoffSeconds} />
-
-          <p className="note note--fine">
-            {(
-              [
-                ["p10", h24.ttg.p10],
-                ["p25", h24.ttg.p25],
-                ["p50", h24.ttg.p50],
-                ["p75", h24.ttg.p75],
-                ["p90", h24.ttg.p90],
-                ["p95", h24.ttg.p95],
-                ["max", h24.ttg.max],
-              ] as const
-            )
-              .filter(([, v]) => v !== null)
-              .map(([k, v]) => `${k} ${formatDuration(v as number)}`)
-              .join(" · ")}
-            .
-          </p>
-        </LedgerEntry>
-
-        <LiveBoard folio="05" />
-
-        <LedgerEntry folio="06" id="h-what" heading="What this is">
+        <LedgerEntry id="h-what" heading="What this is">
           <p className="lede">
             LEDGE reads the Pons factory contract every hour, records every launch it finds, and
             counts how many graduated — in the last 24 hours and over the indexed record, split by
@@ -286,14 +214,14 @@ export default function Home(): ReactElement {
           </p>
         </LedgerEntry>
 
-        <LedgerEntry folio="07" id="h-cohorts" heading="More cohorts">
+        <LedgerEntry id="h-cohorts" heading="More cohorts">
           <p className="note">
             Creator tax, hour of day, day of week, launches per deployer and the all-time window
             are in full on <Link href="/cohorts">the cohorts page</Link>.
           </p>
         </LedgerEntry>
 
-        <LedgerEntry folio="08" id="h-config" heading="Configurations">
+        <LedgerEntry id="h-config" heading="Configurations">
           <p className="note">
             Pair token crossed with creator tax, all 20 cells in both windows, is on{" "}
             <Link href="/cockpit">the configurations page</Link>.

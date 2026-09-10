@@ -1,16 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import Home from "../app/page";
-import { LiveNow } from "../components/Live";
-import { h24, numberFile } from "../lib/number";
+import { LivePulse } from "../components/Live";
+import { allTime } from "../lib/number";
 import { formatCount } from "../lib/format";
+import { underSecondsFact } from "../lib/summary";
 import live from "./api-fixtures/live-ok.json";
 
-/* REPOSITION.md Phase B, site side: "/" leads with what is happening now and
-   carries the headline counts; the Number stays present and prominent but no
-   longer occupies the page alone. Every assertion about the Number's own
-   figures is derived from the frozen fixture (tests/fixtures.ts), the same
-   one the rest of the suite reads, never a hand-typed rate. */
+/* The front-door rebuild (2026-09): "/" leads with a live pulse that moves,
+   one plain line naming what LEDGE lets a reader do, the shape of the whole
+   record as proof, and three paths onward -- all ahead of the Pons Number's
+   own fold, which keeps exactly the shape it has on /number. Every assertion
+   about the Number's own figures, or the capability line's own fact, is
+   derived from the frozen fixture (tests/fixtures.ts) or from the same
+   formatter the page uses, never a hand-typed rate. */
 
 function answerWith(payload: unknown) {
   const impl = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
@@ -27,44 +30,87 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("the discovery lead on /", () => {
-  it("stands before the Number's own fold, inside the same crop", async () => {
+describe("the front door, above the fold", () => {
+  /* The home page stopped reprinting the Number's whole fold on 2026-09-10:
+     it was identical to /number, doubled the page's length, and put the most
+     discouraging true figure on the site in front of a first-time reader. The
+     rate is still stated here, with its window and denominator, and linked to
+     in full -- asserted below and in sample.test.tsx. Which true thing leads is
+     a choice; hiding one is not, and nothing is hidden. */
+  it("opens with the live pulse, ahead of the stated rate", async () => {
     const { container } = render(<Home />);
+    await waitFor(() => expect(container.querySelector(".live-pulse")).not.toBeNull());
     const lead = container.querySelector(".discovery-lead");
-    const figure = container.querySelector(".figure-block");
+    const rate = container.querySelector(".headline-rate");
     expect(lead).not.toBeNull();
-    expect(figure).not.toBeNull();
-    expect(lead!.compareDocumentPosition(figure!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(lead?.querySelector(".live-pulse")).not.toBeNull();
+    expect(rate).not.toBeNull();
+    expect(lead!.compareDocumentPosition(rate!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("carries the live board, or a tight extract of it", async () => {
+  it("orders capability, shape and paths between the pulse and the Number", async () => {
     const { container } = render(<Home />);
-    await waitFor(() => expect(container.querySelectorAll(".live-now tbody tr").length).toBeGreaterThan(0));
-    const lead = container.querySelector(".discovery-lead");
-    expect(lead?.querySelector(".live-now")).not.toBeNull();
+    await waitFor(() => expect(container.querySelector(".live-pulse")).not.toBeNull());
+    const order = [".live-pulse", ".capability", ".shape-lead", ".paths-on", ".headline-rate"].map(
+      (sel) => container.querySelector(sel),
+    );
+    expect(order.every((el) => el !== null)).toBe(true);
+    for (let i = 1; i < order.length; i += 1) {
+      expect(order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
   });
 
-  it("carries the headline counts: the 24h launch count and the Number, linked to /number", async () => {
+  it("carries no verdict about an individual token in the capability line or its facts", () => {
     const { container } = render(<Home />);
-    const lead = container.querySelector(".discovery-lead");
-    expect(lead?.textContent).toContain(formatCount(h24.launches));
-    const stat = lead?.querySelector('[data-stat="pons-number-lead"]');
+    const text = (container.querySelector(".capability")?.textContent ?? "").toLowerCase();
+    for (const banned of ["score", "rug", "safe", "risk", "likely", "predict", "odds", "chance"]) {
+      expect(text.includes(banned), `"${banned}" is in the capability copy`).toBe(false);
+    }
+  });
+
+  it("states the capability's fact with its denominator, derived from the frozen fixture", () => {
+    const { container } = render(<Home />);
+    const fact = underSecondsFact(allTime, 10);
+    const stat = container.querySelector('[data-stat="under-ten-seconds"]');
     expect(stat).not.toBeNull();
-    expect(stat?.getAttribute("data-n")).toBe(String(h24.launches));
-    expect(stat?.getAttribute("data-updated")).toBe(numberFile.crawledAt);
-    expect(lead?.querySelector('a[href="/number"]')).not.toBeNull();
+    expect(stat?.getAttribute("data-n")).toBe(String(fact.n));
+    expect(stat?.getAttribute("data-window")).toBe("all-time");
+    expect(container.querySelector(".capability")?.textContent).toContain(
+      formatCount(allTime.graduations),
+    );
   });
 
-  it("does not print the Number's fold alone: the sheet still carries the sample, the finding and the pair register beneath it", () => {
+  it("draws the shape of the whole record, fed from allTime.ttg, ahead of the paths", () => {
     const { container } = render(<Home />);
-    expect(container.querySelector(".sample-line")).not.toBeNull();
-    expect(container.querySelector(".finding")).not.toBeNull();
-    expect(container.querySelector("#h-pair")).not.toBeNull();
+    const shape = container.querySelector(".shape-lead .shape");
+    expect(shape).not.toBeNull();
+    expect(shape?.querySelectorAll("rect.shape-bar").length).toBe(allTime.ttg.histogram.length);
   });
 
-  it("still keeps the deep live board on the sheet, unchanged, with its own folio", () => {
+  it("carries three paths onward: the live board, every graduation, the graveyard", () => {
     const { container } = render(<Home />);
-    expect(container.querySelector("#h-live")).not.toBeNull();
+    const paths = container.querySelector(".paths-on");
+    expect(paths).not.toBeNull();
+    const hrefs = [...(paths?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["/live", "/graduated", "/graveyard"]);
+  });
+
+  /* CONSTRAINTS 5 is a guarantee about reachability, not about which page
+     leads. Everything the sheet used to reprint is one click away and named,
+     so nothing can be quietly dropped without this failing. */
+  it("leaves nothing stranded: every figure it stopped reprinting is named and linked", () => {
+    const { container } = render(<Home />);
+    const rate = container.querySelector(".headline-rate");
+    expect(rate).not.toBeNull();
+    expect(rate?.textContent).toMatch(/launches in the last 24 hours/);
+    for (const href of ["/number", "/method", "/cohorts", "/live", "/graduated", "/graveyard"]) {
+      expect(container.querySelector(`a[href="${href}"]`), href).not.toBeNull();
+    }
+  });
+
+  it("carries no folio numbers", () => {
+    const { container } = render(<Home />);
+    expect(container.querySelectorAll(".entry[data-folio]").length).toBe(0);
   });
 
   it("carries /live in the sheet index", () => {
@@ -75,35 +121,32 @@ describe("the discovery lead on /", () => {
   });
 });
 
-describe("the tight live extract", () => {
-  it("shows no more than six rows, tallest first by recency, even when more are indexed", async () => {
-    const many = {
-      ...live,
-      rows: Array.from({ length: 9 }, (_, i) => ({
-        ...live.rows[0],
-        token: `0x${String(i).padStart(40, "0")}`,
-      })),
-      count: 9,
-    };
-    answerWith(many);
-    const { container } = render(<LiveNow />);
-    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBeGreaterThan(0));
-    expect(container.querySelectorAll("tbody tr").length).toBe(6);
+describe("the live pulse", () => {
+  it("reads two counts off the same rows the board fetches, each with a window", async () => {
+    const { container } = render(<LivePulse />);
+    await waitFor(() => expect(container.querySelectorAll(".pulse-reading").length).toBe(2));
+    const takingBuys = live.rows.filter((r) => r.buys > 0).length;
+    const lastHour = live.rows.filter((r) => r.ageSeconds <= 3600).length;
+    const readings = [...container.querySelectorAll(".pulse-figure")].map((el) => el.textContent);
+    expect(readings).toEqual([formatCount(takingBuys), formatCount(lastHour)]);
+    expect(container.textContent).toContain("taking buys right now");
+    expect(container.textContent).toContain("launched in the last hour");
   });
 
-  it("links to the full board", async () => {
-    const { container } = render(<LiveNow />);
-    await waitFor(() => expect(container.querySelector('a[href="/live"]')).not.toBeNull());
+  it("carries the live board's own population as the first reading's denominator", async () => {
+    const { container } = render(<LivePulse />);
+    await waitFor(() => expect(container.querySelector(".pulse-reading")).not.toBeNull());
+    expect(container.textContent).toContain(`of ${formatCount(live.count)}`);
   });
 
-  it("says the board did not answer rather than showing an empty table as though it had", async () => {
+  it("says the board did not answer rather than showing a stale pulse as though it were live", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
         throw new Error("offline");
       }),
     );
-    const { container } = render(<LiveNow />);
+    const { container } = render(<LivePulse />);
     await waitFor(() => expect(container.textContent).toContain("did not answer"));
   });
 });

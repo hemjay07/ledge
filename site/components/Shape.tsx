@@ -31,7 +31,7 @@ const BASE_Y = 210;
 const TOP_Y = 30;
 const LABEL_Y = BASE_Y + 20;
 const AXIS_CAPTION_Y = BASE_Y + 46;
-const VIEWBOX_H = BASE_Y + 66;
+const VIEWBOX_H = BASE_Y + 88;
 
 /** The tick label under a bucket: its lower edge, which is where it starts. */
 function edgeLabel(seconds: number): string {
@@ -122,8 +122,16 @@ export function Shape({
           )}
         </g>
 
+        {/* Two lines, not one. At 390px the sheet renders this drawing at about
+            half its viewBox width and the stylesheet steps the type up to stay
+            legible, at which point a single caption runs past the right edge
+            and is clipped mid-word. Splitting it costs one line of height and
+            reads identically at full width. */}
         <text x={X0 + W / 2} y={AXIS_CAPTION_Y} className="eng-text" textAnchor="middle">
-          Time to graduation · each bucket about double the last
+          Time to graduation
+        </text>
+        <text x={X0 + W / 2} y={AXIS_CAPTION_Y + 22} className="eng-text" textAnchor="middle">
+          Each bucket about double the last
         </text>
       </svg>
     </figure>

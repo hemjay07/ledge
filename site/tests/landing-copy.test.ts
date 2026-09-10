@@ -24,9 +24,20 @@ function copyOf(startMarker: string, endMarker: string): string {
     .trim();
 }
 
-const WHAT_THIS_IS = copyOf('<LedgerEntry folio="06"', "</LedgerEntry>");
-const PAIR_FINDING = copyOf('<LedgerEntry\n          folio="03"', "<Register");
-const MORE_COHORTS = copyOf('<LedgerEntry folio="07"', "</LedgerEntry>");
+/* Sliced by id, not by folio number: the folios were removed from this page on
+   2026-09-10 when it stopped being a broadsheet, and a marker keyed to one
+   would break for a reason that has nothing to do with the copy. */
+const CAPABILITY = copyOf('<div className="capability">', "</div>");
+const WHAT_THIS_IS = copyOf('<LedgerEntry id="h-what"', "</LedgerEntry>");
+const MORE_COHORTS = copyOf('<LedgerEntry id="h-cohorts"', "</LedgerEntry>");
+
+/* The pair-token finding was WITHDRAWN from this page on 2026-09-10, not
+   moved. It said the pair token makes no difference once fast graduations are
+   excluded. On the record today ETH and stablecoin still match, at 0.82% and
+   0.81%, and tokenized stock runs at 0.47% over 58,106 launches. A claim that
+   has stopped being true is withdrawn rather than relocated, and the reversal
+   is published in METHOD.md's changelog because CONSTRAINTS 5 requires a
+   reversal to be published rather than edited away. */
 
 /* CONSTRAINTS.md's NOT-THIS list, plus the verdict vocabulary a lookup page is
    the likeliest surface to acquire. */
@@ -102,21 +113,38 @@ describe("the What this is entry", () => {
   });
 });
 
-describe("the register, renumbered", () => {
-  it("runs the folios in order with no gap and no repeat", () => {
-    const folios = [...PAGE.matchAll(/folio="(\d{2})"/g)].map((m) => m[1]);
-    /* 08 is the one line pointing at /cockpit, added beneath the existing
-       entries: the inventory grows with the register rather than the check
-       being loosened. */
-    expect(folios).toEqual(["02", "03", "04", "05", "06", "07", "08"]);
+describe("the sheet, without folio numbers", () => {
+  /* The folios went with the broadsheet on 2026-09-10. They numbered a
+     register a reader was expected to work through in order, and this page is
+     no longer that. The check is inverted rather than dropped: none may come
+     back without this failing. */
+  it("carries no folio number anywhere on the page", () => {
+    expect([...PAGE.matchAll(/folio="(\d{2})"/g)].map((m) => m[1])).toEqual([]);
   });
 
-  it("runs lookup, the pair finding, the distribution, the board, the explanation, the index", () => {
-    const order = ["h-lookup", "h-pair", "h-ttg", "<LiveBoard", "h-what", "h-cohorts"].map((id) =>
-      PAGE.indexOf(id),
-    );
+  it("runs the pulse, the capability, the shape, the paths, then the rate and the lookup", () => {
+    const order = [
+      "<LivePulse",
+      'className="capability"',
+      'className="shape-lead"',
+      'className="paths-on"',
+      'className="headline-rate"',
+      "h-lookup",
+    ].map((marker) => PAGE.indexOf(marker));
+    expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(order[0]).toBeGreaterThan(PAGE.indexOf("end of fold"));
+  });
+
+  /* The entries this page stopped reprinting. They are in full on the pages
+     named beside them, and the sheet links to those rather than duplicating
+     them, which is what made it scroll. */
+  it("no longer reprints the fold, the pair register, the distribution or the board", () => {
+    for (const marker of ["<Fold", "id=\"h-pair\"", "id=\"h-ttg\"", "<LiveBoard"]) {
+      expect(PAGE.includes(marker), `${marker} is still reprinted on the sheet`).toBe(false);
+    }
+    for (const href of ["/number", "/cohorts", "/live", "/graduated", "/graveyard", "/method"]) {
+      expect(PAGE.includes(href), `${href} is not linked`).toBe(true);
+    }
   });
 
   /* the entries the sheet no longer carries: they are on /cohorts in full,
@@ -129,23 +157,16 @@ describe("the register, renumbered", () => {
   });
 });
 
-describe("the two moved findings", () => {
-  /* The finding is stated on the excluding-fast rate, because the fold's
-     headline is that rate: a between-bucket comparison drawn on the raw one
-     would be a comparison on the number the page calls contaminated. */
-  it("states the pair finding on the rate the fold leads with", () => {
-    expect(PAIR_FINDING).toContain("the pair token makes no");
-    expect(PAIR_FINDING).toContain("Excluding launches that graduated inside");
-    expect(PAIR_FINDING).toContain("stablecoin");
-    expect(PAIR_FINDING).toContain("ETH");
+describe("the withdrawn pair finding, and what is left in its place", () => {
+  /* The assertions that pinned the old claim are gone with the claim. What
+     replaces them is the guarantee that it cannot come back silently: the
+     sentence must not be on the page, and the page must still point a reader
+     at the cohorts it was drawn from. */
+  it("no longer states that the pair token makes no difference", () => {
+    expect(PAGE).not.toContain("the pair token makes no");
   });
 
-  it("says where the raw difference comes from rather than dropping it", () => {
-    expect(PAIR_FINDING).toContain("Counting every graduation");
-    expect(PAIR_FINDING).toContain("graduations that completed inside");
-  });
-
-  it("names what the cohorts page holds, in one line", () => {
+  it("still points at the page that holds the pair cohorts", () => {
     expect(MORE_COHORTS).toContain("Creator tax, hour of day, day of week");
     expect(MORE_COHORTS).toContain("launches per deployer");
     expect(MORE_COHORTS).toContain("all-time");
@@ -154,11 +175,9 @@ describe("the two moved findings", () => {
   });
 
   it("passes the banned-words list", () => {
-    for (const copy of [PAIR_FINDING, MORE_COHORTS]) {
-      const lower = copy.toLowerCase();
-      for (const banned of BANNED) {
-        expect(lower.includes(banned), `"${banned}" is on the page`).toBe(false);
-      }
+    const lower = MORE_COHORTS.toLowerCase();
+    for (const banned of BANNED) {
+      expect(lower.includes(banned), `"${banned}" is on the page`).toBe(false);
     }
   });
 });
