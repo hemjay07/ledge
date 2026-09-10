@@ -2,6 +2,43 @@
 
 Everything below is a one-time step you run yourself. Nothing in the repo holds a key. Order matters only where stated.
 
+## Now that ledge.tools is registered
+
+Bought 2026-09-10. Until these steps are done every published link points at
+`ledge-alpha.vercel.app`, and the Worker's own config points there too. Do them
+in this order, because flipping a config before the name resolves takes the live
+site down rather than moving it.
+
+1. **Point the nameservers at Cloudflare.** Add `ledge.tools` as a site in the
+   Cloudflare dashboard, then set the two nameservers it gives you at the
+   registrar. Wait for Cloudflare to report the zone active. Nothing below works
+   until it does.
+2. **Add the domain in Vercel.** Project → Settings → Domains → add `ledge.tools`
+   and `www.ledge.tools`, and follow the DNS records it asks for. Confirm
+   `https://ledge.tools/number.json` returns the file before going further.
+3. **Add the Worker's own hostname.** Workers → the `ledge` worker → Settings →
+   Domains → add `api.ledge.tools`. Confirm `https://api.ledge.tools/api/health`
+   answers.
+4. **Only then flip the configs**, in one commit: `NUMBER_JSON_URL` and
+   `SITE_ORIGIN` in `worker/wrangler.toml`, and the four rewrite targets in
+   `vercel.json`. Redeploy the Worker with `wrangler deploy`.
+5. **Add the rate-limit rule**, which does not exist yet and is the one thing
+   between a launch-day traffic spike and an outage: Security → WAF → Rate
+   limiting → 60 requests per minute per IP on paths starting `/api/` and
+   `/og/`.
+6. **Set the Cloudflare credentials** so the crawl pushes `number.json` into KV
+   after every commit: repo secrets `CLOUDFLARE_API_TOKEN` and
+   `CLOUDFLARE_ACCOUNT_ID`, repo variable `LEDGE_KV_NAMESPACE_ID`. Until these
+   are set the Worker answers by fetching the file over HTTP from the site,
+   which is the coupling KV exists to remove. On launch day that coupling means
+   one slow site makes the API slow too.
+7. **Update the links in `OUTREACH.md` and `LAUNCH.md`** from the Vercel alias
+   back to `ledge.tools`.
+
+Steps 1, 2, 3, 5 and 6 are yours: they need dashboard access and credentials
+that are deliberately not in this repo. Steps 4 and 7 are edits I can make in
+one pass once you confirm the name resolves.
+
 ## 0. Accounts
 
 - GitHub: the repo `hemjay07/ledge`, public (the dataset is the product; Actions minutes are unlimited on public repos).
