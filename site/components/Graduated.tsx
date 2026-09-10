@@ -59,8 +59,25 @@ function compareRows(a: GraduatedRow, b: GraduatedRow, sort: GraduatedSortKey): 
   }
 }
 
+/* The tax as the reader's own unit. Every other page on this site says "1%"
+   and "2-3%", and a column that says "100 bps" beside them is the same fact
+   in a second dialect. Basis points are exact, so the conversion is a unit
+   change and not a rounding: a tax is set in whole basis points and 100 of
+   them is one percent. A value that is not a whole number of tenths keeps its
+   basis points rather than being rounded into a tidier lie. */
 function taxCell(bps: number | null): string {
-  return bps === null ? "not read" : `${bps} bps`;
+  if (bps === null) return "not read";
+  const percent = bps / 100;
+  return Number.isInteger(percent * 10) ? `${percent}%` : `${bps} bps`;
+}
+
+/* The address, shortened the way worker/src/text.ts shortens it, so the same
+   token reads the same on its own page and in this list. The full address is
+   the link target and the title, so nothing is lost -- it just stops taking
+   half the table's width and pushing the columns a reader came for off the
+   right-hand edge. */
+function shortAddress(address: string): string {
+  return `${address.slice(0, 10)}\u2026${address.slice(-6)}`;
 }
 
 function pairCell(pairClass: string | null): string {
@@ -120,7 +137,9 @@ export function GraduatedBoard({ data }: { data: GraduatedFile }): ReactElement 
             {rows.map((row) => (
               <tr key={row.token}>
                 <th scope="row" className="mono">
-                  <a href={`/t/${row.token}`}>{row.token}</a>
+                  <a href={`/t/${row.token}`} title={row.token}>
+                    {shortAddress(row.token)}
+                  </a>
                 </th>
                 <td className="fig n mono">{formatDuration(row.durationSeconds)}</td>
                 <td className="fig n">{pairCell(row.pairClass)}</td>

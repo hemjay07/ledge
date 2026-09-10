@@ -37,6 +37,15 @@ import {
 import { pairClassOf } from "./buckets";
 import { activityBlocks, planActivity, type ActivityRow } from "./activity";
 import { loadPairTokens } from "./numberFile";
+import {
+  GRAVEYARD_QUERY,
+  buildGraveyardRows,
+  graveyardPostText,
+  graveyardRowsToCandidates,
+  selectNewGraveyardEntries,
+  type GraveyardDbRow,
+} from "./graveyard";
+import { sendMessage, withinLimits } from "./telegram";
 
 /** One minute of chain. The cron is `* * * * *` and Robinhood Chain runs at
     about 0.1 s a block, so this is both how far a tick advances and how far
@@ -331,6 +340,49 @@ async function fetchTokenConfigs(
   return out;
 }
 
+/** The graveyard's own post (worker/src/graveyard.ts carries the full
+    reasoning). Runs after the tick's own D1 write has already landed, so it
+    reads the freshest cursor and rows, and it never touches the tick's own
+    result -- a Telegram outage or a missing TELEGRAM_GRAVEYARD_CHAT_ID is not
+    an indexing failure, and must not be reported as one. */
+async function announceGraveyard(env: Env, db: D1Database, nowSeconds: number, toBlock: number): Promise<void> {
+  if (!env.TELEGRAM_GRAVEYARD_CHAT_ID) return;
+
+  const rowsResult = await db.prepare(GRAVEYARD_QUERY).all<GraveyardDbRow>();
+  const dbRows = rowsResult.results ?? [];
+  const rows = buildGraveyardRows(
+    dbRows,
+    { last_indexed_block: toBlock, last_success_at: nowSeconds, consecutive_failures: 0 },
+    nowSeconds,
+    "age",
+  );
+  if (rows.length === 0) return;
+
+  const candidates = graveyardRowsToCandidates(rows);
+  const posted = await selectChunked<{ token: string }>(
+    db,
+    (placeholders) => `SELECT token FROM graveyard_posted WHERE token IN (${placeholders})`,
+    candidates.map((c) => c.token),
+  );
+  const newEntries = selectNewGraveyardEntries(candidates, new Set(posted.map((p) => p.token)));
+  if (newEntries.length === 0) return;
+
+  const text = graveyardPostText(newEntries, env.SITE_ORIGIN);
+  if (text === null) return;
+
+  const chatId = env.TELEGRAM_GRAVEYARD_CHAT_ID;
+  if (!(await withinLimits(db, chatId, nowSeconds))) return; // retried next tick, never skipped silently
+
+  await sendMessage(env, chatId, text);
+  await db.batch(
+    newEntries.map((entry) =>
+      db
+        .prepare("INSERT OR IGNORE INTO graveyard_posted (token, posted_at) VALUES (?, ?)")
+        .bind(entry.token, nowSeconds),
+    ),
+  );
+}
+
 async function recordFailure(db: D1Database, nowSeconds: number, message: string): Promise<void> {
   await db
     .prepare(
@@ -589,6 +641,15 @@ export async function tick(
     );
 
     await db.batch(statements);
+
+    try {
+      await announceGraveyard(env, db, nowSeconds, to);
+    } catch (error) {
+      // The graveyard post is downstream of a successful index write and must
+      // never turn an indexed tick into a reported failure. Logged, not thrown.
+      console.error("graveyard announcement failed", error instanceof Error ? error.message : String(error));
+    }
+
     return {
       ok: true,
       from,

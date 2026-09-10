@@ -18,10 +18,13 @@
 import {
   errorResponseSchema,
   liveResponseSchema,
+  graveyardResponseSchema,
   tokenResponseSchema,
   type ErrorCode,
   type LiveResponse,
   type LiveSortKey,
+  type GraveyardResponse,
+  type GraveyardSortKey,
   type TokenResponse,
 } from "./api-schema";
 
@@ -222,6 +225,42 @@ export async function fetchLive(
   }
 }
 
+/* ---- the graveyard ------------------------------------------------------- */
+
+export type GraveyardResult =
+  | { kind: "graveyard"; body: GraveyardResponse }
+  | { kind: "error"; message: string };
+
+/** The response, classified -- same reason readLive is exported: a render
+    can be tested against a fixture without a network, and a payload the
+    Worker sent as an objection (bad_sort, ...) still carries its own words. */
+export function readGraveyard(payload: unknown): GraveyardResult {
+  const graveyard = graveyardResponseSchema.safeParse(payload);
+  if (graveyard.success) return { kind: "graveyard", body: graveyard.data };
+
+  const failure = errorResponseSchema.safeParse(payload);
+  if (failure.success) return { kind: "error", message: failure.data.message };
+
+  return { kind: "error", message: UNREADABLE };
+}
+
+export async function fetchGraveyard(
+  fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
+  sort?: GraveyardSortKey,
+): Promise<GraveyardResult> {
+  const query = sort ? `?sort=${encodeURIComponent(sort)}` : "";
+  try {
+    const response = await fetchImpl(`${API_BASE}/api/graveyard${query}`, {
+      signal,
+      headers: { Accept: "application/json" },
+    });
+    return readGraveyard(await response.json());
+  } catch {
+    return { kind: "error", message: UNREADABLE };
+  }
+}
+
 /** CONSTRAINTS 2: no address is a subject on this site, and the board is a
     view of the population rather than a list of things to open. The Worker
     already strips them; this strips them again on the way to the DOM, because
@@ -230,5 +269,5 @@ export function stripAddresses(value: string): string {
   return value.replace(/0x[0-9a-f]{40}/gi, "");
 }
 
-export { LIVE_SORT_KEYS } from "./api-schema";
-export type { LiveResponse, LiveSortKey, TokenResponse, ErrorCode };
+export { LIVE_SORT_KEYS, GRAVEYARD_SORT_KEYS } from "./api-schema";
+export type { LiveResponse, LiveSortKey, GraveyardResponse, GraveyardSortKey, TokenResponse, ErrorCode };

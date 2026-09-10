@@ -1,5 +1,5 @@
 {
-  "_note": "Frozen fixture. Never live data. COMPUTED by pipeline/recompute.py \u2014 and so by pipeline/stats.py, the only place a statistic is defined \u2014 over the real 20-hour capture in pipeline/tests/fixture-backfill-20h.json, with fixture-only synthetic timestamps and creator-tax readings exactly as pipeline/tests/conftest.py documents. Regenerate with `python3 worker/scripts/make-number-fixture.py`. Never hand-edit a figure in it: a hand-edited one can hold a state the pipeline could not emit, which is how this file's ladder once disagreed with its own fastShares.",
+  "_note": "Frozen fixture. Never live data. COMPUTED by pipeline/recompute.py — and so by pipeline/stats.py, the only place a statistic is defined — over the real 20-hour capture in pipeline/tests/fixture-backfill-20h.json, with fixture-only synthetic timestamps and creator-tax readings exactly as pipeline/tests/conftest.py documents. Regenerate with `python3 worker/scripts/make-number-fixture.py`. Never hand-edit a figure in it: a hand-edited one can hold a state the pipeline could not emit, which is how this file's ladder once disagreed with its own fastShares.",
   "allTime": {
     "cohorts": {
       "day": [
@@ -734,7 +734,93 @@
       "p50": 96,
       "p75": 541,
       "p90": 3028,
-      "p95": 6570
+      "p95": 6570,
+      "histogram": [
+        {
+          "fromSeconds": 0,
+          "toSeconds": 2,
+          "graduations": 44,
+          "share": 0.082243
+        },
+        {
+          "fromSeconds": 2,
+          "toSeconds": 5,
+          "graduations": 28,
+          "share": 0.052336
+        },
+        {
+          "fromSeconds": 5,
+          "toSeconds": 10,
+          "graduations": 28,
+          "share": 0.052336
+        },
+        {
+          "fromSeconds": 10,
+          "toSeconds": 20,
+          "graduations": 31,
+          "share": 0.057944
+        },
+        {
+          "fromSeconds": 20,
+          "toSeconds": 40,
+          "graduations": 62,
+          "share": 0.115888
+        },
+        {
+          "fromSeconds": 40,
+          "toSeconds": 80,
+          "graduations": 60,
+          "share": 0.11215
+        },
+        {
+          "fromSeconds": 80,
+          "toSeconds": 160,
+          "graduations": 48,
+          "share": 0.08972
+        },
+        {
+          "fromSeconds": 160,
+          "toSeconds": 320,
+          "graduations": 64,
+          "share": 0.119626
+        },
+        {
+          "fromSeconds": 320,
+          "toSeconds": 640,
+          "graduations": 50,
+          "share": 0.093458
+        },
+        {
+          "fromSeconds": 640,
+          "toSeconds": 1280,
+          "graduations": 36,
+          "share": 0.06729
+        },
+        {
+          "fromSeconds": 1280,
+          "toSeconds": 2560,
+          "graduations": 22,
+          "share": 0.041121
+        },
+        {
+          "fromSeconds": 2560,
+          "toSeconds": 5120,
+          "graduations": 28,
+          "share": 0.052336
+        },
+        {
+          "fromSeconds": 5120,
+          "toSeconds": 10240,
+          "graduations": 18,
+          "share": 0.033645
+        },
+        {
+          "fromSeconds": 10240,
+          "toSeconds": null,
+          "graduations": 16,
+          "share": 0.029907
+        }
+      ]
     },
     "until": 1762536015
   },
@@ -1478,7 +1564,93 @@
       "p50": 96,
       "p75": 541,
       "p90": 3028,
-      "p95": 6570
+      "p95": 6570,
+      "histogram": [
+        {
+          "fromSeconds": 0,
+          "toSeconds": 2,
+          "graduations": 44,
+          "share": 0.082243
+        },
+        {
+          "fromSeconds": 2,
+          "toSeconds": 5,
+          "graduations": 28,
+          "share": 0.052336
+        },
+        {
+          "fromSeconds": 5,
+          "toSeconds": 10,
+          "graduations": 28,
+          "share": 0.052336
+        },
+        {
+          "fromSeconds": 10,
+          "toSeconds": 20,
+          "graduations": 31,
+          "share": 0.057944
+        },
+        {
+          "fromSeconds": 20,
+          "toSeconds": 40,
+          "graduations": 62,
+          "share": 0.115888
+        },
+        {
+          "fromSeconds": 40,
+          "toSeconds": 80,
+          "graduations": 60,
+          "share": 0.11215
+        },
+        {
+          "fromSeconds": 80,
+          "toSeconds": 160,
+          "graduations": 48,
+          "share": 0.08972
+        },
+        {
+          "fromSeconds": 160,
+          "toSeconds": 320,
+          "graduations": 64,
+          "share": 0.119626
+        },
+        {
+          "fromSeconds": 320,
+          "toSeconds": 640,
+          "graduations": 50,
+          "share": 0.093458
+        },
+        {
+          "fromSeconds": 640,
+          "toSeconds": 1280,
+          "graduations": 36,
+          "share": 0.06729
+        },
+        {
+          "fromSeconds": 1280,
+          "toSeconds": 2560,
+          "graduations": 22,
+          "share": 0.041121
+        },
+        {
+          "fromSeconds": 2560,
+          "toSeconds": 5120,
+          "graduations": 28,
+          "share": 0.052336
+        },
+        {
+          "fromSeconds": 5120,
+          "toSeconds": 10240,
+          "graduations": 18,
+          "share": 0.033645
+        },
+        {
+          "fromSeconds": 10240,
+          "toSeconds": null,
+          "graduations": 16,
+          "share": 0.029907
+        }
+      ]
     },
     "until": 1762536015
   },

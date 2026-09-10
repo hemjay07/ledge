@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-10T18:14:07Z",
+  "lastIndexedBlock": 56172588,
+  "sortedBy": "age",
+  "count": 2,
+  "rows": [
+    {
+      "token": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pairClass": "eth",
+      "pairToken": "0x0000000000000000000000000000000000000000",
+      "creatorTaxBps": 300,
+      "launchBlock": 56100000,
+      "ageSeconds": 270000,
+      "buys": 0,
+      "sells": 0,
+      "firstBlockBuyers": 0,
+      "lastActivityAt": "2026-09-07T15:14:02Z",
+      "window": {
+        "fromBlock": 56100000,
+        "toBlock": 56172588,
+        "label": "counted over blocks 56100000 to 56172588",
+        "partial": false
+      },
+      "pairDecimals": 18,
+      "pairSymbol": "ETH"
+    },
+    {
+      "token": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "pairClass": "stable",
+      "pairToken": "0x1111111111111111111111111111111111111111",
+      "creatorTaxBps": null,
+      "launchBlock": 56050000,
+      "ageSeconds": 400000,
+      "buys": 0,
+      "sells": 2,
+      "firstBlockBuyers": null,
+      "lastActivityAt": "2026-09-06T18:09:07Z",
+      "window": {
+        "fromBlock": 56080000,
+        "toBlock": 56172588,
+        "label": "counted over blocks 56080000 to 56172588 -- partial: this launch's own block predates LEDGE's indexed record, so trades before block 56080000 are not counted",
+        "partial": true
+      },
+      "pairDecimals": null,
+      "pairSymbol": null
+    }
+  ],
+  "scope": {
+    "ageCutoffSeconds": 259200,
+    "indexedLaunches": 214,
+    "earliestIndexedLaunchAt": "2026-09-06T18:09:07Z",
+    "label": "LEDGE's activity index currently holds a record for 214 launches, the oldest launched 2026-09-06T18:09:07Z. A launch outside that record is not counted here at all: its absence means not measured, never a launch that took a buy."
+  },
+  "live": {
+    "stale": false,
+    "lastSuccessAt": "2026-09-10T18:13:47Z",
+    "lastIndexedBlock": 56172588
+  }
+}

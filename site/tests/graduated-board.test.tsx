@@ -44,14 +44,20 @@ const FIXTURE: GraduatedFile = {
 
 afterEach(() => cleanup());
 
+/* The list shortens an address the way worker/src/text.ts does, so the same
+   token reads the same here and on its own page. The FULL address stays the
+   link target, which is the part that must not regress: a shortened href
+   would be a broken link, where shortened text is just a narrower column. */
+const short = (a: string) => `${a.slice(0, 10)}\u2026${a.slice(-6)}`;
+
 describe("GraduatedBoard", () => {
   it("sorts fastest first by default, with duration shown on every row (CONSTRAINTS 1)", () => {
     const { container } = render(<GraduatedBoard data={FIXTURE} />);
     const rows = [...container.querySelectorAll("tbody tr")];
     expect(rows.map((r) => r.querySelector("th")?.textContent)).toEqual([
-      "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "0xcccccccccccccccccccccccccccccccccccccccc",
-      "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      short("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+      short("0xcccccccccccccccccccccccccccccccccccccccc"),
+      short("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
     ]);
     for (const row of FIXTURE.rows) {
       expect(container.textContent).toContain(formatDuration(row.durationSeconds));
@@ -63,7 +69,9 @@ describe("GraduatedBoard", () => {
     for (const row of FIXTURE.rows) {
       const link = container.querySelector(`a[href="/t/${row.token}"]`);
       expect(link).not.toBeNull();
-      expect(link?.textContent).toBe(row.token);
+      // shortened in the cell, whole in the href and the title
+      expect(link?.textContent?.trim()).toBe(short(row.token));
+      expect(link?.getAttribute("title")).toBe(row.token);
     }
   });
 
@@ -71,7 +79,9 @@ describe("GraduatedBoard", () => {
     const { container } = render(<GraduatedBoard data={FIXTURE} />);
     const text = container.textContent ?? "";
     expect(text).toContain(formatUtcLong(FIXTURE.rows[1]!.graduatedAt)); // token A
-    expect(text).toContain("100 bps");
+    // the reader's own unit: every other page says "1%", not "100 bps"
+    expect(text).toContain("1%");
+    expect(text).not.toContain("100 bps");
     expect(text).toContain("not read"); // token C: pairClass and creatorTaxBps null
   });
 
@@ -84,9 +94,9 @@ describe("GraduatedBoard", () => {
     fireEvent.click(slowestLink!);
     const rows = [...container.querySelectorAll("tbody tr")];
     expect(rows.map((r) => r.querySelector("th")?.textContent)).toEqual([
-      "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "0xcccccccccccccccccccccccccccccccccccccccc",
-      "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      short("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+      short("0xcccccccccccccccccccccccccccccccccccccccc"),
+      short("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
     ]);
   });
 

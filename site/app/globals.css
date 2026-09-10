@@ -620,6 +620,12 @@ a:focus-visible,
   width: 100%;
   height: auto;
 }
+/* A shortened address is one token, not two: without this the ellipsis is a
+   break opportunity and "0x5ea524ad…6dca8f" wraps mid-identifier. */
+.graduated-board th[scope="row"] a {
+  white-space: nowrap;
+}
+
 /* The shape of the record. Ink, like every other mark on an instrument page:
    the bars carry no meaning in their colour, and --stale stays the only
    colour on this site that means anything. */
