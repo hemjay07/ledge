@@ -306,15 +306,38 @@ def placement_lookup(number: dict, elapsed_seconds: int | None, window_name: str
 
 
 # --- the sentences ----------------------------------------------------------
-def outcome_word(elapsed_seconds: int | None, phase: int, graduated: bool, observed_max: int | None) -> str:
+def outcome_word(
+    elapsed_seconds: int | None,
+    phase: int,
+    graduated: bool,
+    observed_max: int | None,
+    indexed: bool = True,
+) -> str:
     """The outcome word, in the past tense, about one token.
 
     "died" is said only where the outcome is settled: still on the curve, no
     graduation seen, and older than the longest time to graduation ever
     measured in the published window. Anything else is "on the curve", which
     describes rather than forecasts.
+
+    A graduation carries HOW LONG IT TOOK where both ends are on record.
+    "Graduated" alone is the signal the whole chain runs on, and it is the same
+    word for a curve that filled in eight seconds and one that took six hours.
+    Those are not the same event and the duration is the only thing that
+    separates them. It stays a duration and never a judgement: the 5-minute
+    mark is a descriptive threshold, never a definition of "rigged".
+
+    The three conditions below mirror lookup.ts exactly, which computes
+    `timeToGraduationSeconds` as `graduation.ts - launch.ts` and leaves it null
+    unless BOTH rows are held. A token in phase 2 with no graduation row, or one
+    whose launch predates the indexed record, has no difference to take and says
+    only "graduated". The vector gate compares these two implementations
+    character for character, so a divergence here turns both suites red rather
+    than shipping.
     """
     if graduated or phase == 2:
+        if graduated and indexed and elapsed_seconds is not None:
+            return f"graduated in {format_duration(elapsed_seconds)}"
         return "graduated"
     if elapsed_seconds is None or observed_max is None:
         return "on the curve"
@@ -358,6 +381,7 @@ def headline(number: dict, case_input: dict, cohort: dict) -> str:
                 case_input["phase"],
                 case_input["graduated"],
                 number["allTime"]["ttg"]["max"],
+                case_input.get("indexed", True),
             ),
             cohort_part,
             config_part,
@@ -452,6 +476,18 @@ def build_cases(number: dict) -> list[dict]:
               pairClass="eth", taxBps=1001, elapsedSeconds=600),
         _case(number, "graduated-token", "an outcome already observed, in the past tense",
               pairClass="eth", taxBps=300, elapsedSeconds=96, phase=2, graduated=True),
+        # The whole reason the duration is printed. 15.0% of the 2,382
+        # graduations with a launch on record finished inside 10 seconds
+        # (measured 2026-09-10), and "graduated" alone cannot tell this apart
+        # from one that took six hours. The case pins the fast end of the
+        # distribution so neither implementation can quietly stop saying it.
+        _case(number, "graduated-fast", "a graduation that finished inside ten seconds",
+              pairClass="eth", taxBps=300, elapsedSeconds=8, phase=2, graduated=True),
+        # Graduated, but the launch is older than the indexed record, so there
+        # is no difference to take. It must say "graduated" and NOT invent a
+        # duration -- the null case that keeps the line above honest.
+        _case(number, "graduated-unindexed-launch", "graduated with no launch on record",
+              pairClass="eth", taxBps=300, elapsedSeconds=None, phase=2, graduated=True, indexed=False),
         _case(number, "not-indexed-token", "evicted from the live window: the cohort survives, the clock does not",
               pairClass="eth", taxBps=300, elapsedSeconds=None, indexed=False),
     ]

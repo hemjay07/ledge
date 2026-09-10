@@ -960,7 +960,7 @@
           "window": "allTime"
         },
         "text": {
-          "headline": "minute 1 · graduated · cohort 1.57% (n=3,573) · ETH · 2–3%",
+          "headline": "minute 1 · graduated in 2 min · cohort 1.57% (n=3,573) · ETH · 2–3%",
           "placement": "By 60 s, 43.7% of the 535 graduations measured in this window had already happened."
         }
       },
@@ -974,6 +974,128 @@
       },
       "name": "graduated-token",
       "why": "an outcome already observed, in the past tense"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "2-3%"
+          }
+        },
+        "placement": {
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "elapsedSeconds": 8,
+          "insufficient": false,
+          "n": 535,
+          "reason": "before_first_step",
+          "rung": null,
+          "window": "allTime"
+        },
+        "text": {
+          "headline": "minute 0 · graduated in 8 s · cohort 1.57% (n=3,573) · ETH · 2–3%",
+          "placement": "This launch is younger than the first step of the published table (n=535)."
+        }
+      },
+      "input": {
+        "elapsedSeconds": 8,
+        "graduated": true,
+        "indexed": true,
+        "pairClass": "eth",
+        "phase": 2,
+        "taxBps": 300
+      },
+      "name": "graduated-fast",
+      "why": "a graduation that finished inside ten seconds"
+    },
+    {
+      "expected": {
+        "cohort": {
+          "allTime": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "allTime"
+          },
+          "crawledAt": "2025-11-07T17:20:15Z",
+          "definitionsVersion": "2026-09-06",
+          "h24": {
+            "crawledAt": "2025-11-07T17:20:15Z",
+            "excludingFast": {
+              "cutoffSeconds": 300,
+              "graduations": 26,
+              "insufficient": false,
+              "oneIn": 137,
+              "rate": 0.007277
+            },
+            "graduations": 56,
+            "insufficient": false,
+            "launches": 3573,
+            "rate": 0.015673,
+            "window": "24h"
+          },
+          "key": {
+            "pairClass": "eth",
+            "taxBucket": "2-3%"
+          }
+        },
+        "placement": null,
+        "text": {
+          "headline": "launch time not indexed · graduated · cohort 1.57% (n=3,573) · ETH · 2–3%",
+          "placement": null
+        }
+      },
+      "input": {
+        "elapsedSeconds": null,
+        "graduated": true,
+        "indexed": false,
+        "pairClass": "eth",
+        "phase": 2,
+        "taxBps": 300
+      },
+      "name": "graduated-unindexed-launch",
+      "why": "graduated with no launch on record"
     },
     {
       "expected": {

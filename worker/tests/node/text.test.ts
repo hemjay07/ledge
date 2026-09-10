@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { activitySentences, headline, lookupText, numberText, outcomeWord } from "../../src/text";
+import { formatDuration } from "../../src/format";
 import { ACTIVITY, fixtureNumber, makeBody, NOW_SECONDS, LAUNCH } from "./helpers";
 
 const MAX = fixtureNumber().allTime.ttg.max;
@@ -24,9 +25,35 @@ function percentagesWithoutAnN(text: string): string[] {
 }
 
 describe("outcome words", () => {
-  it("uses the past tense for a settled outcome", () => {
+  it("uses the past tense for a settled outcome, and says how long it took", () => {
     const graduated = makeBody({ graduation: { token: "0x", block: 1, ts: NOW_SECONDS - 200 } });
-    expect(outcomeWord(graduated, MAX)).toBe("graduated");
+    const word = outcomeWord(graduated, MAX);
+    expect(word).toMatch(/^graduated in /);
+    expect(word).toContain(formatDuration(graduated.state.timeToGraduationSeconds!));
+  });
+
+  /* The duration is the only thing separating a curve that filled in seconds
+     from one that took hours, and "graduated" alone says the same word for
+     both. Pinned at the fast end because that is the end the figure exists to
+     make visible: 15.0% of the 2,382 graduations with a launch on record
+     finished inside 10 seconds, measured 2026-09-10. */
+  it("prints a fast graduation as the seconds it actually took", () => {
+    const fast = makeBody({
+      launch: { ...LAUNCH, ts: NOW_SECONDS - 8 },
+      graduation: { token: "0x", block: 1, ts: NOW_SECONDS },
+    });
+    expect(outcomeWord(fast, MAX)).toBe("graduated in 8 s");
+  });
+
+  /* Graduated, but the launch predates the indexed record, so there is no
+     difference to take. It must not invent one. */
+  it("says only 'graduated' when there is no launch to measure from", () => {
+    const noLaunch = makeBody({
+      launch: null,
+      graduation: { token: "0x", block: 1, ts: NOW_SECONDS },
+    });
+    expect(noLaunch.state.timeToGraduationSeconds).toBeNull();
+    expect(outcomeWord(noLaunch, MAX)).toBe("graduated");
   });
 
   it("says 'died' only past the longest measured time to graduation", () => {

@@ -186,10 +186,31 @@ def test_the_unindexed_case_has_no_elapsed_and_no_placement(built):
     assert case["expected"]["cohort"]["allTime"]["launches"] > 0
 
 
-def test_the_graduated_case_reads_in_the_past_tense(built):
+def test_the_graduated_case_reads_in_the_past_tense_and_says_how_long_it_took(built):
     case = next(c for c in built["cases"] if c["name"] == "graduated-token")
     assert case["input"]["graduated"] is True
+    assert " · graduated in 2 min · " in case["expected"]["text"]["headline"]
+
+
+def test_a_fast_graduation_prints_the_seconds_it_took(built):
+    """The reason the duration is printed at all. "Graduated" is the same word
+    for a curve that filled in eight seconds and one that took six hours, and
+    15.0% of the 2,382 graduations with a launch on record finished inside ten
+    seconds (measured 2026-09-10). It stays a duration: nothing here labels the
+    token, and the 5-minute mark remains a descriptive threshold rather than a
+    definition of "rigged"."""
+    case = next(c for c in built["cases"] if c["name"] == "graduated-fast")
+    assert " · graduated in 8 s · " in case["expected"]["text"]["headline"]
+
+
+def test_a_graduation_with_no_launch_on_record_invents_no_duration(built):
+    """Graduated, but the launch predates the indexed record, so there is no
+    difference to take. lookup.ts leaves timeToGraduationSeconds null unless it
+    holds BOTH rows, and this is the case that keeps the two implementations
+    honest about it."""
+    case = next(c for c in built["cases"] if c["name"] == "graduated-unindexed-launch")
     assert " · graduated · " in case["expected"]["text"]["headline"]
+    assert "graduated in" not in case["expected"]["text"]["headline"]
 
 
 # --- the printing rules, ported from the Worker -----------------------------

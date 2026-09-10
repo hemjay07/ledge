@@ -44,7 +44,20 @@ const SEP = " · ";
     after which nothing has ever graduated. Where the outcome is not yet
     settled the word is "on the curve", which is a description, not a forecast. */
 export function outcomeWord(body: Omit<TokenResponse, "text">, observedMaxSeconds: number | null): string {
-  if (body.state.graduated) return "graduated";
+  if (body.state.graduated) {
+    /* How long it took, where both ends are on record. "Graduated" alone is
+       the signal the whole chain runs on, and it is the same word for a curve
+       that filled in eight seconds and one that took six hours. Those are not
+       the same event, and the duration is the only thing that separates them.
+
+       It is a duration, not a judgement: CONSTRAINTS 6 binds here, and the
+       5-minute mark stays a descriptive threshold rather than a definition of
+       "rigged". Nothing here labels a token, and a reader who sees "8 s"
+       needs no help from us. Null when the launch is older than the indexed
+       record, where the difference cannot be taken. */
+    const took = body.state.timeToGraduationSeconds;
+    return took === null ? "graduated" : `graduated in ${formatDuration(took)}`;
+  }
   const elapsed = body.state.elapsedSeconds;
   if (elapsed === null || observedMaxSeconds === null) return "on the curve";
   if (body.state.phase !== 0 && body.state.phase !== null) return "on the curve";
