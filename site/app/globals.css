@@ -552,20 +552,6 @@ a:focus-visible,
   padding: var(--s-6) 0 var(--s-6) 2.75rem;
   border-top: var(--rw-hair) solid var(--rule-hair);
 }
-/* The folio gutter is 44px of every line's measure, spent on a two-digit
-   number that orders a register a phone reader is not working through in
-   sequence. Below the breakpoint the number moves above its entry and the
-   gutter goes back to the text. */
-@media (max-width: 40rem) {
-  .entry {
-    padding-left: 0;
-  }
-  .entry::before {
-    position: static;
-    display: block;
-    margin-bottom: var(--s-2);
-  }
-}
 .entry::before {
   content: attr(data-folio);
   position: absolute;
@@ -577,6 +563,33 @@ a:focus-visible,
   font-size: var(--fs-label);
   letter-spacing: 0.06em;
   color: var(--ink-3);
+}
+/* The folio gutter is 44px of every line's measure, spent on a two-digit
+   number ordering a register a phone reader does not work through in
+   sequence. Below the breakpoint the number moves above its entry and the
+   gutter goes back to the text.
+
+   This MUST come after the base rule. It was written above it, where the
+   base rule's `position: absolute` won on source order and the folio then
+   painted straight over the heading -- "TRA02LING 24 HOURS". Equal
+   specificity, later wins; a media query does not change that. */
+@media (max-width: 40rem) {
+  .entry {
+    padding-left: 0;
+  }
+  .entry::before {
+    position: static;
+    display: block;
+    width: auto;
+    text-align: left;
+    margin-bottom: var(--s-2);
+  }
+  /* The gutter rule goes with the gutter. It marks the edge of a column that
+     no longer exists at this width, so left where it was it simply runs down
+     the page underneath the text. */
+  .entry::after {
+    display: none;
+  }
 }
 .entry::after {
   content: "";
@@ -783,6 +796,48 @@ a:focus-visible,
 }
 
 /* ---- register tables ---- */
+/* The tab strip. Rules and weight rather than a pill or a fill: the selected
+   tab is the one with ink under it, which is the same vocabulary the rest of
+   the sheet uses for a link. Scrolls sideways on a phone rather than shrinking
+   the type below what a thumb can hit. */
+.tabs {
+  margin-top: var(--s-4);
+}
+.tab-strip {
+  display: flex;
+  gap: var(--s-4);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid var(--rule-hair);
+  padding-bottom: 0.4rem;
+  margin-bottom: var(--s-4);
+}
+.tab {
+  flex: none;
+  background: none;
+  border: 0;
+  padding: 0 0 0.35rem;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -0.75rem;
+}
+.tab:hover,
+.tab:focus-visible {
+  color: var(--ink);
+}
+.tab--on {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+.tabs [role="tabpanel"][hidden] {
+  display: none;
+}
+
 .scroller {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;

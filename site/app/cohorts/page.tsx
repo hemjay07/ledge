@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { Age } from "../../components/Age";
 import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Footer } from "../../components/Footer";
+import { Tabs } from "../../components/Tabs";
 import { LedgerEntry } from "../../components/LedgerEntry";
 import { Register } from "../../components/Register";
 import { Stat } from "../../components/Stat";
@@ -53,6 +54,19 @@ const ALL_WINDOWS: { key: string; window: WindowData; label: string; note: strin
 const WINDOWS = allTimeIsSameMeasurement
   ? ALL_WINDOWS.filter((w) => w.key === "h24")
   : ALL_WINDOWS;
+
+/* The cut keys cohortTables() returns, named for a reader rather than for the
+   code. The keys themselves are the register's own `key`, so a cut that is
+   added or renamed there shows up here as its raw key rather than silently
+   vanishing from the strip. */
+const TAB_LABELS: Record<string, string> = {
+  fast: "Fast graduations",
+  pair: "Pair token",
+  tax: "Creator tax",
+  hour: "Hour",
+  day: "Day",
+  dep: "Per deployer",
+};
 
 function cohortTables(w: WindowData, label: string, folioBase: number): ReactElement[] {
   const n = `· ${label} · n = ${formatCount(w.launches)} launches`;
@@ -302,7 +316,21 @@ export default function Cohorts(): ReactElement {
               </p>
             ) : null}
           </LedgerEntry>
-          {cohortTables(w.window, w.label, wi * 10 + 3)}
+          {/* One register at a time rather than five stacked. Every one is
+              still rendered and still in the document — the tab hides them
+              with `hidden`, it does not drop them — so nothing became less
+              reachable, which is what CONSTRAINTS 5 protects. The chosen cut
+              rides in the query string, keyed per window so the two strips do
+              not collide. */}
+          <Tabs
+            param={`cut-${w.key}`}
+            ariaLabel={`Cohorts of the ${w.label} window, by cut`}
+            tabs={cohortTables(w.window, w.label, wi * 10 + 3).map((el) => ({
+              key: String(el.key ?? "cut"),
+              label: TAB_LABELS[String(el.key ?? "")] ?? String(el.key ?? "cut"),
+              content: el,
+            }))}
+          />
         </div>
       ))}
 
