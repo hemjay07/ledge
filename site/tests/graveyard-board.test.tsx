@@ -49,11 +49,34 @@ describe("the graveyard's own row model", () => {
     expect(rows[1]?.textContent).toContain("not indexed");
   });
 
-  it("marks a partial window with its own reason, on the row it applies to", async () => {
+  /* The reason a window is partial is now stated ONCE, in the caption, rather
+     than repeated verbatim in every row. It was rendered per row until
+     2026-09-11, where a forty-word sentence wrapped inside a narrow column,
+     made each row about 450px tall and pushed the token address off screen.
+     CONSTRAINTS 3 requires the counts to carry their window; it does not
+     require the window to be restated in prose on every line, and a caveat
+     nobody can read is not a caveat. The guarantee is unchanged and is
+     asserted here in both halves: the explanation is present, and the rows it
+     applies to are marked. */
+  it("explains a partial window once, and marks every row it applies to", async () => {
     answerWith(graveyard);
     const { container } = render(<GraveyardBoard />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(2));
-    expect(container.textContent).toContain("predates LEDGE's indexed record");
+
+    const caption = container.querySelector("caption")?.textContent ?? "";
+    expect(caption).toMatch(/partial/i);
+    expect(caption).toMatch(/before this index began recording/i);
+    expect(caption).toMatch(/can only be higher/i);
+
+    const marked = container.querySelectorAll("tbody .is-partial");
+    const partialRows = graveyard.rows.filter((r) => r.window.partial).length;
+    expect(marked.length).toBe(partialRows);
+    expect(partialRows).toBeGreaterThan(0);
+
+    // and the row still carries the block its own counts start from
+    for (const row of graveyard.rows) {
+      expect(container.textContent).toContain(row.window.fromBlock.toLocaleString("en-US"));
+    }
   });
 
   it("states no score, no grade, no verdict word anywhere on the page", async () => {

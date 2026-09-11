@@ -151,7 +151,14 @@ export function GraveyardBoard(): ReactElement {
                 One row per token, ranked only by a column printed on the row itself. Every launch
                 here has taken zero buys since its own launch block, at least {formatAge(body.scope.ageCutoffSeconds)}
                 {" "}
-                ago.
+                ago. Counts run from the block in the last column up to{" "}
+                {body.lastIndexedBlock === null
+                  ? "the last block this index read"
+                  : `block ${formatCount(body.lastIndexedBlock)}`}
+                . A row marked{" "}
+                <span className="mono is-partial">partial</span> launched before this index began
+                recording, so trades before its own start block are not counted and its true totals
+                can only be higher.
               </caption>
               <thead>
                 <tr>
@@ -163,7 +170,7 @@ export function GraveyardBoard(): ReactElement {
                   <th scope="col">Buys</th>
                   <th scope="col">Sells</th>
                   <th scope="col">First-block buyers</th>
-                  <th scope="col">Counted over</th>
+                  <th scope="col">Counted from</th>
                 </tr>
               </thead>
               <tbody>
@@ -181,9 +188,25 @@ export function GraveyardBoard(): ReactElement {
                     <td className="fig n">0</td>
                     <td className="fig n">{formatCount(row.sells)}</td>
                     {firstBlockBuyersCell(row.firstBlockBuyers)}
-                    <td className="thin window-cell">
-                      {row.window.label}
-                      {row.window.partial ? <span className="mono is-partial"> · partial</span> : null}
+                    {/* The block this row's counts start from, and a marker
+                        when they are partial. NOT the full explanation.
+
+                        This cell used to render `row.window.label` verbatim,
+                        which is a forty-word sentence naming both bounds and
+                        explaining what partial means. Repeated down two hundred
+                        rows it wrapped into a narrow column, made every row
+                        about 450px tall, and pushed the token address off the
+                        screen. CONSTRAINTS 3 requires the counts to carry their
+                        window; it does not require the window to be restated in
+                        prose on every line. It is stated once above the table,
+                        which is where a reader can actually read it. */}
+                    <td className="fig n">
+                      {formatCount(row.window.fromBlock)}
+                      {row.window.partial ? (
+                        <span className="mono is-partial" title="Counts start at this block; trades before it are not counted">
+                          {" "}· partial
+                        </span>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
