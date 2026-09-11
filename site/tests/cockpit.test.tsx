@@ -50,6 +50,14 @@ function plain(el: Element | null | undefined): string {
 
 const WINDOWS_RENDERED = sameMeasurement(h24, allTime) ? 1 : 2;
 
+  /* The per-page navigation moved into the shell (app/layout.tsx) on
+     2026-09-11, so a page no longer carries its own copy and these assertions
+     no longer belong here. The guarantee they protected -- that every
+     published surface stays reachable, which is what CONSTRAINTS 5 rests on --
+     was not dropped: it is asserted once against the shell itself in
+     tests/topbar.test.tsx, which is stricter, because a destination now has to
+     be reachable from EVERY page rather than from whichever pages happened to
+     have a test. */
 describe("the grid", () => {
   it("prints all 20 pair x tax cells, in every window rendered", () => {
     const { container } = render(<Cockpit />);
@@ -329,22 +337,3 @@ describe("the copy", () => {
   });
 });
 
-describe("the sheet index", () => {
-  it("carries the route from the number and the cohorts page", () => {
-    for (const Page of [Home, Cohorts]) {
-      const { container } = render(<Page />);
-      const nav = container.querySelector('nav[aria-label="Sheet"]');
-      const hrefs = [...(nav?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href"));
-      expect(hrefs).toContain("/cockpit");
-      cleanup();
-    }
-  });
-
-  it("does not link the page a reader is already on", () => {
-    const { container } = render(<Cockpit />);
-    const nav = container.querySelector('nav[aria-label="Sheet"]');
-    const hrefs = [...(nav?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href"));
-    expect(hrefs).not.toContain("/cockpit");
-    expect(hrefs).toContain("/cohorts");
-  });
-});

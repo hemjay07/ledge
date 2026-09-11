@@ -4,7 +4,6 @@ import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Footer } from "../../components/Footer";
 import { LedgerEntry } from "../../components/LedgerEntry";
 import { LiveBoardFull } from "../../components/Live";
-import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { numberFile } from "../../lib/number";
 
@@ -22,7 +21,6 @@ export default function Live(): ReactElement {
       <StaleBanner crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
 
       <main className="sheet">
-        <SheetNav current="live" />
         <RunningHead mark="LEDGE · LIVE" win="Every curve with activity · 01" />
 
         <div className="fold" style={{ paddingBottom: "1.5rem" }}>

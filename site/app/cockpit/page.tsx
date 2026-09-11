@@ -5,7 +5,6 @@ import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { ConfigGrid, type GridWindow } from "../../components/ConfigGrid";
 import { Footer } from "../../components/Footer";
 import { LedgerEntry } from "../../components/LedgerEntry";
-import { SheetNav } from "../../components/SheetNav";
 import { allTime, h24, numberFile, type WindowData } from "../../lib/number";
 import { formatCount, formatDurationLong, formatStamp } from "../../lib/format";
 import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../../lib/windows";
@@ -77,7 +76,6 @@ const WINDOWS: GridWindow[] = allTimeIsSameMeasurement
 export default function Cockpit(): ReactElement {
   return (
     <main className="sheet">
-      <SheetNav current="cockpit" />
       <RunningHead mark="LEDGE · CONFIGURATIONS" win={`${formatCount(cells)} cells · 01`} />
 
       <div className="fold" style={{ paddingBottom: "1.5rem" }}>

@@ -16,6 +16,14 @@ import { formatCount, formatDuration, rateText } from "../lib/format";
 
 afterEach(() => cleanup());
 
+  /* The per-page navigation moved into the shell (app/layout.tsx) on
+     2026-09-11, so a page no longer carries its own copy and these assertions
+     no longer belong here. The guarantee they protected -- that every
+     published surface stays reachable, which is what CONSTRAINTS 5 rests on --
+     was not dropped: it is asserted once against the shell itself in
+     tests/topbar.test.tsx, which is stricter, because a destination now has to
+     be reachable from EVERY page rather than from whichever pages happened to
+     have a test. */
 describe("the /graduated page's structure", () => {
   it("carries the ladder from number.json, with its n, as context", () => {
     const { container } = render(<Graduated />);
@@ -58,14 +66,6 @@ describe("the /graduated page's structure", () => {
     expect(container.textContent).toContain(formatCount(graduatedFile.rows.length));
   });
 
-  it("registers /graduated in the sheet's own index", () => {
-    const { container } = render(<Graduated />);
-    const nav = container.querySelector('nav[aria-label="Sheet"]');
-    expect(nav).not.toBeNull();
-    // the current page is never linked to itself
-    expect(nav?.querySelector('a[href="/graduated"]')).toBeNull();
-    expect(nav?.querySelector('a[href="/live"]')).not.toBeNull();
-  });
 
   it("carries no per-token score, grade, or verdict vocabulary", () => {
     const { container } = render(<Graduated />);

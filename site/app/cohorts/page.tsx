@@ -5,7 +5,6 @@ import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Footer } from "../../components/Footer";
 import { LedgerEntry } from "../../components/LedgerEntry";
 import { Register } from "../../components/Register";
-import { SheetNav } from "../../components/SheetNav";
 import { Stat } from "../../components/Stat";
 import { allTime, h24, numberFile, type WindowData } from "../../lib/number";
 import {
@@ -234,7 +233,6 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
 export default function Cohorts(): ReactElement {
   return (
     <main className="sheet">
-      <SheetNav current="cohorts" />
         <RunningHead mark="LEDGE · COHORTS" win="All buckets · 01" />
 
       <div className="fold" style={{ paddingBottom: "1.5rem" }}>

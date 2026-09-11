@@ -3,7 +3,6 @@ import type { ReactElement } from "react";
 import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Footer } from "../../components/Footer";
 import { LedgerEntry } from "../../components/LedgerEntry";
-import { SheetNav } from "../../components/SheetNav";
 import { numberFile } from "../../lib/number";
 import { methodHtml } from "../../lib/method";
 import { formatStamp } from "../../lib/format";
@@ -21,7 +20,6 @@ export default function Method(): ReactElement {
 
   return (
     <main className="sheet">
-      <SheetNav current="method" />
         <RunningHead mark="LEDGE · METHOD" win={`Definitions ${numberFile.definitionsVersion} · 01`} />
 
       <div className="fold" style={{ paddingBottom: "1.5rem" }}>

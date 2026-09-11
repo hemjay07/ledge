@@ -23,6 +23,14 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
+  /* The per-page navigation moved into the shell (app/layout.tsx) on
+     2026-09-11, so a page no longer carries its own copy and these assertions
+     no longer belong here. The guarantee they protected -- that every
+     published surface stays reachable, which is what CONSTRAINTS 5 rests on --
+     was not dropped: it is asserted once against the shell itself in
+     tests/topbar.test.tsx, which is stricter, because a destination now has to
+     be reachable from EVERY page rather than from whichever pages happened to
+     have a test. */
 describe("the live board's own row model", () => {
   it("renders one row per token, with the token's own address as the link target and title (CONSTRAINTS 2 permits it)", async () => {
     answerWith(live);
@@ -316,15 +324,6 @@ describe("the live board's card layout (below the table's breakpoint)", () => {
 });
 
 describe("the /live page", () => {
-  it("carries the sheet index and links back nowhere it shouldn't", async () => {
-    answerWith(live);
-    const { container } = render(<Live />);
-    const nav = container.querySelector('nav[aria-label="Sheet"]');
-    const hrefs = [...(nav?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href"));
-    expect(hrefs).not.toContain("/live");
-    expect(hrefs).toContain("/");
-    expect(hrefs).toContain("/number");
-  });
 
   it("renders the board", async () => {
     answerWith(live);

@@ -4,7 +4,6 @@ import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Footer } from "../../components/Footer";
 import { LedgerEntry } from "../../components/LedgerEntry";
 import { GraveyardBoard } from "../../components/Graveyard";
-import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { numberFile } from "../../lib/number";
 
@@ -22,7 +21,6 @@ export default function Graveyard(): ReactElement {
       <StaleBanner crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
 
       <main className="sheet">
-        <SheetNav current="graveyard" />
         <RunningHead mark="LEDGE · GRAVEYARD" win="Launches at zero buys · 01" />
 
         <div className="fold" style={{ paddingBottom: "1.5rem" }}>

@@ -10,7 +10,6 @@ import { Lookup } from "../components/Lookup";
 import { Register } from "../components/Register";
 import { Scale } from "../components/Scale";
 import { Shape } from "../components/Shape";
-import { SheetNav } from "../components/SheetNav";
 import { StaleBanner } from "../components/StaleBanner";
 import { Stat } from "../components/Stat";
 import { allTime, h24, numberFile } from "../lib/number";
@@ -121,7 +120,6 @@ const exFastOneIn =
       <StaleBanner crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
 
       <main className="sheet">
-        <SheetNav current="home" />
         <RunningHead mark="LEDGE" win="Trailing 24 hours" />
 
         {/* ---- the front door: live pulse, capability, proof, paths ---- */}

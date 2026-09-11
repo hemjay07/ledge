@@ -4,7 +4,6 @@ import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Fold } from "../../components/Fold";
 import { Stat } from "../../components/Stat";
 import { Footer } from "../../components/Footer";
-import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { h24, numberFile, SITE_URL } from "../../lib/number";
 import { formatCount, formatDurationLong, formatStamp, renderableSample } from "../../lib/format";
@@ -52,7 +51,6 @@ export default function NumberCard(): ReactElement {
       <StaleBanner crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
 
       <main className="sheet">
-        <SheetNav current="card" />
         <RunningHead mark="LEDGE" win="Trailing 24 hours · 01" />
 
         <Fold

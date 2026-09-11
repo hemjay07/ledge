@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Anton, IBM_Plex_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
+import "./shell.css";
+import { TopBar } from "../components/TopBar";
 
 const display = Anton({
   subsets: ["latin"],
@@ -48,7 +50,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${mono.variable} ${body.variable}`}>
-      <body>{children}</body>
+      <body>
+        {/* The shell, mounted once. Until 2026-09-11 there was none: each of
+            eight pages rendered its own copy of the navigation inline, so the
+            only action on the site sat halfway down the home page and every
+            destination was a full reload from a standing start. */}
+        <TopBar />
+        {children}
+      </body>
     </html>
   );
 }

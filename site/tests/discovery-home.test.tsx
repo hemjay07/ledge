@@ -30,6 +30,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+  /* The per-page navigation moved into the shell (app/layout.tsx) on
+     2026-09-11, so a page no longer carries its own copy and these assertions
+     no longer belong here. The guarantee they protected -- that every
+     published surface stays reachable, which is what CONSTRAINTS 5 rests on --
+     was not dropped: it is asserted once against the shell itself in
+     tests/topbar.test.tsx, which is stricter, because a destination now has to
+     be reachable from EVERY page rather than from whichever pages happened to
+     have a test. */
 describe("the front door, above the fold", () => {
   /* The home page stopped reprinting the Number's whole fold on 2026-09-10:
      it was identical to /number, doubled the page's length, and put the most
@@ -113,12 +121,6 @@ describe("the front door, above the fold", () => {
     expect(container.querySelectorAll(".entry[data-folio]").length).toBe(0);
   });
 
-  it("carries /live in the sheet index", () => {
-    const { container } = render(<Home />);
-    const nav = container.querySelector('nav[aria-label="Sheet"]');
-    const hrefs = [...(nav?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href"));
-    expect(hrefs).toContain("/live");
-  });
 });
 
 describe("the live pulse", () => {

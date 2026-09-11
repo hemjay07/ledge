@@ -6,7 +6,6 @@ import { Footer } from "../../components/Footer";
 import { GraduatedBoard } from "../../components/Graduated";
 import { LedgerEntry } from "../../components/LedgerEntry";
 import { Shape } from "../../components/Shape";
-import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { graduatedFile } from "../../lib/graduated";
 import { allTime, numberFile } from "../../lib/number";
@@ -102,7 +101,6 @@ export default function Graduated(): ReactElement {
       <StaleBanner crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
 
       <main className="sheet">
-        <SheetNav current="graduated" />
         <RunningHead mark="LEDGE · GRADUATED" win="Every graduation, ranked · 01" />
 
         <div className="fold" style={{ paddingBottom: "1.5rem" }}>
