@@ -92,7 +92,18 @@ export default function Cockpit(): ReactElement {
       </div>
       <ColophonStrip stamp={formatStamp(crawledAt)} />
 
-      <LedgerEntry folio="02" id="h-what" heading="What these are">
+      {/* The grid first, the explanation after.
+
+          This page opened with three screens of prose defining what a
+          configuration is before a reader reached anything they could touch.
+          That is the same failure the home page had: the argument arriving
+          before the thing it is about. The definition has not been cut and it
+          has not been softened — it sits directly beneath the grid, where
+          someone who wants it is looking for it, rather than in front of
+          someone who does not. */}
+      <ConfigGrid folio="02" windows={WINDOWS} crawledAt={crawledAt} />
+
+      <LedgerEntry folio="03" id="h-what" heading="What these are">
         <p className="lede">
           A configuration is the pair token a launch is priced against and the creator tax set at
           launch. Each row counts every indexed launch made with that configuration and how many
@@ -101,8 +112,6 @@ export default function Cockpit(): ReactElement {
           launch not yet made.
         </p>
       </LedgerEntry>
-
-      <ConfigGrid folio="03" windows={WINDOWS} crawledAt={crawledAt} />
 
       <Footer />
     </main>
