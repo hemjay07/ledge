@@ -40,6 +40,70 @@ page, which is already rebuilt, and not the broadsheets, which are evidence.
 
 ---
 
+## What the 2026-09-11 assessment settled
+
+The owner said three times that the interface was wrong for the audience. Twice
+I defended it on the grounds that the typography is distinctive and a generic
+sans with gradients would look like every other dashboard on this chain. **That
+defence conflated two decisions**: keeping a typographic identity, and keeping a
+flat single-plane document. Only the first was ever argued. Three independent
+assessors were asked, one of them briefed specifically to argue against changing
+anything.
+
+**They agreed with him on every structural point, including the defender.**
+
+| Claim | Verdict | The measurement |
+|---|---|---|
+| The page is enormous | **True** | `/graduated` ships **1.31 MB** of HTML, **2,539 rows**, about **112,000 px** — roughly 125 laptop screens. It grows ~250 rows a day. |
+| No pagination | **True** | Nothing anywhere is paginated, virtualised or load-more. |
+| No search or filter | **True** | One exact-address lookup. No narrowing a board by pair, tax, activity or age. |
+| One plane, no layers | **True** | Every navigation is a full page load. No panels, drawers, tabs or overlays. |
+| Too many navs | **True, but a symptom** | Nine destinations exist because there is no single decision surface. |
+
+**Where they split, and the line I took.** He said the look is wrong. All three
+said the ARCHITECTURE is wrong and the look is an asset — including the
+researcher who spent the task inside DexScreener, Photon, BullX, Axiom, Padre
+and PonsScan, and found every one of them to be a dark dashboard with an accent
+gradient. His finding: a screenshot of LEDGE is identifiable, a screenshot of
+PonsScan looks like five other products. The defender put it as *"build the
+scaffolding, do not burn the building"*.
+
+So: **the scaffolding was never built, and no amount of visual work fixes a page
+that scrolls 125 screens.** The typefaces and palette stay. The structure changes.
+
+### The work, all of it unanimous
+
+1. **Pagination** on the long boards. Named first by all three.
+2. **Filters** by pair, tax, age and activity, with the state in the URL so a
+   filtered view is shareable. Every filtered view states its own n, because a
+   count over a subset that does not say it is a subset is the same defect as a
+   missing denominator.
+3. **The lookup into a persistent top bar**, so the only decision on the site is
+   reachable without scrolling past the evidence for it.
+4. **Navigation down to a smaller primary set**, proof pages behind one entry.
+5. **A homepage line saying what this is** before it says what it found. *(done)*
+
+### One disagreement, and the middle I took
+
+The interaction designer said no modals, everything a page or a drawer. The
+researcher said a token-detail modal, as every trading terminal does. **A board
+row will open a panel**, so a reader keeps their place in the list — **and the
+token page stays a real URL underneath**, because that is the thing people paste
+into group chats and burying it inside an overlay would throw that away.
+
+### A failure worth recording, because it is a pattern
+
+The graveyard rendered the full forty-word window caveat inside **every row**,
+which wrapped in a narrow column, made each row ~450 px tall and pushed the
+token address off screen. It did that because I instructed it to make the window
+prominent on every row. The rule — every count carries its window — is right.
+The instruction for satisfying it was not. **A constraint applied literally,
+without judgement about how it renders, produces a page that satisfies the rule
+and cannot be used.** Fixed by stating the window once in the caption with a
+short per-row marker.
+
+---
+
 ## 1.1 The per-token page and the lookup — the centre of this phase
 
 **What it must answer, in the order someone asks it:** is this real, how far
