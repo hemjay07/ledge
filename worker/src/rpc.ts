@@ -23,7 +23,7 @@ export const LOG_WINDOW_BLOCKS = 1000;
    a word the copy lint bans, and the lint is right to ban it in copy -- a
    User-Agent is machine configuration, so it takes the documented exemption
    rather than being spelled around. */
-export const USER_AGENT = "ledge/1.0 (+https://ledge-alpha.vercel.app)"; // lint-copy:allow — a User-Agent, not copy
+export const USER_AGENT = "ledge/1.0 (+https://ledge.tools)"; // lint-copy:allow — a User-Agent, not copy
 const RETRYABLE_HTTP = new Set([408, 429, 500, 502, 503, 504]);
 
 /* JSON-RPC error codes that mean "ask again", rather than "this is broken".

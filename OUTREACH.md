@@ -2,7 +2,7 @@
 
 Hand-sent, one at a time, in the order below. The site does not spread on its own, and nothing in this file works if it is sent as a broadcast.
 
-**Before you send anything: the link must resolve.** Until `ledge.tools` is registered and pointed at Vercel, substitute `ledge-alpha.vercel.app` in every message below. A dead link in the first line is the whole pitch.
+**`ledge.tools` resolves and serves the site as of 2026-09-12.** Every link below is live as written.
 
 ## What changed, and why the order changed
 
