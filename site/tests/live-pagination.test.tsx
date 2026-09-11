@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { LiveBoardFull } from "../components/Live";
 import live from "./api-fixtures/live-ok.json";
-import { PAGE_SIZE } from "../lib/paginate";
+import { PAGE_SIZE, totalPagesFor } from "../lib/paginate";
 
 /* /live already fetches every row it will hold for a sort in one request
    (the API caps at 200), so pagination and filters here narrow what is
@@ -43,17 +43,20 @@ afterEach(() => {
 });
 
 describe("the live board's pagination", () => {
-  it("shows only the first 50 rows and states 50 of 60, with a working pager", async () => {
+  it("shows only the first page and states its size of 60, with a working pager", async () => {
     answerWith(PAYLOAD);
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(PAGE_SIZE));
     expect(container.textContent).toContain(`${PAGE_SIZE} of 60 tokens with activity in this window shown`);
-    expect(container.textContent).toContain("page 1 of 2");
+    const pages = totalPagesFor(60);
+    expect(container.textContent).toContain(`page 1 of ${pages}`);
 
     const next = [...container.querySelectorAll(".pager a")].find((a) => a.textContent === "Next")!;
     fireEvent.click(next);
-    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(10));
-    expect(container.textContent).toContain("page 2 of 2");
+    // page 2 is a full page unless it is also the last page
+    const secondPageRows = pages === 2 ? 60 - PAGE_SIZE : PAGE_SIZE;
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(secondPageRows));
+    expect(container.textContent).toContain(`page 2 of ${pages}`);
   });
 
   it("carries the page across a sort change by resetting to page 1, and the URL follows", async () => {

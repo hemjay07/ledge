@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { GraduatedBoard } from "../components/Graduated";
-import { PAGE_SIZE } from "../lib/paginate";
+import { PAGE_SIZE, totalPagesFor } from "../lib/paginate";
 import type { GraduatedFile, GraduatedRow } from "../lib/graduated-schema";
 
 /* Only the first page renders at build time (REVAMP.md pagination) -- the
@@ -73,16 +73,19 @@ describe("GraduatedBoard's build-time first page", () => {
     expect(firstRow?.getAttribute("title")).toBe(FULL_ROWS[59]!.token);
   });
 
-  it("pages past the first 50 once the full record is fetched", async () => {
+  it("pages past the first page once the full record is fetched", async () => {
     answerWith(FULL_FILE);
     const { container } = render(<GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} />);
 
     const next = [...container.querySelectorAll(".pager a")].find((a) => a.textContent === "Next")!;
     fireEvent.click(next);
 
-    await waitFor(() => expect(container.textContent).toContain("page 2 of 2"));
+    const total = FULL_ROWS.length;
+    const pages = totalPagesFor(total);
+    await waitFor(() => expect(container.textContent).toContain(`page 2 of ${pages}`));
     const rows = container.querySelectorAll(".graduated-board tbody tr");
-    expect(rows).toHaveLength(10); // 60 rows, page size 50 -> 10 on page 2
+    const secondPageRows = pages === 2 ? total - PAGE_SIZE : PAGE_SIZE;
+    expect(rows).toHaveLength(secondPageRows);
   });
 
   it("states its own filtered n, separately from the unfiltered total, and never renders a bare percentage", async () => {

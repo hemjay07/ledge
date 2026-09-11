@@ -2,7 +2,15 @@
    (REVAMP.md pagination). One place holds the number so the three boards
    cannot drift apart on it. */
 
-export const PAGE_SIZE = 50;
+/* Twenty, down from fifty on 2026-09-12.
+
+   Fifty was sized for a table, where a row is one line and fifty rows is a
+   screen and a half. On a phone the same board is a stack of cards, each about
+   200 px, and fifty of those is ten thousand pixels: the "unending scroll" the
+   owner reported on a page that had supposedly been paginated. It had been.
+   The page was just too big to notice. Twenty keeps the table comfortable and
+   brings a phone page down to something a thumb can get through. */
+export const PAGE_SIZE = 20;
 
 export function totalPagesFor(count: number): number {
   return Math.max(1, Math.ceil(count / PAGE_SIZE));

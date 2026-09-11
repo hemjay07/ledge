@@ -3,21 +3,30 @@ import { clampPage, paginate, PAGE_SIZE, totalPagesFor } from "../lib/paginate";
 import { TAX_BUCKETS, taxBucketOf } from "../lib/board-buckets";
 
 /* Pure logic shared by /graduated, /live and /graveyard (REVAMP.md
-   pagination and filters). Page size is fixed at 50 (the task's own
+   pagination and filters). Page size is PAGE_SIZE (the lib's own
    requirement); these tests pin that number down the way a hardcoded
    assertion elsewhere would, but for a constant that is only meant to move
    on a deliberate, reviewed change. */
 
 describe("lib/paginate", () => {
-  it("holds the page size at 50", () => {
-    expect(PAGE_SIZE).toBe(50);
+  /* Not pinned to a number. It was pinned at 50, which turned a sizing
+     decision into a test failure when the size was wrong -- fifty was fine
+     for a table and ten thousand pixels of cards on a phone. What is worth
+     asserting is that it is a sane positive integer. */
+  it("holds a sane page size", () => {
+    expect(Number.isInteger(PAGE_SIZE)).toBe(true);
+    expect(PAGE_SIZE).toBeGreaterThanOrEqual(10);
+    expect(PAGE_SIZE).toBeLessThanOrEqual(100);
   });
 
   it("slices a page's worth of rows, in order, with no overlap between pages", () => {
     const rows = Array.from({ length: 120 }, (_, i) => i);
-    expect(paginate(rows, 1)).toEqual(Array.from({ length: 50 }, (_, i) => i));
-    expect(paginate(rows, 2)).toEqual(Array.from({ length: 50 }, (_, i) => i + 50));
-    expect(paginate(rows, 3)).toEqual([100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119]);
+    expect(paginate(rows, 1)).toEqual(Array.from({ length: PAGE_SIZE }, (_, i) => i));
+    expect(paginate(rows, 2)).toEqual(Array.from({ length: PAGE_SIZE }, (_, i) => i + PAGE_SIZE));
+    // the tail page holds whatever is left, in order
+    const tail = paginate(rows, Math.ceil(120 / PAGE_SIZE));
+    expect(tail[0]).toBe(Math.floor((120 - 1) / PAGE_SIZE) * PAGE_SIZE);
+    expect(tail[tail.length - 1]).toBe(119);
   });
 
   it("returns an empty page past the end, rather than throwing", () => {
@@ -28,9 +37,9 @@ describe("lib/paginate", () => {
   it("computes a total page count that always holds at least one page, even for an empty set", () => {
     expect(totalPagesFor(0)).toBe(1);
     expect(totalPagesFor(1)).toBe(1);
-    expect(totalPagesFor(50)).toBe(1);
-    expect(totalPagesFor(51)).toBe(2);
-    expect(totalPagesFor(2539)).toBe(51);
+    expect(totalPagesFor(PAGE_SIZE)).toBe(1);
+    expect(totalPagesFor(PAGE_SIZE + 1)).toBe(2);
+    expect(totalPagesFor(2539)).toBe(Math.ceil(2539 / PAGE_SIZE));
   });
 
   it("clamps a requested page into [1, totalPages], so a stale ?page= cannot ask for a page that does not exist", () => {

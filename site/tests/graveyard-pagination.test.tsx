@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { GraveyardBoard } from "../components/Graveyard";
 import graveyard from "./api-fixtures/graveyard-ok.json";
-import { PAGE_SIZE } from "../lib/paginate";
+import { PAGE_SIZE, totalPagesFor } from "../lib/paginate";
 
 /* /graveyard, like /live, already fetches every row it will hold for a sort
    in one request, so pagination and filters narrow what is already in hand
@@ -39,16 +39,18 @@ afterEach(() => {
 });
 
 describe("the graveyard's pagination", () => {
-  it("shows only the first 50 rows and states 50 of 55, with a working pager", async () => {
+  it("shows only the first page and states its size of 55, with a working pager", async () => {
     answerWith(PAYLOAD);
     const { container } = render(<GraveyardBoard />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(PAGE_SIZE));
     expect(container.textContent).toContain(`${PAGE_SIZE} of 55 launches at zero buys`);
-    expect(container.textContent).toContain("page 1 of 2");
+    const pages = totalPagesFor(55);
+    expect(container.textContent).toContain(`page 1 of ${pages}`);
 
     const next = [...container.querySelectorAll(".pager a")].find((a) => a.textContent === "Next")!;
     fireEvent.click(next);
-    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(5));
+    const secondPageRows = pages === 2 ? 55 - PAGE_SIZE : PAGE_SIZE;
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(secondPageRows));
   });
 });
 
