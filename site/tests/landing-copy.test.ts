@@ -176,3 +176,37 @@ describe("the withdrawn pair finding, and what is left in its place", () => {
     }
   });
 });
+
+/* Added 2026-09-11. Three independent assessments found that a stranger
+   landing here could not tell in ten seconds whether this was an audit, a
+   dashboard, a data feed or a signal service: the page opened on a finding,
+   which only means something to someone who already knows what the site is
+   for. The orienting line is now the first thing in the fold, and this pins
+   it there so it cannot quietly be edited back out. */
+describe("the page says what it is before it says what it found", () => {
+  const WHAT = copyOf('<p className="capability-what">', "</p>");
+
+  it("names the thing, the source and what a reader can do, in one line", () => {
+    expect(WHAT).toMatch(/free/i);
+    expect(WHAT).toMatch(/pons/);
+    expect(WHAT).toMatch(/factory contract/i);
+    expect(WHAT).toMatch(/paste an address/i);
+  });
+
+  it("comes before the claim it introduces", () => {
+    expect(PAGE.indexOf('className="capability-what"')).toBeLessThan(
+      PAGE.indexOf('className="capability-line"'),
+    );
+  });
+
+  it("passes the banned-words list and tells no reader what to do with a number", () => {
+    const lower = WHAT.toLowerCase();
+    for (const banned of BANNED) {
+      expect(lower.includes(banned), `"${banned}" is on the page`).toBe(false);
+    }
+  });
+
+  it("stays one line: 40 words or fewer", () => {
+    expect(WHAT.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length).toBeLessThanOrEqual(40);
+  });
+});

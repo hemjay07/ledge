@@ -132,6 +132,19 @@ const exFastOneIn =
         </div>
 
         <div className="capability">
+          {/* What this is, before what it found.
+
+             Three independent assessments on 2026-09-11 said the same thing: a
+             stranger landing here could not tell in ten seconds whether this
+             was an audit, a dashboard, a data feed or a signal service. The
+             page opened on a finding, which only means something to a reader
+             who already knows what the site is for. One orienting line costs
+             almost nothing and it is the difference between a page that
+             explains itself and one that assumes you arrived informed. */}
+          <p className="capability-what">
+            A free, public record of every token launch on pons, read from the factory contract
+            every hour. Paste an address to see what one launch actually did.
+          </p>
           <p className="capability-line">
             LEDGE times every pons graduation, not just whether one happened.
           </p>

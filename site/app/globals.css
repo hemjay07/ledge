@@ -1520,6 +1520,18 @@ footer {
     margin-left: 12%;
   }
 }
+/* The orienting line: what this is, set above and quieter than the claim it
+   introduces. Mono at caption size so it reads as a label on the page rather
+   than as the page's first argument. */
+.capability-what {
+  font-family: var(--font-mono);
+  font-size: var(--fs-note);
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 58ch;
+  margin-bottom: var(--s-3);
+}
+
 .capability-line {
   font-family: var(--font-body);
   font-size: 1.4rem;
