@@ -2,6 +2,40 @@
 
 Everything below is a one-time step you run yourself. Nothing in the repo holds a key. Order matters only where stated.
 
+## The short path: Vercel only, no nameserver migration
+
+**Added 2026-09-11, and this is the recommended route.** The seven-step
+Cloudflare migration below still works and is still correct, but it buys one
+thing a visitor never sees.
+
+The only reason to move the nameservers was to give the Worker a hostname at
+`api.ledge.tools`. The site already proxies `/api/*` to the Worker through the
+rewrites in `vercel.json`, and that works today on the workers.dev host. So the
+migration buys a prettier API hostname and the Cloudflare firewall rule, and
+costs a DNS cutover.
+
+**Two steps, both yours, about five minutes:**
+
+1. **Vercel** → the `ledge` project → Settings → Domains → add `ledge.tools` and
+   `www.ledge.tools`. Vercel then prints the exact DNS records it wants. Do not
+   take them from here: read them off that screen, because they change.
+2. **Namecheap** → Domain List → Manage `ledge.tools` → Advanced DNS → add the
+   records Vercel just showed you. Leave the nameservers on Namecheap.
+
+That is the whole thing. The site serves on the domain, the API keeps answering
+through the existing rewrites, and nothing about the Worker or Cloudflare
+changes.
+
+**What is given up by skipping the migration:** the Cloudflare WAF rate-limit
+rule on `/api/` and `/og/`, and one network hop on API calls. The rate limit
+matters on a launch day and not before, and the migration is still available
+later — nothing here forecloses it.
+
+**Then tell me it resolves**, and I will make the two edits that are mine: the
+links in `OUTREACH.md` and `LAUNCH.md` move from the Vercel alias to
+`ledge.tools`. Do not send anything with a `ledge.tools` link before that,
+because a dead link in the first line of a pitch ends the pitch.
+
 ## Now that ledge.tools is registered
 
 Bought 2026-09-10. Until these steps are done every published link points at
