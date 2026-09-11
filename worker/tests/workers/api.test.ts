@@ -645,6 +645,13 @@ describe("the units a fill is denominated in", () => {
     );
   }
 
+  /* These two exercise a path that legitimately retries: an unknown or
+     unreadable decimals() answer is retried before the client gives up and the
+     caller prints raw base units. That is correct behaviour and it costs real
+     backoff, so the tests carry a timeout that reflects it rather than
+     pretending they are instant. Backoff itself was shortened on 2026-09-11
+     from 1000/8000 to 250/2000, which is the right size for a job that runs
+     every sixty seconds and also brought these back under control. */
   it("reads decimals() once and caches the answer in KV", async () => {
     await env.LEDGE_KV.delete(kvDecimalsKey(USDG));
     stubUsdgChain({ decimals: 6 });
@@ -656,7 +663,7 @@ describe("the units a fill is denominated in", () => {
     expect(partial.text).toContain("Curve fill: 4045 USDG of 8090 USDG (50.0% of the threshold).");
     expect(partial.text).not.toContain("4045000000 of");
     expect(await env.LEDGE_KV.get(kvDecimalsKey(USDG), "text")).toBe("6");
-  });
+  }, 20_000);
 
   it("prints the raw integer and says so rather than assuming 18", async () => {
     await env.LEDGE_KV.delete(kvDecimalsKey(USDG));
@@ -668,7 +675,7 @@ describe("the units a fill is denominated in", () => {
     expect(partial.text).toContain("its decimals are not known");
     // an assumed 18 would have rendered this as 0.000000004 of something
     expect(partial.text).not.toContain("0.000000004");
-  });
+  }, 20_000);
 });
 
 /* Phase A — the activity block on the lookup.

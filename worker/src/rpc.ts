@@ -83,8 +83,21 @@ const MAX_RETRIES = 4;
    the budget spent fighting is the budget the rest of the tick needs. 40 leaves
    headroom under the 50 for everything else an invocation does. */
 const SUBREQUEST_BUDGET = 40;
-const BACKOFF_BASE_MS = 1000;
-const BACKOFF_CAP_MS = 8000;
+/* Backoff, sized for a job that runs every sixty seconds.
+
+   It was 1000/8000, which spends 7 seconds sleeping across four attempts. That
+   is a poor trade inside a Worker invocation: the sleep is wall time the tick
+   cannot spend indexing, and the cron is going to try again in under a minute
+   regardless. It also broke CI on 2026-09-11, where adding retries for
+   JSON-RPC-level errors meant any test stubbing an error response slept past
+   vitest's 5-second timeout — the tests were right and the backoff was wrong.
+
+   250/2000 spends 1.75 seconds across the same four attempts, which is enough
+   to ride out a moment of load shedding and short enough that a failed tick
+   fails early and cheaply. The cron is the outer retry loop; this is only the
+   inner one. */
+const BACKOFF_BASE_MS = 250;
+const BACKOFF_CAP_MS = 2000;
 const TIMEOUT_MS = 20_000;
 
 export class RpcUnavailable extends Error {
@@ -185,7 +198,19 @@ function httpTransport(url: string): Transport {
   };
 }
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/* Injectable so a test does not spend real seconds asleep.
+
+   Backoff and batch pacing are correct behaviour in production and pure waste
+   in a test: on 2026-09-11 two Worker tests sat at exactly 5,000 ms and failed
+   vitest's timeout, not because anything was broken but because they were
+   waiting out retries. The Python suite hit the same wall and was fixed the
+   same way, taking it from six minutes to fifteen seconds.
+
+   The default is the real thing, so production behaviour is unchanged unless a
+   caller deliberately replaces it. */
+export type Sleeper = (ms: number) => Promise<void>;
 
 export class RpcClient {
   private readonly transport: Transport;
@@ -208,6 +233,7 @@ export class RpcClient {
     fallbackUrl?: string,
     fallbackTransport?: Transport,
     private readonly budget: number = SUBREQUEST_BUDGET,
+    private readonly sleep: Sleeper = realSleep,
   ) {
     this.transport = transport ?? httpTransport(url);
     this.fallback = fallbackTransport ?? (fallbackUrl && fallbackUrl !== url ? httpTransport(fallbackUrl) : null);
@@ -254,7 +280,7 @@ export class RpcClient {
         if (attempt === MAX_RETRIES - 1) {
           throw new RpcUnavailable(`rpc: gave up after retryable error: ${JSON.stringify(response).slice(0, 200)}`);
         }
-        await sleep(delay);
+        await this.sleep(delay);
         delay = Math.min(delay * 2, BACKOFF_CAP_MS);
         continue;
       }
@@ -263,7 +289,7 @@ export class RpcClient {
         if (attempt === MAX_RETRIES - 1) {
           throw new RpcUnavailable(`rpc: gave up: ${response.message}`, response.code === 429);
         }
-        await sleep(delay);
+        await this.sleep(delay);
         delay = Math.min(delay * 2, BACKOFF_CAP_MS);
         continue;
       }
@@ -275,7 +301,7 @@ export class RpcClient {
         if (attempt === MAX_RETRIES - 1) {
           throw new RpcUnavailable(`rpc: malformed batch response: ${error.message}`);
         }
-        await sleep(delay);
+        await this.sleep(delay);
         delay = Math.min(delay * 2, BACKOFF_CAP_MS);
       }
     }
@@ -302,7 +328,7 @@ export class RpcClient {
         indexBatchResponse(response, expected),
       )) as unknown[];
       results.push(...part);
-      if (c < chunks.length - 1) await sleep(BATCH_PACING_MS);
+      if (c < chunks.length - 1) await this.sleep(BATCH_PACING_MS);
     }
     return results;
   }
