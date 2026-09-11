@@ -1,0 +1,182 @@
+/* The shell: the persistent top bar that sits above every page.
+
+   Kept in its own file rather than in globals.css. That file is edited by
+   several hands at once and is long enough that a change to it is hard to read
+   in a diff; the shell is a distinct thing with a distinct job and belongs
+   beside the component that uses it.
+
+   Everything here uses the tokens globals.css already defines -- the same
+   bone, the same ink, the same rules, the same three faces. A shell that
+   introduced its own palette would read as a different product bolted on top
+   of this one, which is exactly what it must not be. Rules rather than
+   shadows, no radius, no soft colour blends, one accent. */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--ground);
+  border-bottom: 1px solid var(--rule-heavy);
+}
+
+.topbar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0.55rem var(--s-4);
+}
+
+.topbar-mark {
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--ink);
+  text-decoration: none;
+  border: 0;
+  flex: none;
+}
+
+/* The one action, given the space that implies. It grows into whatever the
+   row has spare, because it is the reason most people arrive. */
+.topbar-find {
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--rule-mid);
+}
+
+.topbar-find-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.topbar-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.55rem;
+}
+.topbar-input::placeholder {
+  color: var(--ink-3);
+}
+.topbar-input:focus-visible {
+  outline: 2px solid var(--fill);
+  outline-offset: -2px;
+}
+
+.topbar-go {
+  flex: none;
+  border: 0;
+  border-left: 1px solid var(--rule-mid);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0 0.7rem;
+  cursor: pointer;
+}
+.topbar-go:hover,
+.topbar-go:focus-visible {
+  color: var(--ink);
+}
+
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: none;
+}
+.topbar-nav a,
+.topbar-more {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule-hair);
+}
+.topbar-nav a:hover,
+.topbar-more:hover,
+.topbar-nav a:focus-visible,
+.topbar-more:focus-visible {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.topbar-problem {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 var(--s-4) 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--stale);
+}
+
+.topbar-reference {
+  border-top: 1px solid var(--rule-hair);
+}
+.topbar-reference[hidden] {
+  display: none;
+}
+.topbar-reference {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0.5rem var(--s-4);
+}
+.topbar-reference a {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule-hair);
+}
+.topbar-reference a:hover,
+.topbar-reference a:focus-visible {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+/* On a phone the row cannot hold mark, field and three links at a readable
+   size. The field keeps the first row with the mark, because it is the reason
+   most people arrive; the sections wrap to their own row beneath it and scroll
+   sideways if they must, rather than shrinking the type. */
+@media (max-width: 44rem) {
+  .topbar-row {
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    padding: 0.5rem var(--s-3);
+  }
+  .topbar-find {
+    order: 2;
+    flex-basis: 100%;
+  }
+  .topbar-nav {
+    order: 3;
+    flex-basis: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

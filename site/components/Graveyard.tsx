@@ -13,7 +13,7 @@
    that before the table, not after it -- a count that looks complete without
    saying so is the denominator defect CONSTRAINTS 3 exists to catch. */
 
-import { useEffect, useState, type MouseEvent, type ReactElement } from "react";
+import { useEffect, useMemo, useState, type MouseEvent, type ReactElement } from "react";
 import {
   fetchGraveyard,
   stripAddresses,
@@ -22,7 +22,12 @@ import {
 } from "../lib/api";
 import { GRAVEYARD_SORT_KEYS } from "../lib/api-schema";
 import type { GraveyardResponse } from "../lib/api-schema";
-import { formatAge, formatCount, pairLabel } from "../lib/format";
+import { FilterNumber, FilterSelect } from "./FilterField";
+import { Pager } from "./Pager";
+import { PAIR_BUCKETS, TAX_BUCKETS, taxBucketOf } from "../lib/board-buckets";
+import { clampPage, paginate, totalPagesFor } from "../lib/paginate";
+import { mergeQuery, readQuery, readQueryInt } from "../lib/query-state";
+import { formatAge, formatCount, pairLabel, taxLabel } from "../lib/format";
 
 const REFRESH_MS = 15_000;
 const DEFAULT_SORT: GraveyardSortKey = "age";
@@ -40,6 +45,53 @@ function sortFromLocation(): GraveyardSortKey {
   return (GRAVEYARD_SORT_KEYS as readonly string[]).includes(requested ?? "")
     ? (requested as GraveyardSortKey)
     : DEFAULT_SORT;
+}
+
+/* Page and every filter (REVAMP.md pagination and filters), read off the
+   address bar once on mount, the same way sortFromLocation already reads
+   `?sort=`. /graveyard already fetches every row it will ever hold for a
+   given sort in one request -- the API caps at 200 -- so page and filters
+   narrow what is already in hand rather than triggering a second fetch. */
+interface GraveyardFilters {
+  pair: string; // "" = all, or a lib/board-buckets PAIR_BUCKETS value
+  tax: string; // "" = all, "not-read", or a lib/board-buckets TAX_BUCKETS value
+  ageMin: string; // seconds, "" = no lower bound
+  ageMax: string; // seconds, "" = no upper bound
+}
+
+const DEFAULT_GRAVEYARD_FILTERS: GraveyardFilters = { pair: "", tax: "", ageMin: "", ageMax: "" };
+
+function hasActiveGraveyardFilters(f: GraveyardFilters): boolean {
+  return f.pair !== "" || f.tax !== "" || f.ageMin !== "" || f.ageMax !== "";
+}
+
+function graveyardStateFromLocation(): { sort: GraveyardSortKey; page: number; filters: GraveyardFilters } {
+  return {
+    sort: sortFromLocation(),
+    page: readQueryInt("page") ?? 1,
+    filters: {
+      pair: readQuery("pair") ?? "",
+      tax: readQuery("tax") ?? "",
+      ageMin: readQuery("ageMin") ?? "",
+      ageMax: readQuery("ageMax") ?? "",
+    },
+  };
+}
+
+function applyGraveyardFilters(rows: Row[], f: GraveyardFilters): Row[] {
+  const ageMin = f.ageMin === "" ? null : Number(f.ageMin);
+  const ageMax = f.ageMax === "" ? null : Number(f.ageMax);
+  return rows.filter((row) => {
+    if (f.pair !== "" && row.pairClass !== f.pair) return false;
+    if (f.tax === "not-read") {
+      if (row.creatorTaxBps !== null) return false;
+    } else if (f.tax !== "" && taxBucketOf(row.creatorTaxBps) !== f.tax) {
+      return false;
+    }
+    if (ageMin !== null && Number.isFinite(ageMin) && row.ageSeconds < ageMin) return false;
+    if (ageMax !== null && Number.isFinite(ageMax) && row.ageSeconds > ageMax) return false;
+    return true;
+  });
 }
 
 function useGraveyard(sort: GraveyardSortKey) {
@@ -95,20 +147,78 @@ function stalenessNote(body: GraveyardResponse): ReactElement | null {
 
 export function GraveyardBoard(): ReactElement {
   const [sort, setSort] = useState<GraveyardSortKey>(DEFAULT_SORT);
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<GraveyardFilters>(DEFAULT_GRAVEYARD_FILTERS);
 
   useEffect(() => {
-    setSort(sortFromLocation());
+    const next = graveyardStateFromLocation();
+    setSort(next.sort);
+    setPage(next.page);
+    setFilters(next.filters);
   }, []);
 
   const result = useGraveyard(sort);
   const body = result?.kind === "graveyard" ? result.body : null;
 
+  const filtered = hasActiveGraveyardFilters(filters);
+  const filteredRows = useMemo(
+    () => (body === null ? [] : applyGraveyardFilters(body.rows, filters)),
+    [body, filters],
+  );
+  const pages = totalPagesFor(filteredRows.length);
+  const clampedPage = clampPage(page, pages);
+  const pageRows = useMemo(() => paginate(filteredRows, clampedPage), [filteredRows, clampedPage]);
+
   function chooseSort(key: GraveyardSortKey) {
     return (event: MouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
       setSort(key);
-      window.history.replaceState(null, "", key === DEFAULT_SORT ? "?" : `?sort=${key}`);
+      setPage(1);
+      mergeQuery({ sort: key === DEFAULT_SORT ? null : key, page: null });
     };
+  }
+
+  function updateFilters(patch: Partial<GraveyardFilters>) {
+    const next = { ...filters, ...patch };
+    setFilters(next);
+    setPage(1);
+    mergeQuery({
+      pair: next.pair || null,
+      tax: next.tax || null,
+      ageMin: next.ageMin || null,
+      ageMax: next.ageMax || null,
+      page: null,
+    });
+  }
+
+  function resetFilters() {
+    setFilters(DEFAULT_GRAVEYARD_FILTERS);
+    setPage(1);
+    mergeQuery({ pair: null, tax: null, ageMin: null, ageMax: null, page: null });
+  }
+
+  function choosePage(next: number) {
+    setPage(next);
+    mergeQuery({ page: next === 1 ? null : next });
+  }
+
+  const pairOptions = [
+    { value: "", label: "All pair tokens" },
+    ...PAIR_BUCKETS.map((p) => ({ value: p, label: pairLabel(p) })),
+  ];
+  const taxOptions = [
+    { value: "", label: "All creator tax bands" },
+    ...TAX_BUCKETS.map((t) => ({ value: t, label: taxLabel(t) })),
+    { value: "not-read", label: "Not read" },
+  ];
+
+  function countLine(body: GraveyardResponse): string {
+    const shown = formatCount(pageRows.length);
+    const matched = formatCount(filteredRows.length);
+    if (!filtered) {
+      return `${shown} of ${matched} launches at zero buys, 72 h or older, shown`;
+    }
+    return `${shown} of ${matched} matching launches shown (${matched} of ${formatCount(body.count)} total)`;
   }
 
   return (
@@ -129,6 +239,43 @@ export function GraveyardBoard(): ReactElement {
         )}
       </nav>
 
+      <div className="board-filters" role="group" aria-label="Filter the graveyard">
+        <FilterSelect
+          label="Pair token"
+          value={filters.pair}
+          onChange={(value) => updateFilters({ pair: value })}
+          options={pairOptions}
+        />
+        <FilterSelect
+          label="Creator tax"
+          value={filters.tax}
+          onChange={(value) => updateFilters({ tax: value })}
+          options={taxOptions}
+        />
+        <FilterNumber
+          label="Age from (s)"
+          value={filters.ageMin}
+          onChange={(value) => updateFilters({ ageMin: value })}
+        />
+        <FilterNumber
+          label="Age to (s)"
+          value={filters.ageMax}
+          onChange={(value) => updateFilters({ ageMax: value })}
+        />
+        {filtered ? (
+          <a
+            className="board-filters-reset"
+            href="?"
+            onClick={(event) => {
+              event.preventDefault();
+              resetFilters();
+            }}
+          >
+            Reset filters
+          </a>
+        ) : null}
+      </div>
+
       {result === null ? <div className="hairline-pulse" /> : null}
       {result !== null && result.kind === "error" ? (
         <p className="lookup-line-plain">{result.message}</p>
@@ -137,7 +284,7 @@ export function GraveyardBoard(): ReactElement {
       {body !== null ? (
         <>
           <p className="note note--fine">
-            {formatCount(body.count)} launches at zero buys, 72 h or older · sorted by{" "}
+            {countLine(body)} · page {clampedPage} of {pages} · sorted by{" "}
             {SORT_LABEL[body.sortedBy]}
             {" · "}
             <span className={body.live.stale ? "mono is-stale" : "mono"}>
@@ -174,7 +321,7 @@ export function GraveyardBoard(): ReactElement {
                 </tr>
               </thead>
               <tbody>
-                {body.rows.map((row: Row) => (
+                {pageRows.map((row: Row) => (
                   <tr key={row.token}>
                     <th scope="row" className="mono">
                       {row.token}
@@ -213,11 +360,16 @@ export function GraveyardBoard(): ReactElement {
               </tbody>
             </table>
           </div>
+
+          <Pager page={clampedPage} totalPages={pages} onChange={choosePage} label="Page through the graveyard" />
+
           {body.rows.length === 0 ? (
             <p className="note note--fine">
               No launch in the activity index's own window currently meets the age and zero-buys
               gate.
             </p>
+          ) : filteredRows.length === 0 ? (
+            <p className="note note--fine">No launch matches these filters.</p>
           ) : null}
         </>
       ) : null}

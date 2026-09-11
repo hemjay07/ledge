@@ -1602,6 +1602,48 @@ footer {
   font-weight: 700;
 }
 
+/* The filter row: the same ruled fields as .picker (ConfigGrid), reused
+   under its own name because .picker's own comment says it marks a row and
+   does nothing else -- a filter narrows the row list, which is a different
+   act and gets a different class so the two are never confused reading the
+   markup. Named after the column each field filters (CONSTRAINTS 1: a
+   filter is not a ranking and must never read as a preset with a verdict in
+   its name). */
+.board-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4) var(--s-8);
+  margin-top: var(--s-3);
+}
+.board-filters .picker-field {
+  min-width: 9rem;
+}
+.board-filters-reset {
+  align-self: flex-end;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border-bottom-color: var(--rule-hair);
+  padding-bottom: var(--s-1);
+}
+
+/* The pager: .sheet-nav's own vocabulary, plain links either side of the
+   position stated in words -- "Page 3 of 51" is what keeps a slice of the
+   record from reading as the whole of it. */
+.pager {
+  align-items: baseline;
+}
+.pager-disabled {
+  color: var(--ink-3);
+}
+.pager-position {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
 .window-cell {
   white-space: normal;
   max-width: 26rem;

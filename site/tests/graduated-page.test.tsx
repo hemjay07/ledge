@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import Graduated from "../app/graduated/page";
 import { allTime } from "../lib/number";
 import { graduatedFile } from "../lib/graduated";
+import { PAGE_SIZE } from "../lib/paginate";
 import { formatCount, formatDuration, rateText } from "../lib/format";
 
 /* Structural assertions only, derived through the same live imports and the
@@ -41,13 +42,20 @@ describe("the /graduated page's structure", () => {
     expect(text).toContain("no launch is on record");
   });
 
-  it("renders one row per graduated token, with the duration visible on every row", () => {
+  /* Only the first page ships in the HTML -- 2,500+ rows in one document was
+     the 1.31 MB defect this pagination fixes (REVAMP.md). The page states
+     its own slice against the true total rather than rendering every row;
+     the assertion below follows that change rather than the old "every row
+     renders" behaviour it replaces, which is now the thing under test as a
+     regression, not the guarantee. */
+  it("renders only the first page (50 rows) at build time, with the duration visible on every row and the true total stated", () => {
     const { container } = render(<Graduated />);
     const rows = container.querySelectorAll(".graduated-board tbody tr");
-    expect(rows).toHaveLength(graduatedFile.rows.length);
+    expect(rows).toHaveLength(Math.min(PAGE_SIZE, graduatedFile.rows.length));
     if (graduatedFile.rows[0]) {
       expect(container.textContent).toContain(formatDuration(graduatedFile.rows[0].durationSeconds));
     }
+    expect(container.textContent).toContain(formatCount(graduatedFile.rows.length));
   });
 
   it("registers /graduated in the sheet's own index", () => {

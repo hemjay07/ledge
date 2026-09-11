@@ -10,6 +10,7 @@ import { SheetNav } from "../../components/SheetNav";
 import { StaleBanner } from "../../components/StaleBanner";
 import { graduatedFile } from "../../lib/graduated";
 import { allTime, numberFile } from "../../lib/number";
+import { PAGE_SIZE } from "../../lib/paginate";
 import { formatCount, formatDurationLong, formatStamp, rateText } from "../../lib/format";
 
 const MIN_N = 30;
@@ -138,7 +139,16 @@ export default function Graduated(): ReactElement {
           <p className="note note--fine">
             <Age crawledAt={graduatedFile.generatedAt} staleAfterSeconds={graduatedFile.staleAfterSeconds} prefix="list built" />
           </p>
-          <GraduatedBoard data={graduatedFile} />
+          {/* Only the first page ships in the HTML (REVAMP.md pagination):
+              graduatedFile.rows is already sorted fastest-first -- the
+              board's own default sort -- by scripts/generate-graduated.mjs,
+              so slicing it here is that same first page. Any other sort,
+              filter or page fetches the rest from /graduated.json on demand
+              (components/Graduated.tsx). */}
+          <GraduatedBoard
+            initialRows={graduatedFile.rows.slice(0, PAGE_SIZE)}
+            totalCount={graduatedFile.rows.length}
+          />
         </LedgerEntry>
 
         <LedgerEntry folio="05" id="h-graduated-what" heading="What this counts">

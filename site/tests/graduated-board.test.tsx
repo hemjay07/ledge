@@ -52,7 +52,7 @@ const short = (a: string) => `${a.slice(0, 10)}\u2026${a.slice(-6)}`;
 
 describe("GraduatedBoard", () => {
   it("sorts fastest first by default, with duration shown on every row (CONSTRAINTS 1)", () => {
-    const { container } = render(<GraduatedBoard data={FIXTURE} />);
+    const { container } = render(<GraduatedBoard initialRows={FIXTURE.rows} totalCount={FIXTURE.rows.length} />);
     const rows = [...container.querySelectorAll("tbody tr")];
     expect(rows.map((r) => r.querySelector("th")?.textContent)).toEqual([
       short("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
@@ -65,7 +65,7 @@ describe("GraduatedBoard", () => {
   });
 
   it("links every row to /t/{address}", () => {
-    const { container } = render(<GraduatedBoard data={FIXTURE} />);
+    const { container } = render(<GraduatedBoard initialRows={FIXTURE.rows} totalCount={FIXTURE.rows.length} />);
     for (const row of FIXTURE.rows) {
       const link = container.querySelector(`a[href="/t/${row.token}"]`);
       expect(link).not.toBeNull();
@@ -76,7 +76,7 @@ describe("GraduatedBoard", () => {
   });
 
   it("prints the graduated timestamp and the pair/tax facts a row carries, or says they were not read", () => {
-    const { container } = render(<GraduatedBoard data={FIXTURE} />);
+    const { container } = render(<GraduatedBoard initialRows={FIXTURE.rows} totalCount={FIXTURE.rows.length} />);
     const text = container.textContent ?? "";
     expect(text).toContain(formatUtcLong(FIXTURE.rows[1]!.graduatedAt)); // token A
     // the reader's own unit: every other page says "1%", not "100 bps"
@@ -86,7 +86,7 @@ describe("GraduatedBoard", () => {
   });
 
   it("re-sorts to slowest-first on request, without losing the duration column", () => {
-    const { container } = render(<GraduatedBoard data={FIXTURE} />);
+    const { container } = render(<GraduatedBoard initialRows={FIXTURE.rows} totalCount={FIXTURE.rows.length} />);
     const slowestLink = [...container.querySelectorAll(".sheet-nav a")].find(
       (a) => a.textContent === "Slowest first",
     );
@@ -101,7 +101,7 @@ describe("GraduatedBoard", () => {
   });
 
   it("never renders a score, grade, or verdict word", () => {
-    const { container } = render(<GraduatedBoard data={FIXTURE} />);
+    const { container } = render(<GraduatedBoard initialRows={FIXTURE.rows} totalCount={FIXTURE.rows.length} />);
     const text = (container.textContent ?? "").toLowerCase();
     for (const banned of ["rug", "score", "grade", "rigged", "organic", "safe", "risky"]) {
       expect(text).not.toContain(banned);
@@ -109,7 +109,7 @@ describe("GraduatedBoard", () => {
   });
 
   it("renders a plain note, not a table, when there are no rows", () => {
-    const { container } = render(<GraduatedBoard data={{ ...FIXTURE, rows: [] }} />);
+    const { container } = render(<GraduatedBoard initialRows={[]} totalCount={0} />);
     expect(container.querySelectorAll("tbody tr")).toHaveLength(0);
     expect(container.textContent).toContain("No graduation joins to a launch on record yet.");
   });
