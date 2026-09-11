@@ -113,10 +113,14 @@ test.describe("no number without its denominator", () => {
       const figures = page.locator(".figure, .figure-2");
       const count = await figures.count();
 
-      /* A page with no figures would pass this loop without executing it.
-         The fold carries figures by definition, so on / that is a defect,
-         not an exemption. */
-      if (route === "/") {
+      /* A page with no figures would pass this loop without executing it, so
+         one page has to be required to have them or the check is vacuous.
+         That page was "/" until 2026-09-11, when the Number's fold moved to
+         /number and the home page stopped carrying display figures. The
+         requirement moved with the fold rather than being dropped: /number is
+         where the poster figures live now, and it is still the page that
+         travels. */
+      if (route === "/number/") {
         expect(count, "the fold rendered no display figure at all").toBeGreaterThan(0);
       }
 

@@ -142,9 +142,16 @@ const exFastOneIn =
             A free, public record of every token launch on pons, read from the factory contract
             every hour. Paste an address to see what one launch actually did.
           </p>
-          <p className="capability-line">
+          {/* The page's h1.
+
+              The home page lost its only h1 when the Number's fold moved to
+              /number on 2026-09-11, which an end-to-end check caught. That is
+              an accessibility defect rather than a test artifact: a document
+              with no h1 has no name in a reader's outline, and the page's
+              central claim is the right thing to carry it. */}
+          <h1 className="capability-line">
             LEDGE times every pons graduation, not just whether one happened.
-          </p>
+          </h1>
           <p className="capability-facts">
             Of <span className="mono">{formatCount(allTime.graduations)}</span> graduations,{" "}
             <Stat
