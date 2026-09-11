@@ -285,9 +285,19 @@ export class RpcClient {
         continue;
       }
       if (isFault(response)) {
-        if (response.code === 429) this.rateLimitSeen = true;
+        /* A 429 is not retried inside the tick. Retrying it is the one thing
+           that makes a rate limit worse: four attempts plus a fallback turns
+           one refused call into eight, every tick, against an endpoint that
+           just said it has had enough -- and on 2026-09-12 that feedback loop
+           was the third outage of the same shape. The cron reruns in a minute,
+           which is the backoff this endpoint actually wants. Any other
+           transport fault is retried as before. */
+        if (response.code === 429) {
+          this.rateLimitSeen = true;
+          throw new RpcUnavailable(`rpc: rate limited; the next tick resumes`, true);
+        }
         if (attempt === MAX_RETRIES - 1) {
-          throw new RpcUnavailable(`rpc: gave up: ${response.message}`, response.code === 429);
+          throw new RpcUnavailable(`rpc: gave up: ${response.message}`, false);
         }
         await this.sleep(delay);
         delay = Math.min(delay * 2, BACKOFF_CAP_MS);
