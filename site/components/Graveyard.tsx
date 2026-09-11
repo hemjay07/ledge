@@ -24,6 +24,8 @@ import { GRAVEYARD_SORT_KEYS } from "../lib/api-schema";
 import type { GraveyardResponse } from "../lib/api-schema";
 import { FilterNumber, FilterSelect } from "./FilterField";
 import { Pager } from "./Pager";
+import { TokenPanel } from "./TokenPanel";
+import { useTokenPanel } from "../lib/use-token-panel";
 import { PAIR_BUCKETS, TAX_BUCKETS, taxBucketOf } from "../lib/board-buckets";
 import { clampPage, paginate, totalPagesFor } from "../lib/paginate";
 import { mergeQuery, readQuery, readQueryInt } from "../lib/query-state";
@@ -149,6 +151,7 @@ export function GraveyardBoard(): ReactElement {
   const [sort, setSort] = useState<GraveyardSortKey>(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<GraveyardFilters>(DEFAULT_GRAVEYARD_FILTERS);
+  const panel = useTokenPanel();
 
   useEffect(() => {
     const next = graveyardStateFromLocation();
@@ -322,7 +325,21 @@ export function GraveyardBoard(): ReactElement {
               </thead>
               <tbody>
                 {pageRows.map((row: Row) => (
-                  <tr key={row.token}>
+                  <tr
+                    key={row.token}
+                    className="row-clickable"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      if ((event.target as HTMLElement).closest("a")) return;
+                      panel.open(row.token, event.currentTarget);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      if ((event.target as HTMLElement).closest("a")) return;
+                      event.preventDefault();
+                      panel.open(row.token, event.currentTarget);
+                    }}
+                  >
                     <th scope="row" className="mono">
                       {row.token}
                     </th>
@@ -372,6 +389,9 @@ export function GraveyardBoard(): ReactElement {
             <p className="note note--fine">No launch matches these filters.</p>
           ) : null}
         </>
+      ) : null}
+      {panel.token ? (
+        <TokenPanel token={panel.token} onClose={panel.close} returnFocusTo={panel.returnFocusTo} />
       ) : null}
     </div>
   );

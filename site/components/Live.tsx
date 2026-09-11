@@ -27,6 +27,8 @@ import { LIVE_SORT_KEYS } from "../lib/api-schema";
 import type { LiveResponse } from "../lib/api-schema";
 import { FilterNumber, FilterSelect } from "./FilterField";
 import { Pager } from "./Pager";
+import { TokenPanel } from "./TokenPanel";
+import { useTokenPanel } from "../lib/use-token-panel";
 import { PAIR_BUCKETS, TAX_BUCKETS, taxBucketOf } from "../lib/board-buckets";
 import { clampPage, paginate, totalPagesFor } from "../lib/paginate";
 import { mergeQuery, readQuery, readQueryInt } from "../lib/query-state";
@@ -327,9 +329,30 @@ function lastActivityAgo(row: Row, observedAt: string): string {
    print rather than dropped. CONSTRAINTS 3 requires every count to carry its
    window; on the table that window is its own column, once per row, so here
    it is its own line, once per card. The partial marker travels with it. */
-function LiveCard({ row, observedAt }: { row: Row; observedAt: string }): ReactElement {
+function LiveCard({
+  row,
+  observedAt,
+  onOpen,
+}: {
+  row: Row;
+  observedAt: string;
+  onOpen: (address: string, trigger: HTMLElement | null) => void;
+}): ReactElement {
   return (
-    <li className="live-card">
+    <li
+      className="live-card row-clickable"
+      tabIndex={0}
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest("a")) return;
+        onOpen(row.token, event.currentTarget);
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if ((event.target as HTMLElement).closest("a")) return;
+        event.preventDefault();
+        onOpen(row.token, event.currentTarget);
+      }}
+    >
       <a className="live-card-token mono" href={`/t/${row.token}`} title={row.token}>
         {shortAddress(row.token)}
       </a>
@@ -367,6 +390,7 @@ export function LiveBoardFull(): ReactElement {
   const [sort, setSort] = useState<LiveSortKey>(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<LiveFilters>(DEFAULT_LIVE_FILTERS);
+  const panel = useTokenPanel();
 
   useEffect(() => {
     const next = liveStateFromLocation();
@@ -544,7 +568,21 @@ export function LiveBoardFull(): ReactElement {
               </thead>
               <tbody>
                 {pageRows.map((row) => (
-                  <tr key={row.token}>
+                  <tr
+                    key={row.token}
+                    className="row-clickable"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      if ((event.target as HTMLElement).closest("a")) return;
+                      panel.open(row.token, event.currentTarget);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      if ((event.target as HTMLElement).closest("a")) return;
+                      event.preventDefault();
+                      panel.open(row.token, event.currentTarget);
+                    }}
+                  >
                     <th scope="row" className="mono">
                       <a href={`/t/${row.token}`} title={row.token}>
                         {shortAddress(row.token)}
@@ -572,7 +610,7 @@ export function LiveBoardFull(): ReactElement {
 
           <ul className="live-cards" aria-label="Every curve with activity, sortable">
             {pageRows.map((row) => (
-              <LiveCard key={row.token} row={row} observedAt={body.observedAt} />
+              <LiveCard key={row.token} row={row} observedAt={body.observedAt} onOpen={panel.open} />
             ))}
           </ul>
 
@@ -593,6 +631,9 @@ export function LiveBoardFull(): ReactElement {
             <p className="note note--fine">No launch matches these filters.</p>
           ) : null}
         </>
+      ) : null}
+      {panel.token ? (
+        <TokenPanel token={panel.token} onClose={panel.close} returnFocusTo={panel.returnFocusTo} />
       ) : null}
     </div>
   );

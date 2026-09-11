@@ -28,6 +28,8 @@ import type { GraduatedFile, GraduatedRow } from "../lib/graduated";
 import { graduatedFileSchema } from "../lib/graduated-schema";
 import { FilterDate, FilterNumber, FilterSelect } from "./FilterField";
 import { Pager } from "./Pager";
+import { TokenPanel } from "./TokenPanel";
+import { useTokenPanel } from "../lib/use-token-panel";
 import { PAIR_BUCKETS, TAX_BUCKETS, taxBucketOf } from "../lib/board-buckets";
 import { clampPage, paginate, totalPagesFor } from "../lib/paginate";
 import { mergeQuery, readQuery, readQueryInt } from "../lib/query-state";
@@ -180,6 +182,7 @@ export function GraduatedBoard({
   const [sort, setSort] = useState<GraduatedSortKey>(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const panel = useTokenPanel();
   const [fullRows, setFullRows] = useState<GraduatedRow[] | null>(null);
   const [loadState, setLoadState] = useState<"idle" | "loading" | "error">("idle");
   const fetchStarted = useRef(false);
@@ -415,7 +418,21 @@ export function GraduatedBoard({
               </thead>
               <tbody>
                 {pageRows.map((row) => (
-                  <tr key={row.token}>
+                  <tr
+                    key={row.token}
+                    className="row-clickable"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      if ((event.target as HTMLElement).closest("a")) return;
+                      panel.open(row.token, event.currentTarget);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      if ((event.target as HTMLElement).closest("a")) return;
+                      event.preventDefault();
+                      panel.open(row.token, event.currentTarget);
+                    }}
+                  >
                     <th scope="row" className="mono">
                       <a href={`/t/${row.token}`} title={row.token}>
                         {shortAddress(row.token)}
@@ -442,6 +459,9 @@ export function GraduatedBoard({
           ) : null}
         </>
       )}
+      {panel.token ? (
+        <TokenPanel token={panel.token} onClose={panel.close} returnFocusTo={panel.returnFocusTo} />
+      ) : null}
     </div>
   );
 }

@@ -35,3 +35,21 @@ export function mergeQuery(patch: Record<string, string | number | null>): void 
   const qs = search.toString();
   window.history.replaceState(null, "", qs ? `?${qs}` : "?");
 }
+
+/** Same merge as `mergeQuery`, but pushes a new history entry instead of
+    replacing the current one -- for a change the browser's own Back and
+    Forward should be able to step through, which `mergeQuery`'s
+    `replaceState` cannot (used by `use-token-panel.ts`: opening the token
+    panel is a navigation a reader can step back out of, sort/filter/page are
+    not). `state` is stored on the pushed entry so the caller can tell, on a
+    later close, whether it was the one that pushed this particular entry. */
+export function pushQuery(patch: Record<string, string | number | null>, state?: unknown): void {
+  if (typeof window === "undefined") return;
+  const search = new URLSearchParams(window.location.search);
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null || value === "") search.delete(key);
+    else search.set(key, String(value));
+  }
+  const qs = search.toString();
+  window.history.pushState(state ?? null, "", qs ? `?${qs}` : "?");
+}

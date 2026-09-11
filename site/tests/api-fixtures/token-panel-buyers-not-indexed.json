@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "address": "0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2",
+  "venue": "pons",
+  "observedAt": "2026-09-06T18:14:07Z",
+  "source": "chain",
+  "config": {
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "pairClass": "eth",
+    "pairSymbol": "ETH",
+    "pairDecimals": 18,
+    "creatorTaxBps": 300,
+    "taxBucket": "2-3%"
+  },
+  "state": {
+    "phase": 0,
+    "phaseLabel": "on the bonding curve",
+    "curveFilledWei": "1743200000000000000",
+    "graduationThresholdWei": "4200000000000000000",
+    "curveFilledShare": 0.415048,
+    "fillNote": null,
+    "launchBlock": 56172001,
+    "launchedAt": "2026-09-06T18:00:36Z",
+    "elapsedSeconds": 811,
+    "graduated": false,
+    "graduatedAt": null,
+    "timeToGraduationSeconds": null,
+    "indexed": true
+  },
+  "cohort": {
+    "crawledAt": "2025-11-07T17:20:15Z",
+    "definitionsVersion": "2026-09-06",
+    "key": {
+      "pairClass": "eth",
+      "taxBucket": "2-3%"
+    },
+    "h24": {
+      "window": "24h",
+      "crawledAt": "2025-11-07T17:20:15Z",
+      "launches": 2324,
+      "graduations": 34,
+      "rate": 0.01463,
+      "insufficient": false,
+      "excludingFast": {
+        "cutoffSeconds": 300,
+        "graduations": 17,
+        "rate": 0.007315,
+        "oneIn": 137,
+        "insufficient": false
+      }
+    },
+    "allTime": {
+      "window": "allTime",
+      "crawledAt": "2025-11-07T17:20:15Z",
+      "launches": 2324,
+      "graduations": 34,
+      "rate": 0.01463,
+      "insufficient": false,
+      "excludingFast": {
+        "cutoffSeconds": 300,
+        "graduations": 17,
+        "rate": 0.007315,
+        "oneIn": 137,
+        "insufficient": false
+      }
+    }
+  },
+  "activity": {
+    "window": {
+      "fromBlock": 56172001,
+      "toBlock": 56172588,
+      "label": "counted over blocks 56172001 to 56172588"
+    },
+    "buys": 41,
+    "sells": 12,
+    "quoteIn": "1743200000000000000",
+    "quoteOut": "220000000000000000",
+    "firstBuyAt": "2026-09-06T18:00:40Z",
+    "lastActivityAt": "2026-09-06T18:13:27Z",
+    "firstBlock": null
+  },
+  "freshness": {
+    "crawledAt": "2025-11-07T17:20:15Z",
+    "ageSeconds": 26182432,
+    "staleAfterSeconds": 7200,
+    "stale": true
+  },
+  "placement": {
+    "crawledAt": "2025-11-07T17:20:15Z",
+    "window": "allTime",
+    "elapsedSeconds": 811,
+    "rung": {
+      "atSeconds": 600,
+      "cumulative": 409,
+      "cumulativeShare": 0.764486
+    },
+    "n": 535,
+    "insufficient": false,
+    "reason": "ok"
+  },
+  "live": {
+    "stale": false,
+    "lastSuccessAt": "2026-09-06T18:13:47Z",
+    "lastIndexedBlock": 56172588
+  },
+  "notice": null,
+  "links": {
+    "method": "https://ledge.tools/method",
+    "numberJson": "https://ledge.tools/number.json"
+  },
+  "text": "0x23fe54b3\u2026f98fe2 \u00b7 Pons\nETH \u00b7 2\u20133% \u00b7 on the bonding curve\nminute 13 \u00b7 on the curve \u00b7 cohort 1.46% (n=2,324) \u00b7 ETH \u00b7 2\u20133%\nLaunches configured this way, all time: 34 of 2,324 graduated, 1.46%. Excluding launches that graduated inside 5 min: 17 of 2,324, 0.73% (1 in 137). These figures were measured 303 d ago \u2014 older than the 2 h freshness bound.\nIn the last 24 hours: 34 of 2,324 graduated, 1.46%. Excluding launches that graduated inside 5 min: 17 of 2,324, 0.73% (1 in 137). These figures were measured 303 d ago \u2014 older than the 2 h freshness bound.\nBy 10 min, 76.4% of the 535 graduations measured in this window had already happened. These figures were measured 303 d ago \u2014 older than the 2 h freshness bound.\nCurve fill: 1.7432 ETH of 4.2 ETH (41.5% of the threshold).\nActivity, counted over blocks 56172001 to 56172588: 41 buys, 12 sells, 1.7432 ETH in and 0.22 ETH out.\nFirst buy: Measured 6 Sep 2026 \u00b7 18:00 UTC. Last activity: Measured 6 Sep 2026 \u00b7 18:13 UTC.\nDistinct buyers in the launch's own block: that block was not indexed.\nMeasured 7 Nov 2025 \u00b7 17:20 UTC\nhttps://ledge.tools/method"
+}

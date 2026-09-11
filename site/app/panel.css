@@ -1,0 +1,151 @@
+/* The row-opened panel (REVAMP.md 1.1) -- TokenPanel.tsx's own styles.
+
+   Kept in its own file and imported only from TokenPanel.tsx, per the same
+   reasoning shell.css's own header gives: globals.css is edited by several
+   hands at once, is long enough that a change to it is hard to read in a
+   diff, and the panel is a distinct surface with a distinct job. Everything
+   here uses the tokens globals.css already defines -- the same bone, the same
+   ink, the same rules, the one --fill accent -- so the panel reads as the same
+   product as the board underneath it, not a second one laid on top. Rules
+   rather than shadows, no radius, no soft colour blends, nothing spent off
+   the NOT-THIS list (CONSTRAINTS.md). */
+
+/* Every board row that can open this panel (Live.tsx, Graduated.tsx,
+   Graveyard.tsx). Lives here rather than in each board's own rule set
+   because the class exists only for this feature -- a row that cannot open
+   the panel has no use for it. */
+.row-clickable {
+  cursor: pointer;
+}
+.row-clickable:focus-visible {
+  outline: 2px solid var(--fill);
+  outline-offset: -2px;
+}
+
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-4);
+  background: color-mix(in srgb, black 55%, transparent);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 30rem;
+  max-height: min(85vh, 42rem);
+  background: var(--ground);
+  border: var(--rw-hair) solid var(--rule-heavy);
+  overflow: hidden;
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: var(--rw-hair) solid var(--rule-hair);
+  flex: none;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: var(--fs-note);
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.panel-close {
+  flex: none;
+  border: var(--rw-hair) solid var(--rule-mid);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-fine);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+.panel-close:hover,
+.panel-close:focus-visible {
+  color: var(--ink);
+  border-color: var(--ink);
+  outline: 2px solid var(--fill);
+  outline-offset: 2px;
+}
+
+.panel-body {
+  padding: var(--s-4);
+  overflow-y: auto;
+}
+
+.panel-facts > :first-child {
+  margin-top: 0;
+}
+
+/* The most prominent reading on the panel: distinct buyers in the launch's
+   own block. Larger and first, but stated in the API's own words -- no
+   colour, no badge, nothing that reads as a verdict rather than a fact. */
+.panel-lede {
+  margin: 0;
+  font-size: var(--fs-lede);
+  font-weight: 600;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.panel-foot {
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: var(--rw-hair) solid var(--rule-hair);
+  font-size: var(--fs-fine);
+}
+.panel-foot a {
+  color: var(--ink);
+}
+
+/* Below the boards' own phone breakpoint, a floating box is the wrong shape
+   for the space -- a full-height sheet, per REVAMP.md's own instruction,
+   rather than a small card lost in the middle of a 390px screen. */
+@media (max-width: 40rem) {
+  .panel-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .panel {
+    max-width: none;
+    max-height: 92vh;
+    height: 92vh;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .panel-backdrop {
+    animation: panel-backdrop-in 150ms ease-out both;
+  }
+  .panel {
+    animation: panel-in 200ms cubic-bezier(0.2, 0.6, 0.2, 1) both;
+  }
+  @keyframes panel-backdrop-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+  }
+}
