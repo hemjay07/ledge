@@ -285,6 +285,15 @@ a:focus-visible,
   text-transform: uppercase;
   font-weight: 600;
   padding: var(--s-2) 0 0.55rem;
+  /* The strip is a mark and a stamp on one line. At 390px the stamp is longer
+     than the room left for it, and a flex row with no wrapping simply cut it
+     mid-word -- "LIST BUILT AT DEPLOY TIME, NO". It wraps to a second line
+     instead, which is what a strip carrying provenance should do rather than
+     lose half of it. */
+  flex-wrap: wrap;
+}
+.colophon > * {
+  min-width: 0;
 }
 .head .mark,
 .colophon .mark {
@@ -543,6 +552,20 @@ a:focus-visible,
   padding: var(--s-6) 0 var(--s-6) 2.75rem;
   border-top: var(--rw-hair) solid var(--rule-hair);
 }
+/* The folio gutter is 44px of every line's measure, spent on a two-digit
+   number that orders a register a phone reader is not working through in
+   sequence. Below the breakpoint the number moves above its entry and the
+   gutter goes back to the text. */
+@media (max-width: 40rem) {
+  .entry {
+    padding-left: 0;
+  }
+  .entry::before {
+    position: static;
+    display: block;
+    margin-bottom: var(--s-2);
+  }
+}
 .entry::before {
   content: attr(data-folio);
   position: absolute;
@@ -771,12 +794,27 @@ table {
   border-collapse: collapse;
   font-size: var(--fs-note);
 }
+/* A caption belongs to its table, so inside a horizontally scrolling wrapper
+   it is laid out at the TABLE's width, not the viewport's. On a phone that
+   turned every caption into a line running off the right edge -- "Cumulative
+   share of all-time graduations completing" with the rest gone -- which reads
+   as broken text rather than as something scrollable, because prose is not
+   something a reader expects to scroll sideways to finish.
+
+   Sticky at the left keeps it at the scroll origin while the columns move
+   under it, and constraining the width to the viewport (less the sheet's own
+   gutters) makes it wrap like the prose it is. The table keeps its caption, so
+   the accessible name is unchanged. */
 caption {
   caption-side: top;
   text-align: left;
   font-size: var(--fs-fine);
   color: var(--ink-3);
   padding-bottom: var(--s-2);
+  position: sticky;
+  left: 0;
+  width: min(100%, calc(100vw - 2 * var(--pad-x)));
+  box-sizing: border-box;
 }
 th,
 td {

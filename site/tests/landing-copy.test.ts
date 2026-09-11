@@ -117,11 +117,13 @@ describe("the sheet, without folio numbers", () => {
      only decision this page offers, and it was sitting under a heading halfway
      down, beneath the chart and the paths. The action now comes before the
      argument for it. */
-  it("runs the pulse, the capability, the lookup, then the proof, the paths and the rate", () => {
+  /* The lookup left this page on 2026-09-11 for the shell, where it is on
+     every page instead of only this one. Its reachability is asserted in
+     tests/topbar.test.tsx, which is stricter than asserting it here was. */
+  it("runs the pulse, the capability, then the proof, the paths and the rate", () => {
     const order = [
       "<LivePulse",
       'className="capability"',
-      'className="lookup-lead"',
       'className="shape-lead"',
       'className="paths-on"',
       'className="headline-rate"',

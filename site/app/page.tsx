@@ -6,7 +6,6 @@ import { Footer } from "../components/Footer";
 import { LedgerEntry } from "../components/LedgerEntry";
 import { LiveBoard } from "../components/LiveBoard";
 import { LivePulse } from "../components/Live";
-import { Lookup } from "../components/Lookup";
 import { Register } from "../components/Register";
 import { Scale } from "../components/Scale";
 import { Shape } from "../components/Shape";
@@ -162,19 +161,13 @@ const exFastOneIn =
           </p>
         </div>
 
-        {/* The only decision anyone makes here, so it sits where it can be
-            reached without scrolling.
-
-            It was halfway down the page, under a heading, beneath the proof and
-            the paths. Browsing the board is not a decision and reading the
-            evidence is not a decision; pasting an address to find out whether a
-            specific token has anything behind it is, and it is what a person
-            arriving from a group chat already has in their clipboard. One input
-            costs almost no vertical space, and putting it above the proof puts
-            the action before the argument for it. */}
-        <section className="lookup-lead" id="h-lookup">
-          <Lookup />
-        </section>
+        {/* The lookup used to sit here. It moved into the shell on 2026-09-11,
+            where it is on every page rather than only this one, and where a
+            reader arriving with an address in their clipboard reaches it
+            without scrolling. Two near-identical address fields four hundred
+            pixels apart was worse than either alone. The shell's field
+            navigates to the token's own page rather than rendering a result
+            inline, which keeps that page the thing people paste onward. */}
 
         <div className="shape-lead">
           <h2 className="kicker">The shape of the record</h2>
