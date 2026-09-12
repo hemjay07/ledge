@@ -1,0 +1,16 @@
+[Unit]
+Description=LEDGE canonical crawl (pipeline/crawl.py, commit, push)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ledge
+Group=ledge
+WorkingDirectory=/home/ledge/ledge
+EnvironmentFile=/etc/ledge/env
+ExecStart=/home/ledge/ledge/ops/crawl.sh
+# A crawl that has fallen far behind may legitimately take an hour; there is
+# no 45-minute ceiling here, which is the point. Two hours is the sanity cap.
+TimeoutStartSec=2h
+Nice=5

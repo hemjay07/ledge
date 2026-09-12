@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the LEDGE crawl every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+# If the box was off when a run was due, run once on boot rather than skip.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
