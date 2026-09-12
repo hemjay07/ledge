@@ -558,6 +558,22 @@ export function tokenShell(
 
   main { max-width: 30rem; margin: 0 auto; padding: 1.5rem 1rem 0; }
 
+  /* On a wide screen the four cards sat in one 30rem column with the rest of
+     the window empty, which is a phone layout stretched (2026-09-12). The
+     page keeps its phone order and gains a two-column grid at 60rem: the two
+     readings a person came for (buyers, fill) share the first row, the two
+     that explain them (cohort, activity) the second. */
+  @media (min-width: 60rem) {
+    main { max-width: 58rem; padding: 2rem 1.5rem 0; }
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.9rem;
+      align-items: start;
+    }
+    .token-header { margin-bottom: 1.5rem; }
+  }
+
   /* ---- the header: the address and the token's own facts, not a card --- */
   .token-header { margin: 0 0 1.25rem; }
   /* Untrusted, on-chain text (worker/schema.sql's token_meta cache): a
@@ -710,10 +726,12 @@ export function tokenShell(
     ${liveStaleBanner(body)}
     ${staleBanner(body)}
     ${headerBlock(body, observedMaxSeconds)}
-    ${buyersCard(body)}
-    ${fillCard(body)}
-    ${cohortCard(body)}
-    ${activityCard(body)}
+    <div class="cards">
+      ${buyersCard(body)}
+      ${fillCard(body)}
+      ${cohortCard(body)}
+      ${activityCard(body)}
+    </div>
     ${metaLine(body, observedMaxSeconds)}
     <hr>
     <details class="fact-details">
@@ -722,10 +740,8 @@ export function tokenShell(
         ${facts}
       </div>
     </details>
-    <hr>
     <footer>
-      <p>${escapeHtml(body.address)}</p>
-      <p><a href="${siteOrigin}/method">${siteOrigin}/method</a></p>
+      <p><a href="${siteOrigin}/">ledge.tools</a> · <a href="${siteOrigin}/method">how this is counted</a></p>
     </footer>
   </main>
   <script type="application/json" id="ledge-data">${JSON.stringify(body).replace(/</g, "\\u003c")}</script>
