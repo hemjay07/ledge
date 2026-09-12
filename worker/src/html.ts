@@ -231,7 +231,55 @@ function cohortCard(body: Body): string {
         ${cohortRow("All time", body.cohort.allTime)}
       </div>
       <div class="note">Share that graduated, with the launches each share was counted over.</div>
-      <!-- outcomes: what tokens in this cohort did after graduating; lands with the outcomes tracker -->
+    </section>`;
+}
+
+/* ---- what launches like this one did after graduating --------------------
+
+   A population fact, printed beside the token and never about it
+   (CONSTRAINTS 1). The bucket is this token's own time to graduation; the
+   change is the median against each pool's own opening price. Below the
+   n = 30 floor the sample size is printed and nothing else, which is the
+   same gate every rate on the site passes through (CONSTRAINTS 4). The
+   card renders nothing at all when the published file carries no outcomes
+   yet -- an empty card would imply a measurement that has not been made. */
+const OUTCOME_BUCKET_LABEL: Record<string, string> = {
+  u10: "graduated in under 10 seconds",
+  mid: "graduated in 10 seconds to 5 minutes",
+  over: "graduated in over 5 minutes",
+};
+
+const OUTCOME_MARK_LABEL: Record<string, string> = {
+  "1h": "1 hour after",
+  "24h": "24 hours after",
+  "7d": "7 days after",
+};
+
+function outcomeChange(value: number | null): string {
+  if (value === null) return "—";
+  const percent = value * 100;
+  const sign = percent > 0 ? "+" : "";
+  return `${sign}${percent.toFixed(1)}%`;
+}
+
+function outcomesCard(body: Body): string {
+  const outcomes = body.outcomes;
+  if (!outcomes || outcomes.marks.length === 0) return "";
+  const label = OUTCOME_BUCKET_LABEL[outcomes.bucket] ?? outcomes.bucket;
+  const rows = outcomes.marks
+    .map((mark) => {
+      const when = OUTCOME_MARK_LABEL[mark.mark] ?? mark.mark;
+      const figure = mark.insufficient
+        ? `not enough data (n=${e(formatCount(mark.n))})`
+        : `${e(outcomeChange(mark.median))} <span class="thin">median · n=${e(formatCount(mark.n))} · ${e(formatCount(mark.noTrade))} never traded</span>`;
+      return `<div class="cell"><span class="cell-k">${e(when)}</span><span class="cell-v">${figure}</span></div>`;
+    })
+    .join("");
+  return `
+    <section class="card">
+      <div class="k">Launches that ${e(label)}</div>
+      <div class="grid">${rows}</div>
+      <div class="note">Median change against each pool&rsquo;s own opening price, for the ${e(formatCount(outcomes.graduations))} launches in this bucket. A population, not this token.</div>
     </section>`;
 }
 
@@ -730,6 +778,7 @@ export function tokenShell(
       ${buyersCard(body)}
       ${fillCard(body)}
       ${cohortCard(body)}
+      ${outcomesCard(body)}
       ${activityCard(body)}
     </div>
     ${metaLine(body, observedMaxSeconds)}

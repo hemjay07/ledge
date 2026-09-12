@@ -124,6 +124,7 @@ def test_every_bucket_is_emitted_even_when_empty():
                 "p25": None,
                 "p75": None,
                 "insufficient": True,
+                "fromProbe": 0,
             }
 
 

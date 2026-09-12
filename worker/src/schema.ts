@@ -93,6 +93,28 @@ const freshness = z
     }
   });
 
+/* What launches in this token's own time-to-graduation bucket did AFTER
+   they graduated (pipeline/stats.py `outcomes`, METHOD.md 2026-09-12). A
+   population fact carried beside the token, never a statement about the
+   token: CONSTRAINTS 1. Null until the crawl publishes outcomes and the
+   bucket clears the n = 30 floor, and every figure carries its own n. */
+const outcomeMark = z.object({
+  mark: z.enum(["1h", "24h", "7d"]),
+  n: z.number().int().nonnegative(),
+  noTrade: z.number().int().nonnegative(),
+  noTradeShare: z.number().nullable(),
+  median: z.number().nullable(),
+  insufficient: z.boolean(),
+});
+
+const outcomesForToken = z.object({
+  /** The bucket this token's own time to graduation falls in, or the one
+      it would fall in: "u10", "mid", "over". */
+  bucket: z.string(),
+  graduations: z.number().int().nonnegative(),
+  marks: z.array(outcomeMark),
+});
+
 const cohort = z.object({
   crawledAt: z.string(),
   definitionsVersion: z.string(),
@@ -235,6 +257,10 @@ export const tokenResponseSchema = z
     config,
     state,
     cohort: cohort.nullable(),
+    /* Beside the cohort, not inside it: the cohort is pair x tax, and this
+       is keyed on the time-to-graduation bucket. Absent when the published
+       file carries no outcomes yet. */
+    outcomes: outcomesForToken.nullable().optional(),
     /* Class B. Counts of this token's own curve events, with the range of
        blocks they were counted over. No rate, no ordering against any other
        token. Null when LEDGE holds no activity row for it. */

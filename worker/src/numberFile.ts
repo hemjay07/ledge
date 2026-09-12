@@ -104,6 +104,33 @@ export interface NumberWindow {
   };
 }
 
+/** One mark's reading for one cohort: +1 h, +24 h or +7 d after a
+    graduation (pipeline/stats.py `outcomes`, METHOD.md 2026-09-12).
+    `median`, `p25` and `p75` are the change against the pool's own opening
+    price; every one of them is null below the n = 30 floor. */
+export interface OutcomeMark {
+  n: number;
+  noTrade: number;
+  noTradeShare: number | null;
+  median: number | null;
+  p25: number | null;
+  p75: number | null;
+  insufficient: boolean;
+}
+
+export interface OutcomeCohortRow {
+  bucket: string;
+  graduations: number;
+  withoutPrice: number;
+  marks: Record<string, OutcomeMark>;
+}
+
+export interface Outcomes {
+  matched: number;
+  cohorts: Record<string, OutcomeCohortRow[]>;
+  cohortsExcluded: Record<string, number>;
+}
+
 export interface NumberFile {
   schemaVersion: number;
   definitionsVersion: string;
@@ -114,6 +141,10 @@ export interface NumberFile {
   staleAfterSeconds: number;
   h24: NumberWindow;
   allTime: NumberWindow;
+  /** Absent in a file written before 2026-09-12: the Worker serves whatever
+      the crawl last published, and a file without outcomes is not an error,
+      it is an older file. */
+  outcomes?: Outcomes;
 }
 
 export type WindowName = "h24" | "allTime";

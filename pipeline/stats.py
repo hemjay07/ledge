@@ -549,20 +549,43 @@ def _bar_close_at_or_before(bar_rows: list, target_hour: str) -> Optional[Decima
     return bar_rows[idx][1] if idx >= 0 else None
 
 
-def _graduation_marks(anchor_ts: int, opening_price: Decimal, bar_rows: list, until_ts: int) -> dict:
+def _graduation_marks(
+    anchor_ts: int, opening_price: Decimal, bar_rows: list, until_ts: int, probes: Optional[dict] = None
+) -> tuple[dict, dict]:
     """One entry per OUTCOME_MARKS label whose mark has elapsed as of
     until_ts. A mark absent from the returned dict has not elapsed and is
     not counted toward that mark's n at all. A present value of None is
-    `noTrade`: the mark elapsed but no bar exists at or before it -- never
-    a price of 0, never dropped. A present Decimal is changeAt."""
+    `noTrade`: the mark elapsed but no bar (and no backfill probe) answers
+    it -- never a price of 0, never dropped. A present Decimal is
+    changeAt.
+
+    A real hour bar always wins over a probe for the same mark
+    (OUTCOMES-BACKFILL-BRIEF.md step 4): `probes` -- this pool's
+    `data/pools/backfill.jsonl` rows keyed by mark label -- is consulted
+    only where `_bar_close_at_or_before` found nothing. Returns
+    `(marks, marks_from_probe)`, the second dict recording which present
+    labels were answered by a probe rather than a bar, so a caller can
+    publish `fromProbe` without re-deriving it."""
+    probes = probes or {}
     result: dict = {}
+    from_probe: dict = {}
     for label, seconds in OUTCOME_MARKS.items():
         mark_ts = anchor_ts + seconds
         if until_ts < mark_ts:
             continue
         close = _bar_close_at_or_before(bar_rows, _hour_key(mark_ts))
-        result[label] = None if close is None else (close / opening_price) - 1
-    return result
+        if close is not None:
+            result[label] = (close / opening_price) - 1
+            from_probe[label] = False
+            continue
+        probe = probes.get(label)
+        if probe is None:
+            result[label] = None
+            from_probe[label] = False
+            continue
+        result[label] = None if probe["noTrade"] else (Decimal(probe["price"]) / opening_price) - 1
+        from_probe[label] = True
+    return result, from_probe
 
 
 def _quantile(sorted_values: list, p: int) -> Optional[float]:
@@ -578,12 +601,16 @@ def _quantile(sorted_values: list, p: int) -> Optional[float]:
     return float(value.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP))
 
 
-def _outcome_mark_row(mark_observations: list) -> dict:
+def _outcome_mark_row(mark_observations: list, from_probe: int = 0) -> dict:
     """mark_observations: one entry per graduation for which this mark has
     elapsed and whose pool has a known opening price -- None for noTrade,
     a Decimal changeAt otherwise. n gates insufficiency for the whole row,
     exactly as every other rate in this module: below MIN_N every
-    quantile and the noTrade share are null, never a computed value."""
+    quantile and the noTrade share are null, never a computed value.
+    `from_probe` -- how many of these readings came from a backfill probe
+    rather than a real hour bar (OUTCOMES-BACKFILL-BRIEF.md step 4) --
+    is a raw count and is always published, like n and noTrade, regardless
+    of insufficiency."""
     n = len(mark_observations)
     no_trade = sum(1 for v in mark_observations if v is None)
     changes = sorted(v for v in mark_observations if v is not None)
@@ -596,18 +623,39 @@ def _outcome_mark_row(mark_observations: list) -> dict:
         "p25": None if insufficient else _quantile(changes, 25),
         "p75": None if insufficient else _quantile(changes, 75),
         "insufficient": insufficient,
+        "fromProbe": from_probe,
     }
 
 
+def _probes_by_pool(backfill_points: list) -> dict:
+    """`data/pools/backfill.jsonl` rows (OUTCOMES-BACKFILL-BRIEF.md step 3),
+    grouped by pool id and then by mark label, for O(1) lookup from
+    `_graduation_marks`."""
+    by_pool: dict = {}
+    for point in backfill_points:
+        by_pool.setdefault(point["pool"], {})[point["mark"]] = point
+    return by_pool
+
+
 def _outcomes_population(
-    launches: list, graduations: list, pool_index: list, pool_bars: list, pair_tokens: dict, until_ts: int
+    launches: list,
+    graduations: list,
+    pool_index: list,
+    pool_bars: list,
+    pair_tokens: dict,
+    until_ts: int,
+    backfill_points: Optional[list] = None,
 ) -> list:
     """One row per graduation that has a matching pons pool (OUTCOMES.md
     "What is computed"), each carrying the launch it belongs to (None for
     an orphan graduation, which no cohort below can place), whether its
-    pool's price is known at all, and its per-mark observations."""
+    pool's price is known at all, and its per-mark observations. A mark
+    with no real hour bar falls back to a backfill probe for the same
+    pool and mark, per OUTCOMES-BACKFILL-BRIEF.md; `marksFromProbe` records
+    which present labels were answered that way."""
     pool_by_token = {p["token"]: p for p in pool_index if p.get("token")}
     bars_by_pool = _bars_by_pool(pool_bars)
+    probes_by_pool = _probes_by_pool(backfill_points or [])
     launch_by_token = {l["token"]: l for l in launches}
 
     rows = []
@@ -617,15 +665,18 @@ def _outcomes_population(
             continue
         opening_price = _opening_price(pool, pair_tokens)
         marks: dict = {}
+        marks_from_probe: dict = {}
         if opening_price is not None:
             bar_rows = bars_by_pool.get(pool["pool"], [])
-            marks = _graduation_marks(g["ts"], opening_price, bar_rows, until_ts)
+            probes = probes_by_pool.get(pool["pool"], {})
+            marks, marks_from_probe = _graduation_marks(g["ts"], opening_price, bar_rows, until_ts, probes)
         rows.append(
             {
                 "launch": launch_by_token.get(g["token"]),
                 "ts": g["ts"],
                 "withoutPrice": opening_price is None,
                 "marks": marks,
+                "marksFromProbe": marks_from_probe,
             }
         )
     return rows
@@ -677,7 +728,10 @@ def outcomes_cohort(rows: list, key: str) -> list[dict]:
                 "graduations": len(bucket_rows),
                 "withoutPrice": without_price,
                 "marks": {
-                    label: _outcome_mark_row([r["marks"][label] for r in priced_rows if label in r["marks"]])
+                    label: _outcome_mark_row(
+                        [r["marks"][label] for r in priced_rows if label in r["marks"]],
+                        sum(1 for r in priced_rows if r["marksFromProbe"].get(label)),
+                    )
                     for label in OUTCOME_MARKS
                 },
             }
@@ -699,13 +753,20 @@ def outcomes(
     pool_bars: list,
     pair_tokens: dict,
     until_ts: int,
+    backfill_points: Optional[list] = None,
 ) -> dict:
     """The published `outcomes` block: OUTCOMES.md step 3. Not windowed by
     h24/all-time like the rest of build_number -- it is its own
     population, every graduation that has a pons pool, matched by token,
     with `until_ts` (the same instant crawledAt keys on) deciding which
-    marks have elapsed."""
-    rows = _outcomes_population(launches, graduations, pool_index, pool_bars, pair_tokens, until_ts)
+    marks have elapsed. `backfill_points` -- `data/pools/backfill.jsonl`
+    rows -- answer a mark that has no real hour bar
+    (OUTCOMES-BACKFILL-BRIEF.md); a bar always wins over a probe for the
+    same mark, and each mark row publishes `fromProbe` so a reader can see
+    how many of its readings came from a probe."""
+    rows = _outcomes_population(
+        launches, graduations, pool_index, pool_bars, pair_tokens, until_ts, backfill_points
+    )
     return {
         "matched": len(rows),
         "cohorts": {
@@ -797,6 +858,7 @@ def build_number(
     pool_index: list | None = None,
     pool_bars: list | None = None,
     pair_tokens: dict | None = None,
+    backfill_points: list | None = None,
 ) -> dict:
     # `crawled_at` is chain time: the block timestamp of the last indexed
     # block, passed in by the caller (METHOD.md "Freshness"). Every window
@@ -839,5 +901,7 @@ def build_number(
         # OUTCOMES.md step 3: not a window like h24/allTime above -- every
         # graduation that has a pons pool, joined by token, with `until`
         # (the same crawledAt instant) deciding which marks have elapsed.
-        "outcomes": outcomes(launches, graduations, pool_index or [], pool_bars or [], pair_tokens or {}, until),
+        "outcomes": outcomes(
+            launches, graduations, pool_index or [], pool_bars or [], pair_tokens or {}, until, backfill_points
+        ),
     }

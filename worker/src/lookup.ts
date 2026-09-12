@@ -104,6 +104,49 @@ const WINDOW_LABEL: Record<WindowName, "24h" | "allTime"> = { h24: "24h", allTim
 
 /** A number.json row, restated in the response contract. Every field is copied
     across; none is computed. */
+/** The time-to-graduation bucket a duration falls in. The edges are the
+    descriptive marks the site already prints -- under 10 seconds, 10
+    seconds to 5 minutes, over 5 minutes (METHOD.md) -- and they are not
+    invented here: pipeline/stats.py keys its own cohorts on the same three
+    and this must agree with it or the row it looks up is the wrong row. */
+export function ttgBucketOf(seconds: number): string {
+  if (seconds < 10) return "u10";
+  if (seconds < 300) return "mid";
+  return "over";
+}
+
+/** What launches in this token's own bucket did after graduating.
+
+    Null when the published file has no outcomes, or when the token has no
+    time to graduation (it has not graduated, so it is in no bucket). A
+    mark below the n = 30 floor is still carried, with its n and
+    `insufficient: true` -- the reader is owed the sample size, not a gap
+    (CONSTRAINTS 4 and 5). No verdict is attached to the token itself: this
+    is a fact about a population that happens to include it. */
+export function outcomesFor(
+  file: NumberFile,
+  timeToGraduationSeconds: number | null,
+): TokenResponse["outcomes"] {
+  if (!file.outcomes || timeToGraduationSeconds === null) return null;
+  const bucket = ttgBucketOf(timeToGraduationSeconds);
+  const row = (file.outcomes.cohorts.ttg ?? []).find((r) => r.bucket === bucket);
+  if (!row) return null;
+  const marks = (["1h", "24h", "7d"] as const)
+    .filter((mark) => row.marks[mark] !== undefined)
+    .map((mark) => {
+      const m = row.marks[mark]!;
+      return {
+        mark,
+        n: m.n,
+        noTrade: m.noTrade,
+        noTradeShare: m.noTradeShare,
+        median: m.median,
+        insufficient: m.insufficient,
+      };
+    });
+  return { bucket, graduations: row.graduations, marks };
+}
+
 export function cohortWindowFrom(
   row: PairTaxRow,
   windowName: WindowName,
@@ -258,6 +301,7 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
   const staleLive = liveStale(cursor, nowSeconds);
 
   let cohort: TokenResponse["cohort"] = null;
+  let outcomes: TokenResponse["outcomes"] = null;
   let freshness: TokenResponse["freshness"] = null;
   let placement: Placement | null = null;
   if (numberFile) {
@@ -282,6 +326,7 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
       h24: h24Row ? cohortWindowFrom(h24Row, "h24", numberFile.crawledAt) : null,
       allTime: allTimeRow ? cohortWindowFrom(allTimeRow, "allTime", numberFile.crawledAt) : null,
     };
+    outcomes = outcomesFor(numberFile, timeToGraduationSeconds);
     /* No launch time, no placement. An unindexed token is not placed at
        "minute 0": it is not placed at all. */
     placement =
@@ -322,6 +367,7 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
       indexed,
     },
     cohort,
+    outcomes,
     activity: activityFrom(input.activity ?? null, cursor),
     freshness,
     /* `reason` stays internal to ladder.ts: the pair (rung, insufficient) is

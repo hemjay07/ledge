@@ -197,3 +197,52 @@ describe("the token's own name/symbol: untrusted on-chain text", () => {
     expect(titleMatch?.[1]?.startsWith("PONS · ")).toBe(true);
   });
 });
+
+/* 2026-09-12: what launches in this token's own time-to-graduation bucket
+   did after graduating (pipeline/stats.py `outcomes`). A population fact
+   beside the token, never about it. */
+describe("the outcomes card", () => {
+  const MARKS = {
+    "1h": { n: 400, noTrade: 12, noTradeShare: 0.03, median: -0.61, p25: -0.8, p75: -0.2, insufficient: false },
+    "24h": { n: 380, noTrade: 90, noTradeShare: 0.236, median: -0.78, p25: -0.9, p75: -0.4, insufficient: false },
+    "7d": { n: 12, noTrade: 4, noTradeShare: null, median: null, p25: null, p75: null, insufficient: true },
+  };
+
+  /** A published file that carries outcomes, and a token that graduated
+      fast enough to fall in the u10 bucket. */
+  function withOutcomes() {
+    const file = JSON.parse(JSON.stringify(fixtureNumber()));
+    file.outcomes = {
+      matched: 412,
+      cohorts: { ttg: [{ bucket: "u10", graduations: 412, withoutPrice: 3, marks: MARKS }] },
+      cohortsExcluded: { ttg: 0 },
+    };
+    return file;
+  }
+
+  const GRADUATED = {
+    numberFile: withOutcomes(),
+    /* five seconds after LAUNCH.ts, so the token genuinely falls in the
+       under-10-seconds bucket rather than matching it by accident. */
+    graduation: { token: ADDRESS, block: 56172009, ts: NOW_SECONDS - 811 + 5 },
+  } as Parameters<typeof makeBody>[0];
+
+  it("renders nothing at all when the file carries no outcomes", () => {
+    const html = render({ activity: ACTIVITY });
+    expect(html).not.toContain("Launches that graduated in");
+  });
+
+  it("names the bucket, prints the median with its n, and says it is a population", () => {
+    const html = render({ ...GRADUATED, activity: ACTIVITY });
+    expect(html).toContain("Launches that graduated in under 10 seconds");
+    expect(html).toContain("-61.0%");
+    expect(html).toContain("n=400");
+    expect(html).toContain("12 never traded");
+    expect(html).toContain("A population, not this token.");
+  });
+
+  it("prints the sample size and no figure below the n = 30 floor", () => {
+    const html = render({ ...GRADUATED, activity: ACTIVITY });
+    expect(html).toContain("not enough data (n=12)");
+  });
+});
