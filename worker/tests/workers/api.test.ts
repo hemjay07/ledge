@@ -231,6 +231,12 @@ describe("GET /api/live", () => {
     firstBlockBuyers?: number | null;
     lastActivityTs: number;
     fromBlock?: number;
+    /** The reserve read (worker/src/reserve.ts / worker/src/tick.ts). Absent
+        by default -- a row seeded with neither is the "never read" case, and
+        board.ts must render no fill for it regardless of whether a threshold
+        is known. */
+    reserveWei?: string | null;
+    reserveBlock?: number | null;
   }
 
   /* One row on the board is one launch row plus one token_activity row --
@@ -251,7 +257,7 @@ describe("GET /api/live", () => {
         `0xtx${opts.token}`,
       ),
       env.LEDGE_DB.prepare(
-        `INSERT INTO token_activity VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO token_activity VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         opts.token,
         fromBlock,
@@ -262,6 +268,8 @@ describe("GET /api/live", () => {
         null,
         opts.lastActivityTs,
         opts.firstBlockBuyers === undefined ? 1 : opts.firstBlockBuyers,
+        opts.reserveWei ?? null,
+        opts.reserveBlock ?? null,
       ),
       ...(opts.graduated
         ? [
@@ -276,7 +284,7 @@ describe("GET /api/live", () => {
     ];
   }
 
-  it("prints one row per token, with the token address, its counts, and its indexed fill", async () => {
+  it("prints one row per token, with the token address, its counts, and its reserve fill", async () => {
     const now = Math.floor(Date.now() / 1000);
     await env.LEDGE_DB.batch([
       ...seedRow({
@@ -292,6 +300,8 @@ describe("GET /api/live", () => {
         quoteOut: "220000000000000000",
         firstBlockBuyers: 7,
         lastActivityTs: now - 5,
+        reserveWei: "2245000000000000000",
+        reserveBlock: 56_172_580,
       }),
       ...seedRow({
         token: "0x222222222222222222222222222222222222222b",
@@ -341,8 +351,16 @@ describe("GET /api/live", () => {
     expect(row.window.label).toContain("56172588");
     // R2b: never a lone percentage -- the threshold is labelled and both
     // figures it is measured against travel outside the fill object too.
+    // 2026-09-12: this used to assert an INDEXED net-quote fill
+    // ("not read from the curve" in the label) -- that figure was wrong by
+    // orders of magnitude on wash-traded curves (CONSTRAINTS.md-adjacent
+    // finding: -1.40 ETH indexed against 0.007 ETH actually held) and is
+    // replaced by a real reserve_wei/reserve_block reading, taken by
+    // worker/src/reserve.ts and written by worker/src/tick.ts.
     expect(row.fill.graduationThresholdWei).toBe("4200000000000000000");
-    expect(row.fill.label).toContain("not read from the curve");
+    expect(row.fill.reserveWei).toBe("2245000000000000000");
+    expect(row.fill.readAtBlock).toBe(56_172_580);
+    expect(row.fill.label).toContain("read from the curve at block 56172580");
     expect(row.fill.label).not.toMatch(/\d+(\.\d+)?%/);
 
     const graduated = body.rows.find((r: any) => r.token === "0x222222222222222222222222222222222222222b");
@@ -365,6 +383,35 @@ describe("GET /api/live", () => {
     const body = (await (await get("/api/live")).json()) as any;
     expect(body.rows[0].fill).toBeNull();
     expect(body.rows[0].creatorTaxBps).toBeNull();
+  });
+
+  // 2026-09-12: graduated() drains the curve to a reserve of 0 -- the exact
+  // reading a naive fill would misread as "just started", not "finished".
+  // `graduated` on the row (read from the `graduation` table, independent of
+  // this reading) must stay true, and the fill itself must still be shown as
+  // the real reserve_wei that was read, never suppressed because it is 0.
+  it("shows a graduated row's real fill, reserve 0, rather than hiding it", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await env.LEDGE_DB.batch(
+      seedRow({
+        token: "0xdddddddddddddddddddddddddddddddddddddddd",
+        pairClass: "eth",
+        graduationThreshold: "4200000000000000000",
+        graduated: true,
+        launchBlock: 56_172_100,
+        launchTs: now - 500,
+        lastActivityTs: now - 30,
+        reserveWei: "0",
+        reserveBlock: 56_172_580,
+      }),
+    );
+    const body = (await (await get("/api/live")).json()) as any;
+    const row = body.rows[0];
+    expect(row.graduated).toBe(true);
+    expect(row.fill).not.toBeNull();
+    expect(row.fill.reserveWei).toBe("0");
+    expect(row.fill.graduationThresholdWei).toBe("4200000000000000000");
+    expect(row.fill.readAtBlock).toBe(56_172_580);
   });
 
   it("marks a row's window partial when its own launch block was never indexed", async () => {
@@ -686,7 +733,7 @@ describe("the units a fill is denominated in", () => {
 describe("GET /api/token/{address} — curve activity", () => {
   async function seedActivity(): Promise<void> {
     await env.LEDGE_DB.prepare(
-      `INSERT OR REPLACE INTO token_activity VALUES (?, 56172001, 41, 12, '1743200000000000000', '220000000000000000', ?, ?, 7)`,
+      `INSERT OR REPLACE INTO token_activity VALUES (?, 56172001, 41, 12, '1743200000000000000', '220000000000000000', ?, ?, 7, NULL, NULL)`,
     )
       .bind(ADDRESS, Math.floor(Date.now() / 1000) - 800, Math.floor(Date.now() / 1000) - 40)
       .run();

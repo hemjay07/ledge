@@ -26,7 +26,7 @@
 
 import type { CursorRow } from "./lookup";
 import type { PairTokenEntry } from "./buckets";
-import { pairUnits } from "./board";
+import { pairUnits, type DbPairToken } from "./board";
 import { toIso } from "./format";
 
 /** 72 hours. A launch younger than this has not had the window the finding
@@ -146,6 +146,7 @@ function rowOf(
   toBlock: number,
   nowSeconds: number,
   pairTokens: Record<string, PairTokenEntry> | null,
+  dbPairTokens: Map<string, DbPairToken> | null,
 ): GraveyardRow {
   return {
     token: row.token,
@@ -159,7 +160,7 @@ function rowOf(
     firstBlockBuyers: row.first_block_buyers,
     lastActivityAt: toIso(row.last_activity_ts),
     window: windowOf(row, toBlock),
-    ...pairUnits(row.pair_token, pairTokens),
+    ...pairUnits(row.pair_token, dbPairTokens, pairTokens),
   };
 }
 
@@ -186,12 +187,13 @@ export function buildGraveyardRows(
   sort: GraveyardSortKey,
   limit = 200,
   pairTokens: Record<string, PairTokenEntry> | null = null,
+  dbPairTokens: Map<string, DbPairToken> | null = null,
 ): GraveyardRow[] {
   const toBlock = cursor ? cursor.last_indexed_block : 0;
   const eligible = dbRows.filter((row) => nowSeconds - row.ts >= GRAVEYARD_AGE_SECONDS);
   return sortDbRows(eligible, sort)
     .slice(0, limit)
-    .map((row) => rowOf(row, toBlock, nowSeconds, pairTokens));
+    .map((row) => rowOf(row, toBlock, nowSeconds, pairTokens, dbPairTokens));
 }
 
 export function buildGraveyardScope(scopeRow: GraveyardScopeDbRow | null): GraveyardScope {

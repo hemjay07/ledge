@@ -28,7 +28,9 @@
       },
       "fill": {
         "graduationThresholdWei": "4200000000000000000",
-        "label": "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure is an upper bound on the curve's real reserve, not the reading /t/{address} shows."
+        "reserveWei": "1477504000000000000",
+        "readAtBlock": 56172588,
+        "label": "read from the curve at block 56172588"
       },
       "pairDecimals": 18,
       "pairSymbol": "ETH"
@@ -40,7 +42,7 @@
       "creatorTaxBps": 300,
       "launchBlock": 56172398,
       "ageSeconds": 190,
-      "graduated": false,
+      "graduated": true,
       "buys": 6,
       "sells": 1,
       "quoteIn": "300000000000000000",
@@ -56,7 +58,9 @@
       },
       "fill": {
         "graduationThresholdWei": "4200000000000000000",
-        "label": "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure is an upper bound on the curve's real reserve, not the reading /t/{address} shows."
+        "reserveWei": "291000000000000000",
+        "readAtBlock": 56172588,
+        "label": "read from the curve at block 56172588"
       },
       "pairDecimals": 18,
       "pairSymbol": "ETH"
@@ -68,7 +72,7 @@
       "creatorTaxBps": 100,
       "launchBlock": 56171688,
       "ageSeconds": 900,
-      "graduated": true,
+      "graduated": false,
       "buys": 88,
       "sells": 40,
       "quoteIn": "8500000000",
@@ -84,7 +88,9 @@
       },
       "fill": {
         "graduationThresholdWei": "8090000000",
-        "label": "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure is an upper bound on the curve's real reserve, not the reading /t/{address} shows."
+        "reserveWei": "7847300000",
+        "readAtBlock": 56172588,
+        "label": "read from the curve at block 56172588"
       },
       "pairDecimals": null,
       "pairSymbol": null

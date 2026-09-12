@@ -20,7 +20,24 @@ import {
 } from "./schema";
 import { loadNumber, loadPairTokens, KV_NUMBER } from "./numberFile";
 import { liveStale, type CursorRow } from "./lookup";
-import { BOARD_QUERY, BOARD_SORT_KEYS, buildBoardRows, isBoardSortKey, type BoardDbRow } from "./board";
+import {
+  BOARD_QUERY,
+  BOARD_SORT_KEYS,
+  buildBoardRows,
+  isBoardSortKey,
+  pairTokenMapFromRows,
+  type BoardDbRow,
+} from "./board";
+
+/** Every row of the live pair-token cache, read once per request alongside
+    the board/graveyard queries -- never once per row (worker/schema.sql's
+    `pair_token` table comment, worker/src/board.ts's pairUnits). */
+const PAIR_TOKEN_QUERY = "SELECT address, decimals, symbol FROM pair_token";
+interface PairTokenDbRow {
+  address: string;
+  decimals: number | null;
+  symbol: string | null;
+}
 import {
   GRAVEYARD_QUERY,
   GRAVEYARD_SCOPE_QUERY,
@@ -152,18 +169,20 @@ async function handleLive(env: Env, nowMs: number, url: URL): Promise<Response> 
      once a minute by the tick, and it lets a row say "4.2 ETH" instead of
      4200000000000000000. No decimals() call per row -- 121 rows could never
      afford one, and decimals.ts forbids guessing the exponent. */
-  const [[rowsResult, cursorResult], pairTokens] = await Promise.all([
+  const [[rowsResult, cursorResult, pairTokenResult], pairTokens] = await Promise.all([
     env.LEDGE_DB.batch([
     env.LEDGE_DB.prepare(BOARD_QUERY),
     env.LEDGE_DB.prepare(
       "SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1",
     ),
+    env.LEDGE_DB.prepare(PAIR_TOKEN_QUERY),
     ]),
     loadPairTokens(env, nowMs),
   ]);
   const cursor = (cursorResult?.results[0] as CursorRow | undefined) ?? null;
   const dbRows = (rowsResult?.results ?? []) as unknown as BoardDbRow[];
-  const rows = buildBoardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens);
+  const dbPairTokens = pairTokenMapFromRows((pairTokenResult?.results ?? []) as unknown as PairTokenDbRow[]);
+  const rows = buildBoardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens, dbPairTokens);
 
   const payload = {
     schemaVersion: SCHEMA_VERSION,
@@ -207,20 +226,22 @@ async function handleGraveyard(env: Env, nowMs: number, url: URL): Promise<Respo
     );
   }
 
-  const [[rowsResult, scopeResult, cursorResult], pairTokens] = await Promise.all([
+  const [[rowsResult, scopeResult, cursorResult, pairTokenResult], pairTokens] = await Promise.all([
     env.LEDGE_DB.batch([
       env.LEDGE_DB.prepare(GRAVEYARD_QUERY),
       env.LEDGE_DB.prepare(GRAVEYARD_SCOPE_QUERY),
       env.LEDGE_DB.prepare(
         "SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1",
       ),
+      env.LEDGE_DB.prepare(PAIR_TOKEN_QUERY),
     ]),
     loadPairTokens(env, nowMs),
   ]);
   const cursor = (cursorResult?.results[0] as CursorRow | undefined) ?? null;
   const dbRows = (rowsResult?.results ?? []) as unknown as GraveyardDbRow[];
   const scopeRow = (scopeResult?.results[0] as GraveyardScopeDbRow | undefined) ?? null;
-  const rows = buildGraveyardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens);
+  const dbPairTokens = pairTokenMapFromRows((pairTokenResult?.results ?? []) as unknown as PairTokenDbRow[]);
+  const rows = buildGraveyardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens, dbPairTokens);
   const scope = buildGraveyardScope(scopeRow);
 
   const payload = {

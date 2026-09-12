@@ -95,6 +95,18 @@ CREATE INDEX IF NOT EXISTS graduation_ts_idx    ON graduation (ts DESC);
 -- bought in the launch's own block, which costs gas and snipe tax to fake.
 -- It needs no (token, buyer) table -- see the note at the top of
 -- worker/src/activity.ts for why a block is never split across ticks.
+--
+-- reserve_wei / reserve_block hold the curve's OWN realQuoteReserve(), read
+-- straight off the curve rather than netted from indexed CurveBuy/CurveSell
+-- logs (worker/src/board.ts carried the indexed figure alone until
+-- 2026-09-12, and it was wrong by orders of magnitude on wash-traded curves
+-- because it never sees fee or creator tax leaving quote_in before the
+-- curve's reserve does). reserve_block is the block that reading was taken
+-- at, so a reader can see its age against the tick that wrote it. NULL in
+-- either column means this token has never been read this way -- not zero,
+-- which is a real, distinct reading a drained or graduated curve can give.
+-- Filled by worker/src/reserve.ts, one Multicall3 aggregate3() call a tick
+-- covering the whole board population, never a per-curve RPC call.
 CREATE TABLE IF NOT EXISTS token_activity (
   token              TEXT PRIMARY KEY,       -- lowercase 0x address
   from_block         INTEGER NOT NULL,       -- the launch block: where these counts open
@@ -104,10 +116,25 @@ CREATE TABLE IF NOT EXISTS token_activity (
   quote_out          TEXT NOT NULL DEFAULT '0',
   first_buy_ts       INTEGER,                -- NULL until a buy is seen
   last_activity_ts   INTEGER NOT NULL,       -- block header, never a wall clock
-  first_block_buyers INTEGER                 -- NULL when the launch block was never read
+  first_block_buyers INTEGER,                -- NULL when the launch block was never read
+  reserve_wei        TEXT,                   -- realQuoteReserve() from the curve, NULL = never read
+  reserve_block      INTEGER                 -- the block reserve_wei was read at, NULL = never read
 );
 -- Retention prunes on the row's own last event, exactly as the other tables do.
 CREATE INDEX IF NOT EXISTS token_activity_ts_idx ON token_activity (last_activity_ts DESC);
+
+-- MIGRATION (2026-09-12). worker/schema.sql has, until now, been edited in
+-- place and replaced wholesale on every change (see the B6 migration note
+-- above) because D1 had not been deployed yet. It now holds live data, so
+-- the two columns above are also stated as an explicit migration: run this
+-- by hand against the deployed database (this repo runs no migration
+-- tooling and no `wrangler d1 execute` from an agent -- a human runs this).
+-- Both are nullable and additive; no existing row's other columns change and
+-- every existing row reads reserve_wei/reserve_block as NULL ("never read")
+-- until the next tick's reserve pass writes them.
+--
+--   ALTER TABLE token_activity ADD COLUMN reserve_wei TEXT;
+--   ALTER TABLE token_activity ADD COLUMN reserve_block INTEGER;
 
 -- Curve logs LEDGE could not attribute: the curve belongs to a launch older
 -- than the indexed record, or to one that has been evicted. Counted rather
@@ -154,3 +181,44 @@ CREATE TABLE IF NOT EXISTS tg_usage (
   count     INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (chat_id, hour_key)
 );
+
+-- Pair-token decimals/symbol, read once per address and cached for ever
+-- (2026-09-12). worker/src/board.ts's pairUnits() resolved units ONLY from
+-- the static registry map sourced from data/pair-tokens.json/KV, so a real
+-- pair token outside that registry -- any tokenized-stock pair the Python
+-- pipeline has not enriched yet -- got pairDecimals: null and the board
+-- printed the raw uint256. This table is that gap closed on the live side:
+-- worker/src/reserve.ts reads decimals()/symbol() for every pair token among
+-- the tick's reserve targets that is not the zero address (ETH is defined as
+-- 18/"ETH" by the factory and is never called for) and is not already a row
+-- here, in the SAME Multicall3 aggregate3() call the reserve read already
+-- makes -- one subrequest total, never a second eth_call.
+--
+-- A row existing means the read was ATTEMPTED, not that it succeeded:
+-- decimals/symbol are independently nullable because aggregate3's
+-- allowFailure lets one sub-call fail without blanking the other, and a
+-- symbol that decodes as a raw bytes32 or invalid UTF-8 (rather than the
+-- ABI-encoded dynamic string most ERC-20s return) is stored as NULL rather
+-- than guessed at. board.ts's pairUnits() therefore checks this table FIRST:
+-- a row here is used exactly as read (decimals: NULL stays NULL, never
+-- falling back to the registry map's guess) and only a genuine table MISS
+-- falls back to the registry, then to null. read_block records the tick's
+-- head block the read was taken at, for parity with reserve_block.
+CREATE TABLE IF NOT EXISTS pair_token (
+  address     TEXT PRIMARY KEY,     -- lowercase 0x address
+  decimals    INTEGER,              -- NULL when decimals() failed or was implausible
+  symbol      TEXT,                 -- NULL when symbol() failed or did not decode as a string
+  read_block  INTEGER
+);
+
+-- MIGRATION (2026-09-12). Additive and nullable, same posture as the
+-- reserve_wei/reserve_block migration above: run this by hand against the
+-- deployed database (no `wrangler d1 execute` from an agent -- a human runs
+-- this). No existing table is touched.
+--
+--   CREATE TABLE IF NOT EXISTS pair_token (
+--     address     TEXT PRIMARY KEY,
+--     decimals    INTEGER,
+--     symbol      TEXT,
+--     read_block  INTEGER
+--   );

@@ -12,6 +12,7 @@ import {
   tick,
 } from "../../src/tick";
 import { TOPIC_TOKEN_LAUNCHED, TOPIC_POOL_GRADUATED, TOPIC_CURVE_BUY, TOPIC_CURVE_SELL } from "../../src/pons";
+import { MULTICALL3_ADDRESS } from "../../src/reserve";
 import { reset, seedCursor } from "./setup";
 
 const NOW = 1_788_720_000;
@@ -724,7 +725,7 @@ describe("retention reaches the activity rows", () => {
   it("prunes an activity row whose last event is past the cutoff", async () => {
     await seedCursor(500_000, NOW);
     await env.LEDGE_DB.prepare(
-      `INSERT INTO token_activity VALUES ('0xold', 10, 1, 0, '1', '0', ?, ?, 1)`,
+      `INSERT INTO token_activity VALUES ('0xold', 10, 1, 0, '1', '0', ?, ?, 1, NULL, NULL)`,
     )
       .bind(NOW - RETENTION_SECONDS - 10, NOW - RETENTION_SECONDS - 10)
       .run();
@@ -740,7 +741,7 @@ describe("retention reaches the activity rows", () => {
         `INSERT INTO launch VALUES ('0xlive', '0xc', '0x0', 'eth', 0, NULL, 10, ?, '0xt1', 0)`,
       ).bind(NOW - RETENTION_SECONDS - 3600),
       env.LEDGE_DB.prepare(
-        `INSERT INTO token_activity VALUES ('0xlive', 10, 3, 0, '3', '0', ?, ?, 1)`,
+        `INSERT INTO token_activity VALUES ('0xlive', 10, 3, 0, '3', '0', ?, ?, 1, NULL, NULL)`,
       ).bind(NOW - RETENTION_SECONDS - 3000, NOW - 60),
     ]);
     await tickOnce();
@@ -755,7 +756,7 @@ describe("retention reaches the activity rows", () => {
         NOW - 60,
       ),
       env.LEDGE_DB.prepare(
-        `INSERT INTO token_activity VALUES ('0xgrad', 10, 3, 0, '3', '0', ?, ?, 1)`,
+        `INSERT INTO token_activity VALUES ('0xgrad', 10, 3, 0, '3', '0', ?, ?, 1, NULL, NULL)`,
       ).bind(NOW - RETENTION_SECONDS - 3000, NOW - RETENTION_SECONDS - 10),
     ]);
     await tickOnce();
@@ -913,7 +914,7 @@ describe("a pass that seeds a row for a token it already holds", () => {
   it("keeps the counters a previous pass wrote", async () => {
     await seedCursor(5000, NOW);
     await env.LEDGE_DB.prepare(
-      `INSERT INTO token_activity VALUES (?, 4000, 9, 2, '900', '20', ?, ?, 3)`,
+      `INSERT INTO token_activity VALUES (?, 4000, 9, 2, '900', '20', ?, ?, 3, NULL, NULL)`,
     )
       .bind(TOKEN_A, NOW - 400, NOW - 300)
       .run();
@@ -932,5 +933,334 @@ describe("a pass that seeds a row for a token it already holds", () => {
       .first<any>();
     expect(row.buys).toBe(9);
     expect(row.quote_in).toBe("900");
+  });
+});
+
+/* The reserve read (2026-09-12): tick.ts spends one call from the same
+   subrequest budget on Multicall3's aggregate3(), reading every curve in the
+   board population, and writes what comes back into reserve_wei/reserve_block
+   -- never touching them for a row the multicall did not answer. */
+describe("the reserve read tick.ts writes", () => {
+  const WORD = 64;
+
+  function word64(value: bigint): string {
+    return value.toString(16).padStart(WORD, "0");
+  }
+
+  /** Same encoding worker/src/reserve.ts decodes -- a Multicall3
+      `Result[] (bool success, bytes returnData)[]` response, built
+      independently of the source under test. */
+  function encodeResults(items: Array<{ success: boolean; data: string }>): string {
+    const n = items.length;
+    const elements = items.map((item) => {
+      const dataBytes = item.data.length / 2;
+      const paddedChars = Math.ceil(item.data.length / WORD) * WORD;
+      const bytesEncoded = word64(BigInt(dataBytes)) + item.data.padEnd(paddedChars, "0");
+      return word64(item.success ? 1n : 0n) + word64(64n) + bytesEncoded;
+    });
+    let cursor = n * 32;
+    const offsets: string[] = [];
+    for (const element of elements) {
+      offsets.push(word64(BigInt(cursor)));
+      cursor += element.length / 2;
+    }
+    const arrayData = word64(BigInt(n)) + offsets.join("") + elements.join("");
+    return "0x" + word64(32n) + arrayData;
+  }
+
+  /** No launches or graduations in this window -- these tests exercise the
+      reserve step alone, against a token_activity/launch row seeded directly. */
+  function fakeChainWithMulticall(options: { head: number; multicallResult: string | null }) {
+    return new RpcClient("http://unused", async (payload) => {
+      const batch = payload as Array<{ id: number; method: string; params: any[] }>;
+      return batch.map((request) => {
+        if (request.method === "eth_blockNumber") {
+          return { id: request.id, result: "0x" + options.head.toString(16) };
+        }
+        if (request.method === "eth_getLogs") {
+          return { id: request.id, result: [] };
+        }
+        if (request.method === "eth_getBlockByNumber") {
+          return { id: request.id, result: { timestamp: "0x" + NOW.toString(16) } };
+        }
+        if (request.method === "eth_call") {
+          const to = String(request.params[0].to).toLowerCase();
+          if (to === MULTICALL3_ADDRESS) {
+            return { id: request.id, result: options.multicallResult };
+          }
+          const words = Array.from({ length: 15 }, () => word(0n));
+          words[8] = word(300n);
+          words[14] = word(1n);
+          return { id: request.id, result: "0x" + words.join("") };
+        }
+        return { id: request.id, result: null };
+      });
+    });
+  }
+
+  async function seedBoardRow(
+    token: string,
+    curve: string,
+    launchBlock: number,
+    // The canonical zero address, not the '0x0' shorthand (2026-09-12):
+    // tick.ts now reads launch.pair_token to decide which pair tokens are
+    // worth a decimals()/symbol() call, and only the exact ZERO_ADDRESS
+    // string is recognised as "ETH, never called" -- '0x0' would have been
+    // treated as an unknown pair token and appended extra calls to the
+    // multicall these tests hand-encode.
+    pairToken = "0x0000000000000000000000000000000000000000",
+  ): Promise<void> {
+    await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES (?, ?, ?, 'eth', 300, '4200000000000000000', ?, ?, '0xtx', 0)`,
+      ).bind(token, curve, pairToken, launchBlock, NOW - 500),
+      env.LEDGE_DB.prepare(
+        `INSERT INTO token_activity VALUES (?, ?, 1, 0, '100', '0', ?, ?, 1, NULL, NULL)`,
+      ).bind(token, launchBlock, NOW - 500, NOW - 100),
+    ]);
+  }
+
+  beforeEach(async () => {
+    await reset();
+  });
+
+  it("writes reserve_wei and reserve_block at the tick's head block", async () => {
+    await seedCursor(4995, NOW);
+    const curve = "0x00000000000000000000000000000000000000c1";
+    await seedBoardRow(TOKEN_A, curve, 4990);
+
+    const multicallResult = encodeResults([
+      { success: true, data: word64(0n) }, // graduated() -> false
+      { success: true, data: word64(2_245_000_000_000_000_000n) }, // realQuoteReserve()
+    ]);
+
+    const result = await tick(env, NOW, fakeChainWithMulticall({ head: 5100, multicallResult }));
+    expect(result.ok).toBe(true);
+
+    const row = await env.LEDGE_DB.prepare(
+      "SELECT reserve_wei, reserve_block FROM token_activity WHERE token = ?",
+    )
+      .bind(TOKEN_A)
+      .first<any>();
+    expect(row.reserve_wei).toBe("2245000000000000000");
+    expect(row.reserve_block).toBe(5100);
+  });
+
+  it("leaves a previous reading untouched when the multicall response is malformed", async () => {
+    await seedCursor(4995, NOW);
+    const curve = "0x00000000000000000000000000000000000000c2";
+    await seedBoardRow(TOKEN_B, curve, 4990);
+    await env.LEDGE_DB.prepare(
+      "UPDATE token_activity SET reserve_wei = '999', reserve_block = 4000 WHERE token = ?",
+    )
+      .bind(TOKEN_B)
+      .run();
+
+    const result = await tick(env, NOW, fakeChainWithMulticall({ head: 5100, multicallResult: null }));
+    expect(result.ok).toBe(true);
+
+    const row = await env.LEDGE_DB.prepare(
+      "SELECT reserve_wei, reserve_block FROM token_activity WHERE token = ?",
+    )
+      .bind(TOKEN_B)
+      .first<any>();
+    expect(row.reserve_wei).toBe("999");
+    expect(row.reserve_block).toBe(4000);
+  });
+
+  it("never blocks the tick's own job when the reserve read fails", async () => {
+    await seedCursor(4995, NOW);
+    const curve = "0x00000000000000000000000000000000000000c3";
+    await seedBoardRow(TOKEN_A, curve, 4990);
+
+    const result = await tick(
+      env,
+      NOW,
+      fakeChainWithMulticall({ head: 5100, multicallResult: "0xnotarealmulticallresponse" }),
+    );
+    expect(result.ok).toBe(true);
+
+    const cursor = await env.LEDGE_DB.prepare("SELECT last_indexed_block FROM cursor WHERE id = 1").first<any>();
+    expect(cursor.last_indexed_block).toBe(5100);
+  });
+});
+
+/* The pair_token read-once cache (2026-09-12): tick.ts folds decimals()/
+   symbol() calls for unknown pair tokens into the SAME aggregate3 call the
+   reserve read makes, then upserts worker/schema.sql's `pair_token` table --
+   and never re-reads an address already in it. */
+describe("the pair_token cache tick.ts writes", () => {
+  const PAIR_TOKEN = "0xcccccccccccccccccccccccccccccccccccccccc";
+  const WORD = 64;
+
+  /** Same Multicall3 `Result[] (bool success, bytes returnData)[]` encoding
+      the "reserve read" describe block above builds independently -- kept
+      local to this block rather than hoisted, since both are test-only
+      fixtures with no production counterpart to share. */
+  function encodeResults(items: Array<{ success: boolean; data: string }>): string {
+    const n = items.length;
+    const elements = items.map((item) => {
+      const dataBytes = item.data.length / 2;
+      const paddedChars = Math.ceil(item.data.length / WORD) * WORD;
+      const bytesEncoded = word(BigInt(dataBytes)) + item.data.padEnd(paddedChars, "0");
+      return word(item.success ? 1n : 0n) + word(64n) + bytesEncoded;
+    });
+    let cursor = n * 32;
+    const offsets: string[] = [];
+    for (const element of elements) {
+      offsets.push(word(BigInt(cursor)));
+      cursor += element.length / 2;
+    }
+    const arrayData = word(BigInt(n)) + offsets.join("") + elements.join("");
+    return "0x" + word(32n) + arrayData;
+  }
+
+  /** Reads the array-length word out of an aggregate3 calldata payload
+      (selector, then a head offset word, then the array length itself) --
+      independent of reserve.ts's own encoder, so this test notices if it
+      changes how many calls it actually sent. */
+  function aggregate3CallCount(dataHex: string): number {
+    const hex = dataHex.replace(/^0x/, "");
+    return Number(BigInt("0x" + hex.slice(8 + 64, 8 + 64 + 64)));
+  }
+
+  function fakeChainCapturingMulticall(options: { head: number; multicallResult: string | null }) {
+    const seenCalldata: string[] = [];
+    const client = new RpcClient("http://unused", async (payload) => {
+      const batch = payload as Array<{ id: number; method: string; params: any[] }>;
+      return batch.map((request) => {
+        if (request.method === "eth_blockNumber") {
+          return { id: request.id, result: "0x" + options.head.toString(16) };
+        }
+        if (request.method === "eth_getLogs") {
+          return { id: request.id, result: [] };
+        }
+        if (request.method === "eth_getBlockByNumber") {
+          return { id: request.id, result: { timestamp: "0x" + NOW.toString(16) } };
+        }
+        if (request.method === "eth_call") {
+          const to = String(request.params[0].to).toLowerCase();
+          if (to === MULTICALL3_ADDRESS) {
+            seenCalldata.push(request.params[0].data);
+            return { id: request.id, result: options.multicallResult };
+          }
+          const words = Array.from({ length: 15 }, () => word(0n));
+          words[8] = word(300n);
+          words[14] = word(1n);
+          return { id: request.id, result: "0x" + words.join("") };
+        }
+        return { id: request.id, result: null };
+      });
+    });
+    return { client, seenCalldata };
+  }
+
+  async function seedBoardRowWithPairToken(token: string, curve: string, launchBlock: number): Promise<void> {
+    await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES (?, ?, ?, 'stock', 300, '4200000000000000000', ?, ?, '0xtx', 0)`,
+      ).bind(token, curve, PAIR_TOKEN, launchBlock, NOW - 500),
+      env.LEDGE_DB.prepare(
+        `INSERT INTO token_activity VALUES (?, ?, 1, 0, '100', '0', ?, ?, 1, NULL, NULL)`,
+      ).bind(token, launchBlock, NOW - 500, NOW - 100),
+    ]);
+  }
+
+  beforeEach(async () => {
+    await reset();
+  });
+
+  it("reads decimals()/symbol() for an unknown pair token and caches the row", async () => {
+    await seedCursor(4995, NOW);
+    const curve = "0x00000000000000000000000000000000000000d1";
+    await seedBoardRowWithPairToken(TOKEN_A, curve, 4990);
+
+    // reserve pair (graduated/realQuoteReserve), then the pair token's own
+    // decimals()/symbol() -- the offset/length dynamic-string layout
+    // symbol() is specified to return.
+    const symbolBytes = Buffer.from("TSLAX", "utf-8");
+    const symbolHex = symbolBytes.toString("hex").padEnd(64, "0");
+    const multicallResult = encodeResults([
+      { success: true, data: word(0n) },
+      { success: true, data: word(0n) },
+      { success: true, data: word(8n) },
+      { success: true, data: word(32n) + word(BigInt(symbolBytes.length)) + symbolHex },
+    ]);
+
+    const { client } = fakeChainCapturingMulticall({ head: 5100, multicallResult });
+    const result = await tick(env, NOW, client);
+    expect(result.ok).toBe(true);
+
+    const row = await env.LEDGE_DB.prepare(
+      "SELECT decimals, symbol, read_block FROM pair_token WHERE address = ?",
+    )
+      .bind(PAIR_TOKEN)
+      .first<any>();
+    expect(row).toEqual({ decimals: 8, symbol: "TSLAX", read_block: 5100 });
+  });
+
+  it("never re-reads a pair token already cached: the multicall carries only the reserve calls", async () => {
+    await seedCursor(4995, NOW);
+    const curve = "0x00000000000000000000000000000000000000d2";
+    await seedBoardRowWithPairToken(TOKEN_A, curve, 4990);
+    await env.LEDGE_DB.prepare(
+      "INSERT INTO pair_token (address, decimals, symbol, read_block) VALUES (?, ?, ?, ?)",
+    )
+      .bind(PAIR_TOKEN, 8, "TSLAX", 4000)
+      .run();
+
+    // Only the reserve pair -- if tick.ts asked for the pair token again this
+    // would decode too few results and the reserve read would be dropped
+    // entirely (logged, not thrown), which the assertions below would catch.
+    const multicallResult = encodeResults([
+      { success: true, data: word(0n) },
+      { success: true, data: word(2_245_000_000_000_000_000n) },
+    ]);
+
+    const { client, seenCalldata } = fakeChainCapturingMulticall({ head: 5100, multicallResult });
+    const result = await tick(env, NOW, client);
+    expect(result.ok).toBe(true);
+
+    expect(seenCalldata).toHaveLength(1);
+    expect(aggregate3CallCount(seenCalldata[0] as string)).toBe(2); // graduated + realQuoteReserve only
+
+    const cached = await env.LEDGE_DB.prepare(
+      "SELECT decimals, symbol, read_block FROM pair_token WHERE address = ?",
+    )
+      .bind(PAIR_TOKEN)
+      .first<any>();
+    expect(cached).toEqual({ decimals: 8, symbol: "TSLAX", read_block: 4000 }); // untouched
+
+    const reserve = await env.LEDGE_DB.prepare(
+      "SELECT reserve_wei, reserve_block FROM token_activity WHERE token = ?",
+    )
+      .bind(TOKEN_A)
+      .first<any>();
+    expect(reserve.reserve_wei).toBe("2245000000000000000");
+    expect(reserve.reserve_block).toBe(5100);
+  });
+
+  it("stores decimals as NULL, never a guess, when the chain call fails, without blocking the tick", async () => {
+    await seedCursor(4995, NOW);
+    const curve = "0x00000000000000000000000000000000000000d3";
+    await seedBoardRowWithPairToken(TOKEN_A, curve, 4990);
+
+    const multicallResult = encodeResults([
+      { success: true, data: word(0n) },
+      { success: true, data: word(0n) },
+      { success: false, data: "" }, // decimals() reverts
+      { success: false, data: "" }, // symbol() reverts
+    ]);
+
+    const { client } = fakeChainCapturingMulticall({ head: 5100, multicallResult });
+    const result = await tick(env, NOW, client);
+    expect(result.ok).toBe(true);
+
+    const row = await env.LEDGE_DB.prepare(
+      "SELECT decimals, symbol, read_block FROM pair_token WHERE address = ?",
+    )
+      .bind(PAIR_TOKEN)
+      .first<any>();
+    expect(row).toEqual({ decimals: null, symbol: null, read_block: 5100 });
   });
 });

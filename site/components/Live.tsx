@@ -25,9 +25,10 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useMemo,
+  useRef,
   useState,
-  type MouseEvent,
   type ReactElement,
   type ReactNode,
 } from "react";
@@ -41,6 +42,7 @@ import { useTokenPanel } from "../lib/use-token-panel";
 import { PAIR_BUCKETS, TAX_BUCKETS, taxBucketOf } from "../lib/board-buckets";
 import { clampPage, paginate, totalPagesFor } from "../lib/paginate";
 import { mergeQuery, readQuery, readQueryInt } from "../lib/query-state";
+import { numberFile } from "../lib/number";
 import {
   formatAge,
   formatBigDecimal,
@@ -136,7 +138,16 @@ export function useLiveBoard(sort: LiveSortKey) {
     const load = async () => {
       const next = await fetchLive(fetch, controller.signal, sort);
       if (!live) return;
-      setResult(next);
+      /* A failed poll does not replace a good reading with an error. The
+         reading it holds is still true, and its own observedAt keeps ageing
+         on screen -- "updated 48 s ago", the stale colour past the threshold
+         -- which is the honest state. Swapping it for "not reachable" on one
+         dropped request made a phone show that line for minutes on
+         2026-09-12 while nothing was down. The first fetch has nothing to
+         keep, so an error there is shown. */
+      setResult((current) =>
+        next.kind === "error" && current !== null && current.kind === "live" ? current : next,
+      );
     };
     void load();
     const id = window.setInterval(() => void load(), REFRESH_MS);
@@ -288,14 +299,17 @@ function firstBlockBuyersCell(value: number | null): ReactElement {
    worth recording"). The rule -- the threshold travels with what it is
    measured against -- is kept by the caption, not dropped. */
 export function FillBody({ row, compact = false }: { row: Row; compact?: boolean }): ReactElement {
-  const pct = fillPercent(row.netQuoteWei, row.fill!.graduationThresholdWei);
+  /* The bar is the curve's own reserve (worker/src/reserve.ts), read at a
+     named block, never the indexed net quote: on 2026-09-12 that sum was
+     measured at -1.40 ETH against a curve holding 0.007 ETH. */
+  const pct = fillPercent(row.fill!.reserveWei, row.fill!.graduationThresholdWei);
   const width = pct === null ? 0 : Math.min(100, Math.max(0, pct));
   /* In the pair token's own units where they are known -- "1.5232 of 4.2 ETH"
      rather than two 19-digit integers. Where they are not known the raw base
      units are printed and said to be raw, because decimals.ts forbids
      guessing an exponent: a wrong one moves the figure by orders of
      magnitude. The threshold is this launch's OWN, never 4.2 assumed. */
-  const net = pairQuantity(row.netQuoteWei, row.pairDecimals, null);
+  const net = pairQuantity(row.fill!.reserveWei, row.pairDecimals, null);
   const threshold = pairQuantity(row.fill!.graduationThresholdWei, row.pairDecimals, row.pairSymbol);
   const figures = `${net.text} of ${threshold.text}`;
   return (
@@ -325,6 +339,12 @@ function FillCell({ row, compact = false }: { row: Row; compact?: boolean }): Re
   if (row.fill === null) {
     return <td className="thin">no threshold indexed</td>;
   }
+  /* A graduated curve is drained to zero (PONS_CONTRACTS.md): its reserve
+     reads 0 and a 0% bar would say "empty" about a launch that filled. The
+     word is the reading. */
+  if (row.graduated) {
+    return <td className="thin">graduated</td>;
+  }
   return (
     <td className="fill-cell">
       <FillBody row={row} compact={compact} />
@@ -332,17 +352,54 @@ function FillCell({ row, compact = false }: { row: Row; compact?: boolean }): Re
   );
 }
 
-function windowLine(row: Row): ReactElement {
-  return (
-    <>
-      {row.window.label}
-      {row.window.partial ? <span className="mono is-partial"> · partial</span> : null}
-    </>
-  );
+/* The window sentence, stated once for the whole board rather than once per
+   row (REVAMP.md 2026-09-12, "the homepage direction" -- the /live pass).
+   When every visible row was counted over the same window that sentence is
+   printed verbatim; when they differ the caption falls back to the plain
+   phrase "the indexed window" rather than picking one row's window to stand
+   for all of them. A row whose own window is partial still carries its own
+   label -- in the "partial" tag's `title`, not in running text -- so the
+   fact is never lost, only moved off the caption's own sentence. */
+function windowCaption(rows: readonly Row[]): string {
+  if (rows.length === 0) return "the indexed window";
+  const first = rows[0]!.window.label;
+  return rows.every((r) => r.window.label === first) ? first : "the indexed window";
 }
 
-function windowCell(row: Row): ReactElement {
-  return <td className="thin window-cell">{windowLine(row)}</td>;
+/* The fill rule's own forty-word label, stated once for the board rather than
+   once per row -- the defect LIVE-FINDINGS.md recorded ("the 40-word fill
+   caveat is printed inside EVERY card"). Distinct labels are kept distinct
+   rather than collapsed to one, on the same principle as windowCaption: never
+   pick one row's text to stand in for a row that says something else. */
+function fillLabels(rows: readonly Row[]): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const row of rows) {
+    if (row.fill === null || seen.has(row.fill.label)) continue;
+    seen.add(row.fill.label);
+    labels.push(row.fill.label);
+  }
+  return labels;
+}
+
+/** A graduated row, or one whose own window is partial, carries a small mono
+    tag after its address -- the one fact CONSTRAINTS 1 permits printing about
+    a token's own state, and the one CONSTRAINTS 3 requires for a partial
+    count. The partial tag's own `title` carries this row's own window label
+    in full, since the caption above only states it when every row shares it. */
+function stateTags(row: Row): ReactElement | null {
+  if (!row.graduated && !row.window.partial) return null;
+  return (
+    <>
+      {row.graduated ? <span className="mono state-tag"> graduated</span> : null}
+      {row.window.partial ? (
+        <span className="mono state-tag is-partial" title={row.window.label}>
+          {" "}
+          partial
+        </span>
+      ) : null}
+    </>
+  );
 }
 
 /* The address, shortened the way Graduated.tsx and worker/src/text.ts shorten
@@ -397,7 +454,14 @@ function LiveCard({
       <a className="live-card-token mono" href={`/t/${row.token}`} title={row.token}>
         {shortAddress(row.token)}
       </a>
-      {row.fill === null ? <p className="thin">no threshold indexed</p> : <FillBody row={row} />}
+      {stateTags(row)}
+      {row.fill === null ? (
+        <p className="thin">no threshold indexed</p>
+      ) : row.graduated ? (
+        <p className="thin">graduated</p>
+      ) : (
+        <FillBody row={row} compact />
+      )}
       <div className="live-card-stats">
         <div className="live-card-stat">
           <span className="live-card-stat-v mono">{formatCount(row.buys)}</span>
@@ -412,14 +476,10 @@ function LiveCard({
           <span className="live-card-stat-k">first-block buyers</span>
         </div>
       </div>
-      <p className="note">
-        {formatAge(row.ageSeconds)} old · last activity {lastActivityAgo(row, observedAt)} ago ·{" "}
-        {row.graduated ? "graduated" : "on the curve"}
-      </p>
       <p className="note note--fine live-card-analyst">
         {stripAddresses(pairLabel(row.pairClass))} · creator tax{" "}
-        {row.creatorTaxBps === null ? "not read" : `${row.creatorTaxBps} bps`} · launch block{" "}
-        {formatCount(row.launchBlock)} · {windowLine(row)}
+        {row.creatorTaxBps === null ? "not read" : `${row.creatorTaxBps} bps`} ·{" "}
+        {formatAge(row.ageSeconds)} old · last activity {lastActivityAgo(row, observedAt)} ago
       </p>
     </li>
   );
@@ -432,6 +492,8 @@ export function LiveBoardFull(): ReactElement {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<LiveFilters>(DEFAULT_LIVE_FILTERS);
   const panel = useTokenPanel();
+  const sortId = useId();
+  const filterDetailsRef = useRef<HTMLDetailsElement | null>(null);
 
   useEffect(() => {
     const next = liveStateFromLocation();
@@ -440,10 +502,26 @@ export function LiveBoardFull(): ReactElement {
     setFilters(next.filters);
   }, []);
 
+  /* The filter disclosure's own initial state, read once after mount the
+     same way sortFromLocation and Tabs.tsx read the URL once after mount:
+     the server has no viewport to render against, so the first paint always
+     matches the closed, mobile-first markup, and only a client that can ask
+     `matchMedia` opens it wide immediately. A user's own click after that is
+     never overridden -- this effect runs once, on mount, not on every
+     resize. */
+  useEffect(() => {
+    const details = filterDetailsRef.current;
+    if (!details || typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    details.open = window.matchMedia("(min-width: 64rem)").matches;
+  }, []);
+
   const result = useLiveBoard(sort);
   const body = result?.kind === "live" ? result.body : null;
 
   const filtered = hasActiveLiveFilters(filters);
+  const activeFilterCount = [filters.pair, filters.tax, filters.hasBuys, filters.ageMin, filters.ageMax].filter(
+    (v) => v !== "",
+  ).length;
   const filteredRows = useMemo(
     () => (body === null ? [] : applyLiveFilters(body.rows, filters)),
     [body, filters],
@@ -453,12 +531,9 @@ export function LiveBoardFull(): ReactElement {
   const pageRows = useMemo(() => paginate(filteredRows, clampedPage), [filteredRows, clampedPage]);
 
   function chooseSort(key: LiveSortKey) {
-    return (event: MouseEvent<HTMLAnchorElement>) => {
-      event.preventDefault();
-      setSort(key);
-      setPage(1);
-      mergeQuery({ sort: key === DEFAULT_SORT ? null : key, page: null });
-    };
+    setSort(key);
+    setPage(1);
+    mergeQuery({ sort: key === DEFAULT_SORT ? null : key, page: null });
   }
 
   function updateFilters(patch: Partial<LiveFilters>) {
@@ -510,63 +585,97 @@ export function LiveBoardFull(): ReactElement {
     return `${shown} of ${matched} matching tokens shown (${matched} of ${formatCount(body.count)} total)`;
   }
 
-  return (
-    <div className="live-board">
-      <nav className="sheet-nav live-sort" aria-label="Sort the live board">
-        {LIVE_SORT_KEYS.map((key) =>
-          key === sort ? (
-            <span key={key} aria-current="true" className="live-sort-current">
-              {SORT_LABEL[key]}
-            </span>
-          ) : (
-            <a key={key} href={`?sort=${key}`} onClick={chooseSort(key)}>
-              {SORT_LABEL[key]}
-            </a>
-          ),
-        )}
-      </nav>
+  const stale = body !== null && (body.live.stale || pulseAgeSeconds(body) >= numberFile.staleAfterSeconds);
+  const ageText =
+    result !== null && result.kind === "error"
+      ? "unreachable"
+      : body === null
+        ? "…"
+        : `updated ${formatAge(pulseAgeSeconds(body))} ago`;
+  const headerCount = body === null ? null : formatCount(body.count);
 
-      <div className="board-filters" role="group" aria-label="Filter the live board">
-        <FilterSelect
-          label="Pair token"
-          value={filters.pair}
-          onChange={(value) => updateFilters({ pair: value })}
-          options={pairOptions}
-        />
-        <FilterSelect
-          label="Creator tax"
-          value={filters.tax}
-          onChange={(value) => updateFilters({ tax: value })}
-          options={taxOptions}
-        />
-        <FilterSelect
-          label="Buys"
-          value={filters.hasBuys}
-          onChange={(value) => updateFilters({ hasBuys: value })}
-          options={hasBuysOptions}
-        />
-        <FilterNumber
-          label="Age from (s)"
-          value={filters.ageMin}
-          onChange={(value) => updateFilters({ ageMin: value })}
-        />
-        <FilterNumber
-          label="Age to (s)"
-          value={filters.ageMax}
-          onChange={(value) => updateFilters({ ageMax: value })}
-        />
-        {filtered ? (
-          <a
-            className="board-filters-reset"
-            href="?"
-            onClick={(event) => {
-              event.preventDefault();
-              resetFilters();
-            }}
-          >
-            Reset filters
-          </a>
-        ) : null}
+  const cardsUnscaled = pageRows.some(
+    (row) => row.fill !== null && !pairQuantity(row.netQuoteWei, row.pairDecimals, null).scaled,
+  );
+
+  return (
+    <div className={`card live-board${stale ? " is-stale-card" : ""}`}>
+      <div className="card-header">
+        <span className={`kicker card-kicker${stale ? " is-stale" : ""}`}>
+          LIVE{headerCount === null ? "" : ` · ${headerCount} curve${body?.count === 1 ? "" : "s"} with activity`}
+        </span>
+        <span className={`note note--fine mono${stale ? " is-stale" : ""}`}>{ageText}</span>
+      </div>
+
+      <div className="board-controls">
+        <p className="picker-field live-sort-field">
+          <label className="picker-label" htmlFor={sortId}>
+            Sort
+          </label>
+          <span className="picker-line">
+            <select
+              className="picker-select mono"
+              id={sortId}
+              value={sort}
+              onChange={(event) => chooseSort(event.target.value as LiveSortKey)}
+            >
+              {LIVE_SORT_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {SORT_LABEL[key]}
+                </option>
+              ))}
+            </select>
+            <span className="picker-caret" aria-hidden="true">
+              ▾
+            </span>
+          </span>
+        </p>
+
+        <details className="board-filter-disclosure" ref={filterDetailsRef}>
+          <summary>{filtered ? `Filter · ${activeFilterCount} active` : "Filter"}</summary>
+          <div className="board-filters" role="group" aria-label="Filter the live board">
+            <FilterSelect
+              label="Pair token"
+              value={filters.pair}
+              onChange={(value) => updateFilters({ pair: value })}
+              options={pairOptions}
+            />
+            <FilterSelect
+              label="Creator tax"
+              value={filters.tax}
+              onChange={(value) => updateFilters({ tax: value })}
+              options={taxOptions}
+            />
+            <FilterSelect
+              label="Buys"
+              value={filters.hasBuys}
+              onChange={(value) => updateFilters({ hasBuys: value })}
+              options={hasBuysOptions}
+            />
+            <FilterNumber
+              label="Age from (s)"
+              value={filters.ageMin}
+              onChange={(value) => updateFilters({ ageMin: value })}
+            />
+            <FilterNumber
+              label="Age to (s)"
+              value={filters.ageMax}
+              onChange={(value) => updateFilters({ ageMax: value })}
+            />
+            {filtered ? (
+              <a
+                className="board-filters-reset"
+                href="?"
+                onClick={(event) => {
+                  event.preventDefault();
+                  resetFilters();
+                }}
+              >
+                Reset filters
+              </a>
+            ) : null}
+          </div>
+        </details>
       </div>
 
       {result === null ? <div className="hairline-pulse" /> : null}
@@ -588,23 +697,22 @@ export function LiveBoardFull(): ReactElement {
             <table>
               <caption>
                 One row per token, ranked only by a column printed on the row itself. Every cell
-                is a plain count or a fact about that token's own launch.
+                is a plain count or a fact about that token's own launch. Counted over{" "}
+                {windowCaption(pageRows)}.{" "}
+                {fillLabels(pageRows).map((label) => (
+                  <span key={label}>{label} </span>
+                ))}
               </caption>
               <thead>
                 <tr>
                   <th scope="col">Token</th>
                   <th scope="col">Pair</th>
                   <th scope="col">Creator tax</th>
-                  <th scope="col">Launch block</th>
                   <th scope="col">Age</th>
-                  <th scope="col">Last activity</th>
                   <th scope="col">Buys</th>
                   <th scope="col">Sells</th>
                   <th scope="col">First-block buyers</th>
-                  <th scope="col">Net quote</th>
-                  <th scope="col">Fill against own threshold</th>
-                  <th scope="col">Counted over</th>
-                  <th scope="col">State</th>
+                  <th scope="col">Fill</th>
                 </tr>
               </thead>
               <tbody>
@@ -628,27 +736,29 @@ export function LiveBoardFull(): ReactElement {
                       <a href={`/t/${row.token}`} title={row.token}>
                         {shortAddress(row.token)}
                       </a>
+                      {stateTags(row)}
                     </th>
                     <td className="fig n">{stripAddresses(pairLabel(row.pairClass))}</td>
                     <td className="fig n">
                       {row.creatorTaxBps === null ? "not read" : `${row.creatorTaxBps} bps`}
                     </td>
-                    <td className="fig n">{formatCount(row.launchBlock)}</td>
                     <td className="fig n">{formatAge(row.ageSeconds)}</td>
-                    <td className="fig n">{lastActivityAgo(row, body.observedAt)}</td>
                     <td className="fig n">{formatCount(row.buys)}</td>
                     <td className="fig n">{formatCount(row.sells)}</td>
                     {firstBlockBuyersCell(row.firstBlockBuyers)}
-                    <td className="fig n mono">{pairQuantity(row.netQuoteWei, row.pairDecimals, row.pairSymbol).text}</td>
-                    <FillCell row={row} />
-                    {windowCell(row)}
-                    <td className="thin">{row.graduated ? "graduated" : "on the curve"}</td>
+                    <FillCell row={row} compact />
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
+          {cardsUnscaled ? (
+            <p className="note note--fine live-cards-note">
+              Raw base units. This pair token&rsquo;s decimals are not known, so the figures are not
+              scaled.
+            </p>
+          ) : null}
           <ul className="live-cards" aria-label="Every curve with activity, sortable">
             {pageRows.map((row) => (
               <LiveCard key={row.token} row={row} observedAt={body.observedAt} onOpen={panel.open} />
@@ -671,6 +781,21 @@ export function LiveBoardFull(): ReactElement {
           ) : filteredRows.length === 0 ? (
             <p className="note note--fine">No launch matches these filters.</p>
           ) : null}
+
+          <details className="board-what-counts">
+            <summary>How these are counted</summary>
+            <p className="lede">
+              Buys, sells, and quote in and out are counted from indexed curve trades, not read
+              from the curve itself: the curve skims a fee and the creator tax off quote in before
+              its own reserve sees it, so the net-quote fill here is an upper bound on the curve's
+              real reserve, not a live read of it. A launch older than the indexed record has a
+              partial count, and its own row says so.
+            </p>
+            <p className="note">
+              Distinct first-block buyers is absent, never zero, when that launch's own block was
+              never indexed. Zero means the block was read and nobody bought in it.
+            </p>
+          </details>
         </>
       ) : null}
       {panel.token ? (

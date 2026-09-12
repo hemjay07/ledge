@@ -16,14 +16,6 @@ import { formatCount, formatDuration, rateText } from "../lib/format";
 
 afterEach(() => cleanup());
 
-  /* The per-page navigation moved into the shell (app/layout.tsx) on
-     2026-09-11, so a page no longer carries its own copy and these assertions
-     no longer belong here. The guarantee they protected -- that every
-     published surface stays reachable, which is what CONSTRAINTS 5 rests on --
-     was not dropped: it is asserted once against the shell itself in
-     tests/topbar.test.tsx, which is stricter, because a destination now has to
-     be reachable from EVERY page rather than from whichever pages happened to
-     have a test. */
 describe("the /graduated page's structure", () => {
   it("carries the ladder from number.json, with its n, as context", () => {
     const { container } = render(<Graduated />);
@@ -51,21 +43,26 @@ describe("the /graduated page's structure", () => {
   });
 
   /* Only the first page ships in the HTML -- 2,500+ rows in one document was
-     the 1.31 MB defect this pagination fixes (REVAMP.md). The page states
-     its own slice against the true total rather than rendering every row;
-     the assertion below follows that change rather than the old "every row
-     renders" behaviour it replaces, which is now the thing under test as a
-     regression, not the guarantee. */
-  it("renders only the first page (50 rows) at build time, with the duration visible on every row and the true total stated", () => {
+     the 1.31 MB defect this pagination fixes (REVAMP.md). The default sort
+     became most-recently-graduated on 2026-09-12 (REVAMP.md "the
+     amendment"), so the build-time slice is the newest rows, not the
+     fastest-first slice public/graduated.json is generated in -- the
+     assertion below follows that change rather than asserting against
+     graduatedFile.rows[0], which is the FASTEST row and is not guaranteed to
+     be among the newest 50. */
+  it("renders only the first page (50 rows) at build time, most-recently-graduated first, with the duration visible on every row and the true total stated", () => {
     const { container } = render(<Graduated />);
-    const rows = container.querySelectorAll(".graduated-board tbody tr");
+    const rows = container.querySelectorAll(".graduated-table-wrap tbody tr");
     expect(rows).toHaveLength(Math.min(PAGE_SIZE, graduatedFile.rows.length));
-    if (graduatedFile.rows[0]) {
-      expect(container.textContent).toContain(formatDuration(graduatedFile.rows[0].durationSeconds));
+
+    const newestFirst = [...graduatedFile.rows].sort(
+      (a, b) => Date.parse(b.graduatedAt) - Date.parse(a.graduatedAt),
+    );
+    if (newestFirst[0]) {
+      expect(container.textContent).toContain(formatDuration(newestFirst[0].durationSeconds));
     }
     expect(container.textContent).toContain(formatCount(graduatedFile.rows.length));
   });
-
 
   it("carries no per-token score, grade, or verdict vocabulary", () => {
     const { container } = render(<Graduated />);

@@ -1,23 +1,27 @@
 /* The live board: one row per token with indexed curve activity
    (REPOSITION.md Phase B1).
 
-   THIS IS THE OPPOSITE FILE FROM lookup.ts. lookup.ts reads one token and
-   can afford a live RPC call; this reads up to a few hundred at once and
-   cannot -- 121 live curves at three reads each would be 363 subrequests
-   against a free-plan budget of 50 (REPOSITION.md "What has to be built").
-   So every row here comes from D1 alone: the curve is never read, and the
-   fill this board reports is an INDEXED figure, not the live one.
+   THE FILL IS NOW A REAL READING (2026-09-12). Until this date every row's
+   fill compared the graduation threshold against an INDEXED net quote --
+   quoteIn minus quoteOut, summed off the CurveBuy/CurveSell logs the tick
+   folds (worker/src/activity.ts) -- because reading up to a few hundred
+   curves live, one eth_call each, would have cost hundreds of subrequests
+   against a 40-subrequest budget (worker/src/rpc.ts SUBREQUEST_BUDGET). That
+   figure was wrong on wash-traded curves by orders of magnitude: CurveBuy's
+   own data layout carries [2]=fee [3]=tax, skimmed off quoteIn before the
+   curve's reserve ever sees it, so a curve holding 0.007 ETH could show
+   -1.40 ETH indexed, and one holding 2.82 ETH could show 8.65 ETH -- neither
+   an upper bound on anything, both worse than no figure at all.
 
-   WHY THE INDEXED FIGURE IS NOT THE CURVE'S FIGURE. worker/src/curve.ts reads
-   realQuoteReserve() directly and is exact. This board instead sums quoteIn
-   and quoteOut off the CurveBuy/CurveSell logs the tick already folded
-   (worker/src/activity.ts) and nets them. But CurveBuy's own data layout
-   carries [2]=fee [3]=tax -- the curve skims both off quoteIn before the
-   reserve sees it -- so the indexed net quote is always at or above the
-   curve's real reserve, never below it, and never equal to it once either fee
-   or tax is nonzero. Every row says so in its own `fill.label`, not only in
-   this comment, because a reader who never opens the source must be able to
-   tell the two figures apart from the payload alone.
+   worker/src/reserve.ts fixes the cost problem, not just the accuracy one:
+   Multicall3's aggregate3() reads every curve's realQuoteReserve() and
+   graduated() in ONE eth_call, one subrequest, covering the whole board
+   population every tick. worker/src/tick.ts writes what comes back into
+   token_activity.reserve_wei / reserve_block, and this file reads those two
+   columns for `fill` -- never the curve, and never the indexed net quote.
+   `netQuoteWei` stays on every row regardless: it is still a true observed
+   quantity (this tick's quoteIn minus quoteOut), just no longer what fill is
+   measured against.
 
    NO STATISTIC IS COMPUTED HERE. Counts, sums and one subtraction
    (quoteIn - quoteOut, Class B: two observed quantities about one token, not
@@ -61,7 +65,7 @@ export const BOARD_QUERY = `
          l.block, l.ts,
          EXISTS (SELECT 1 FROM graduation g WHERE g.token = l.token) AS graduated,
          a.from_block, a.buys, a.sells, a.quote_in, a.quote_out, a.first_block_buyers,
-         a.last_activity_ts
+         a.last_activity_ts, a.reserve_wei, a.reserve_block
     FROM token_activity a
     JOIN launch l
       ON l.token = a.token
@@ -86,6 +90,12 @@ export interface BoardDbRow {
   quote_out: string;
   first_block_buyers: number | null;
   last_activity_ts: number;
+  /** realQuoteReserve(), read from the curve by worker/src/reserve.ts. NULL
+      means this token has never been read this way -- not zero, which is a
+      real reading a drained or graduated curve can give. */
+  reserve_wei: string | null;
+  /** The block reserve_wei was read at. NULL exactly when reserve_wei is. */
+  reserve_block: number | null;
 }
 
 export interface BoardWindow {
@@ -103,6 +113,12 @@ export interface BoardWindow {
 
 export interface BoardFill {
   graduationThresholdWei: string;
+  /** realQuoteReserve(), read straight from the curve -- never the indexed
+      net quote. */
+  reserveWei: string;
+  /** The block reserveWei was read at, so its age is legible next to the
+      figure without a second lookup. */
+  readAtBlock: number;
   label: string;
 }
 
@@ -124,8 +140,10 @@ export interface BoardRow {
   firstBlockBuyers: number | null;
   lastActivityAt: string;
   window: BoardWindow;
-  /** Null when the launch carries no threshold (enrichment failed): a guessed
-      fill is worse than none, so the row renders no fill at all. */
+  /** Null when the launch carries no threshold (enrichment failed) or the
+      curve has never been read (reserve_wei still NULL): a guessed or
+      indexed-only fill is worse than none, so the row renders no fill bar at
+      all rather than a figure that cannot be trusted. */
   fill: BoardFill | null;
   /** The pair token's own units, so a reader sees "4.2 ETH" rather than
       4200000000000000000. Resolved WITHOUT a chain call: the zero address is
@@ -139,31 +157,81 @@ export interface BoardRow {
   pairSymbol: string | null;
 }
 
-/** Decimals and symbol from the map alone. No RPC, no KV read per row. */
+/** One `pair_token` row, as read straight off worker/schema.sql's read-once
+    decimals()/symbol() cache (worker/src/reserve.ts, worker/src/tick.ts,
+    2026-09-12). Both fields are independently nullable: a row existing means
+    the read was attempted, not that it succeeded. */
+export interface DbPairToken {
+  decimals: number | null;
+  symbol: string | null;
+}
+
+/** Builds the lookup pairUnits consults first, from every row `pair_token`
+    holds -- loaded ONCE per request (worker/src/index.ts), never once per
+    board row. */
+export function pairTokenMapFromRows(
+  rows: Array<{ address: string; decimals: number | null; symbol: string | null }>,
+): Map<string, DbPairToken> {
+  const map = new Map<string, DbPairToken>();
+  for (const row of rows) {
+    map.set(row.address.toLowerCase(), { decimals: row.decimals, symbol: row.symbol });
+  }
+  return map;
+}
+
+/** Decimals and symbol, checked in a fixed order and never guessed at
+    (2026-09-12 -- this is the second source consulted, not the only one:
+    see the module comment's "THE FILL IS NOW A REAL READING" for the reserve
+    side of the same date's fix):
+
+      1. the zero address is ETH at 18, by the factory's own definition --
+         never touches either map
+      2. `dbPairTokens`, the live `pair_token` table cache: a HIT here is
+         used exactly as read, decimals/symbol and all, even when one or
+         both are NULL (a read that was attempted and failed is not a miss
+         to fall back past -- see worker/schema.sql's table comment)
+      3. `map`, the static registry (data/pair-tokens.json via KV) -- only
+         consulted on a genuine table MISS
+      4. null, and the caller prints the raw integer and says the units are
+         not known
+
+    No RPC, no KV read, no chain call per row -- both maps are loaded once,
+    outside this function, by the caller. */
 export function pairUnits(
   pairToken: string,
+  dbPairTokens: Map<string, DbPairToken> | null,
   map: Record<string, PairTokenEntry> | null,
 ): { pairDecimals: number | null; pairSymbol: string | null } {
   const address = pairToken.toLowerCase();
+  if (address === ZERO_ADDRESS) return { pairDecimals: ETH_DECIMALS, pairSymbol: "ETH" };
+
+  const dbEntry = dbPairTokens?.get(address);
+  if (dbEntry) return { pairDecimals: dbEntry.decimals, pairSymbol: dbEntry.symbol };
+
   const symbol = pairSymbolOf(pairToken, map);
-  if (address === ZERO_ADDRESS) return { pairDecimals: ETH_DECIMALS, pairSymbol: symbol ?? "ETH" };
   const decimals = (map?.[address] as (PairTokenEntry & { decimals?: number }) | undefined)
     ?.decimals;
   return { pairDecimals: typeof decimals === "number" ? decimals : null, pairSymbol: symbol };
 }
 
-/** Every reader of this figure is owed the same sentence the module comment
-    carries, in the payload itself: counted from indexed trades, not read
-    from the curve, and an upper bound on the curve's real reserve because the
-    curve skims fee and creator tax off quoteIn (CurveBuy data words
-    [2]=fee [3]=tax) before the reserve ever sees it. */
-export const NET_QUOTE_LABEL =
-  "indexed net quote (quote in minus quote out), counted from indexed trades, not read from the curve. " +
-  "The curve itself skims a fee and the creator tax off quote in before its reserve sees it, so this figure " +
-  "is an upper bound on the curve's real reserve, not the reading /t/{address} shows.";
-
 function netQuote(row: BoardDbRow): bigint {
   return BigInt(row.quote_in) - BigInt(row.quote_out);
+}
+
+/** Null whenever there is no threshold to measure against, or the curve has
+    never been read this way -- reserve_wei/reserve_block are NULL together
+    (schema.sql) so one check covers both. A row this returns null for still
+    carries netQuoteWei, quoteIn and quoteOut on the row itself; it renders no
+    bar, not a wrong one. */
+function fillOf(row: BoardDbRow): BoardFill | null {
+  if (row.graduation_threshold === null) return null;
+  if (row.reserve_wei === null || row.reserve_block === null) return null;
+  return {
+    graduationThresholdWei: row.graduation_threshold,
+    reserveWei: row.reserve_wei,
+    readAtBlock: row.reserve_block,
+    label: `read from the curve at block ${row.reserve_block}`,
+  };
 }
 
 function windowOf(row: BoardDbRow, toBlock: number): BoardWindow {
@@ -184,6 +252,7 @@ function rowOf(
   toBlock: number,
   nowSeconds: number,
   pairTokens: Record<string, PairTokenEntry> | null,
+  dbPairTokens: Map<string, DbPairToken> | null,
 ): BoardRow {
   return {
     token: row.token,
@@ -201,11 +270,8 @@ function rowOf(
     firstBlockBuyers: row.first_block_buyers,
     lastActivityAt: toIso(row.last_activity_ts),
     window: windowOf(row, toBlock),
-    fill:
-      row.graduation_threshold === null
-        ? null
-        : { graduationThresholdWei: row.graduation_threshold, label: NET_QUOTE_LABEL },
-    ...pairUnits(row.pair_token, pairTokens),
+    fill: fillOf(row),
+    ...pairUnits(row.pair_token, dbPairTokens, pairTokens),
   };
 }
 
@@ -245,9 +311,10 @@ export function buildBoardRows(
   sort: BoardSortKey,
   limit = 200,
   pairTokens: Record<string, PairTokenEntry> | null = null,
+  dbPairTokens: Map<string, DbPairToken> | null = null,
 ): BoardRow[] {
   const toBlock = cursor ? cursor.last_indexed_block : 0;
   return sortDbRows(dbRows, sort)
     .slice(0, limit)
-    .map((row) => rowOf(row, toBlock, nowSeconds, pairTokens));
+    .map((row) => rowOf(row, toBlock, nowSeconds, pairTokens, dbPairTokens));
 }

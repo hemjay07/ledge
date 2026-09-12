@@ -29,6 +29,10 @@ export async function reset(): Promise<void> {
     env.LEDGE_DB.prepare("DELETE FROM activity_unattributed"),
     env.LEDGE_DB.prepare("DELETE FROM tg_usage"),
     env.LEDGE_DB.prepare("DELETE FROM graveyard_posted"),
+    // pair_token (2026-09-12): the read-once decimals()/symbol() cache
+    // worker/src/tick.ts fills, cleared between tests the same way every
+    // other tick-owned table is.
+    env.LEDGE_DB.prepare("DELETE FROM pair_token"),
   ]);
   await env.LEDGE_KV.put(KV_NUMBER, JSON.stringify(numberFixture));
   await env.LEDGE_KV.put(KV_PAIR_TOKENS, JSON.stringify(pairTokens));

@@ -1,22 +1,30 @@
 "use client";
 
-/* The graveyard: launches LEDGE has indexed that took zero buys, at least 72
-   hours after their own launch block. Reuses /live's own vocabulary --
-   `.live-board`, `.live-sort`, `.scroller`, `.fig`, `.thin`, `.note--fine` --
-   rather than inventing a second visual language for what is structurally
-   the same kind of page: one row per token, sortable by a column every row
+/* /graveyard: the 93.5% made concrete. Nobody browses several thousand dead
+   launches -- the count is the product and the list beneath it is secondary
+   evidence, not the headline (REVAMP.md 2026-09-12, "the amendment", boards
+   rebuild). The card leads with the count itself, large, in the same display
+   face the homepage LIVE pulse uses -- but plain ink, never `--fill`: this is
+   not live good news, it is a dead-launch count, and the one hue this site
+   spends on liveness would say the wrong thing about it.
+
+   Reuses /live's own vocabulary -- `.card`, `.card-header`, `.board-controls`,
+   `.board-filter-disclosure`, `.board-what-counts`, `.state-tag`, `.live-card`
+   -- rather than inventing a second visual language for what is structurally
+   the same kind of board: one row per token, sortable by a column every row
    already shows (CONSTRAINTS 1), no score, no grade, no verdict.
 
    THE SCOPE CAVEAT IS NOT A FOOTNOTE. worker/src/graveyard.ts carries the
    full reasoning: a launch whose entire life happened before LEDGE started
    recording curve activity has no row here at all, and the reader is owed
-   that before the table, not after it -- a count that looks complete without
-   saying so is the denominator defect CONSTRAINTS 3 exists to catch. */
+   that before the table, not after it. It is now stated once, in one
+   sentence beside the count, with the full reasoning collapsed into "What
+   this can and cannot see" at the bottom, verbatim -- a caveat moved into a
+   caption or a details element is not a caveat hidden. */
 
-import { useEffect, useMemo, useState, type MouseEvent, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
   fetchGraveyard,
-  stripAddresses,
   type GraveyardResult,
   type GraveyardSortKey,
 } from "../lib/api";
@@ -32,7 +40,11 @@ import { mergeQuery, readQuery, readQueryInt } from "../lib/query-state";
 import { formatAge, formatCount, pairLabel, taxLabel } from "../lib/format";
 
 const REFRESH_MS = 15_000;
-const DEFAULT_SORT: GraveyardSortKey = "age";
+
+/* A visitor here wants to know what most recently crossed the 72-hour gate,
+   not the oldest dead launch on record -- so the default ranks by recency.
+   Oldest-first stays one click away in the same select. */
+const DEFAULT_SORT: GraveyardSortKey = "newest";
 
 type Row = GraveyardResponse["rows"][number];
 
@@ -49,11 +61,6 @@ function sortFromLocation(): GraveyardSortKey {
     : DEFAULT_SORT;
 }
 
-/* Page and every filter (REVAMP.md pagination and filters), read off the
-   address bar once on mount, the same way sortFromLocation already reads
-   `?sort=`. /graveyard already fetches every row it will ever hold for a
-   given sort in one request -- the API caps at 200 -- so page and filters
-   narrow what is already in hand rather than triggering a second fetch. */
 interface GraveyardFilters {
   pair: string; // "" = all, or a lib/board-buckets PAIR_BUCKETS value
   tax: string; // "" = all, "not-read", or a lib/board-buckets TAX_BUCKETS value
@@ -129,12 +136,19 @@ function firstBlockBuyersCell(value: number | null): ReactElement {
   );
 }
 
-function scopeNote(body: GraveyardResponse): ReactElement {
-  return (
-    <p className="note" style={{ marginBottom: "1rem" }}>
-      {body.scope.label}
-    </p>
-  );
+function firstBlockBuyersText(value: number | null): string {
+  return value === null ? "not indexed" : `${formatCount(value)} first-block buyers`;
+}
+
+/** A UTC calendar date, no time -- "6 Sep 2026" -- for the scope sentence's
+    "oldest launched {date}". Local, not lib/format-core.mjs: no other caller
+    on the site needs a date without a time, and format-core.mjs is shared
+    with scripts/og.mjs's own card renderer. */
+function dateOnly(iso: string | null): string {
+  if (iso === null) return "an unknown time";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "an unreadable time";
+  return d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 function stalenessNote(body: GraveyardResponse): ReactElement | null {
@@ -147,17 +161,69 @@ function stalenessNote(body: GraveyardResponse): ReactElement | null {
   );
 }
 
+/* One quiet row per token below the table's own breakpoint -- deliberately
+   smaller than /live's or /graduated's own cards, because this board's job
+   is not to be browsed. */
+function GraveyardCard({
+  row,
+  onOpen,
+}: {
+  row: Row;
+  onOpen: (address: string, trigger: HTMLElement | null) => void;
+}): ReactElement {
+  return (
+    <li
+      className="live-card graveyard-card row-clickable"
+      tabIndex={0}
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest("a")) return;
+        onOpen(row.token, event.currentTarget);
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if ((event.target as HTMLElement).closest("a")) return;
+        event.preventDefault();
+        onOpen(row.token, event.currentTarget);
+      }}
+    >
+      <a className="live-card-token mono" href={`/t/${row.token}`} title={row.token}>
+        {`${row.token.slice(0, 10)}…${row.token.slice(-6)}`}
+      </a>
+      {row.window.partial ? (
+        <span className="mono state-tag is-partial" title={row.window.label}>
+          partial
+        </span>
+      ) : null}
+      <p className="note note--fine live-card-analyst">
+        {formatAge(row.ageSeconds)} old · 0 buys · {formatCount(row.sells)} sells ·{" "}
+        {firstBlockBuyersText(row.firstBlockBuyers)}
+      </p>
+      <p className="note note--fine live-card-analyst">
+        {pairLabel(row.pairClass)} ·{" "}
+        {row.creatorTaxBps === null ? "creator tax not read" : `${row.creatorTaxBps} bps`}
+      </p>
+    </li>
+  );
+}
+
 export function GraveyardBoard(): ReactElement {
   const [sort, setSort] = useState<GraveyardSortKey>(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<GraveyardFilters>(DEFAULT_GRAVEYARD_FILTERS);
   const panel = useTokenPanel();
+  const filterDetailsRef = useRef<HTMLDetailsElement | null>(null);
 
   useEffect(() => {
     const next = graveyardStateFromLocation();
     setSort(next.sort);
     setPage(next.page);
     setFilters(next.filters);
+  }, []);
+
+  useEffect(() => {
+    const details = filterDetailsRef.current;
+    if (!details || typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    details.open = window.matchMedia("(min-width: 64rem)").matches;
   }, []);
 
   const result = useGraveyard(sort);
@@ -173,12 +239,9 @@ export function GraveyardBoard(): ReactElement {
   const pageRows = useMemo(() => paginate(filteredRows, clampedPage), [filteredRows, clampedPage]);
 
   function chooseSort(key: GraveyardSortKey) {
-    return (event: MouseEvent<HTMLAnchorElement>) => {
-      event.preventDefault();
-      setSort(key);
-      setPage(1);
-      mergeQuery({ sort: key === DEFAULT_SORT ? null : key, page: null });
-    };
+    setSort(key);
+    setPage(1);
+    mergeQuery({ sort: key === DEFAULT_SORT ? null : key, page: null });
   }
 
   function updateFilters(patch: Partial<GraveyardFilters>) {
@@ -224,59 +287,94 @@ export function GraveyardBoard(): ReactElement {
     return `${shown} of ${matched} matching launches shown (${matched} of ${formatCount(body.count)} total)`;
   }
 
+  const ageText =
+    result !== null && result.kind === "error"
+      ? "unreachable"
+      : body === null
+        ? "…"
+        : `updated ${formatAge(Math.max(0, Math.round((Date.now() - Date.parse(body.observedAt)) / 1000)))} ago`;
+
   return (
-    <div className="live-board">
-      {body !== null ? scopeNote(body) : null}
+    <div className="card graveyard-board">
+      <div className="card-header">
+        <span className="kicker card-kicker">GRAVEYARD</span>
+        <span className="note note--fine mono">{ageText}</span>
+      </div>
 
-      <nav className="sheet-nav live-sort" aria-label="Sort the graveyard">
-        {GRAVEYARD_SORT_KEYS.map((key) =>
-          key === sort ? (
-            <span key={key} aria-current="true" className="live-sort-current">
-              {SORT_LABEL[key]}
+      {body !== null ? (
+        <div className="graveyard-lead">
+          <span className="graveyard-figure mono">{formatCount(body.count)}</span>
+          <p className="note graveyard-lead-caption">
+            launches at zero buys, 72 h or older, of the {formatCount(body.scope.indexedLaunches)} the
+            activity index holds (oldest launched {dateOnly(body.scope.earliestIndexedLaunchAt)}). A
+            launch outside that record is not counted.
+          </p>
+        </div>
+      ) : null}
+
+      <div className="board-controls">
+        <p className="picker-field live-sort-field">
+          <label className="picker-label" htmlFor="graveyard-sort">
+            Sort
+          </label>
+          <span className="picker-line">
+            <select
+              className="picker-select mono"
+              id="graveyard-sort"
+              value={sort}
+              onChange={(event) => chooseSort(event.target.value as GraveyardSortKey)}
+            >
+              {GRAVEYARD_SORT_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {SORT_LABEL[key]}
+                </option>
+              ))}
+            </select>
+            <span className="picker-caret" aria-hidden="true">
+              ▾
             </span>
-          ) : (
-            <a key={key} href={`?sort=${key}`} onClick={chooseSort(key)}>
-              {SORT_LABEL[key]}
-            </a>
-          ),
-        )}
-      </nav>
+          </span>
+        </p>
 
-      <div className="board-filters" role="group" aria-label="Filter the graveyard">
-        <FilterSelect
-          label="Pair token"
-          value={filters.pair}
-          onChange={(value) => updateFilters({ pair: value })}
-          options={pairOptions}
-        />
-        <FilterSelect
-          label="Creator tax"
-          value={filters.tax}
-          onChange={(value) => updateFilters({ tax: value })}
-          options={taxOptions}
-        />
-        <FilterNumber
-          label="Age from (s)"
-          value={filters.ageMin}
-          onChange={(value) => updateFilters({ ageMin: value })}
-        />
-        <FilterNumber
-          label="Age to (s)"
-          value={filters.ageMax}
-          onChange={(value) => updateFilters({ ageMax: value })}
-        />
-        {filtered ? (
-          <a
-            className="board-filters-reset"
-            href="?"
-            onClick={(event) => {
-              event.preventDefault();
-              resetFilters();
-            }}
-          >
-            Reset filters
-          </a>
-        ) : null}
+        <details className="board-filter-disclosure" ref={filterDetailsRef}>
+          <summary>{filtered ? "Filter · active" : "Filter"}</summary>
+          <div className="board-filters" role="group" aria-label="Filter the graveyard">
+            <FilterSelect
+              label="Pair token"
+              value={filters.pair}
+              onChange={(value) => updateFilters({ pair: value })}
+              options={pairOptions}
+            />
+            <FilterSelect
+              label="Creator tax"
+              value={filters.tax}
+              onChange={(value) => updateFilters({ tax: value })}
+              options={taxOptions}
+            />
+            <FilterNumber
+              label="Age from (s)"
+              value={filters.ageMin}
+              onChange={(value) => updateFilters({ ageMin: value })}
+            />
+            <FilterNumber
+              label="Age to (s)"
+              value={filters.ageMax}
+              onChange={(value) => updateFilters({ ageMax: value })}
+            />
+            {filtered ? (
+              <a
+                className="board-filters-reset"
+                href="?"
+                onClick={(event) => {
+                  event.preventDefault();
+                  resetFilters();
+                }}
+              >
+                Reset filters
+              </a>
+            ) : null}
+          </div>
+        </details>
       </div>
 
       {result === null ? <div className="hairline-pulse" /> : null}
@@ -286,41 +384,28 @@ export function GraveyardBoard(): ReactElement {
 
       {body !== null ? (
         <>
-          <p className="note note--fine">
-            {countLine(body)} · page {clampedPage} of {pages} · sorted by{" "}
-            {SORT_LABEL[body.sortedBy]}
-            {" · "}
-            <span className={body.live.stale ? "mono is-stale" : "mono"}>
-              observed {formatAge(Math.max(0, Math.round((Date.now() - Date.parse(body.observedAt)) / 1000)))} ago
-            </span>
-          </p>
-          {stalenessNote(body)}
-          <div className="scroller" tabIndex={0} role="group" aria-label="Launches at zero buys, sortable">
+          <div
+            className="scroller graveyard-table-wrap"
+            tabIndex={0}
+            role="group"
+            aria-label="Launches at zero buys, sortable"
+          >
             <table>
               <caption>
-                One row per token, ranked only by a column printed on the row itself. Every launch
-                here has taken zero buys since its own launch block, at least {formatAge(body.scope.ageCutoffSeconds)}
-                {" "}
-                ago. Counts run from the block in the last column up to{" "}
-                {body.lastIndexedBlock === null
-                  ? "the last block this index read"
-                  : `block ${formatCount(body.lastIndexedBlock)}`}
-                . A row marked{" "}
-                <span className="mono is-partial">partial</span> launched before this index began
-                recording, so trades before its own start block are not counted and its true totals
-                can only be higher.
+                One row per token, ranked only by a column printed on the row itself, every one at
+                zero buys since its own launch block, at least {formatAge(body.scope.ageCutoffSeconds)}{" "}
+                ago; a row marked <span className="mono is-partial">partial</span> launched before
+                this index began recording, so trades before its own start block are not counted and
+                its true totals can only be higher.
               </caption>
               <thead>
                 <tr>
                   <th scope="col">Token</th>
                   <th scope="col">Pair</th>
                   <th scope="col">Creator tax</th>
-                  <th scope="col">Launch block</th>
                   <th scope="col">Age</th>
-                  <th scope="col">Buys</th>
                   <th scope="col">Sells</th>
                   <th scope="col">First-block buyers</th>
-                  <th scope="col">Counted from</th>
                 </tr>
               </thead>
               <tbody>
@@ -341,42 +426,44 @@ export function GraveyardBoard(): ReactElement {
                     }}
                   >
                     <th scope="row" className="mono">
-                      {row.token}
+                      <a href={`/t/${row.token}`} title={row.token}>
+                        {`${row.token.slice(0, 10)}…${row.token.slice(-6)}`}
+                      </a>
+                      {row.window.partial ? (
+                        <span className="mono state-tag is-partial" title={row.window.label}>
+                          {" "}
+                          partial
+                        </span>
+                      ) : null}
                     </th>
-                    <td className="fig n">{stripAddresses(pairLabel(row.pairClass))}</td>
+                    <td className="fig n">{pairLabel(row.pairClass)}</td>
                     <td className="fig n">
                       {row.creatorTaxBps === null ? "not read" : `${row.creatorTaxBps} bps`}
                     </td>
-                    <td className="fig n">{formatCount(row.launchBlock)}</td>
                     <td className="fig n">{formatAge(row.ageSeconds)}</td>
-                    <td className="fig n">0</td>
                     <td className="fig n">{formatCount(row.sells)}</td>
                     {firstBlockBuyersCell(row.firstBlockBuyers)}
-                    {/* The block this row's counts start from, and a marker
-                        when they are partial. NOT the full explanation.
-
-                        This cell used to render `row.window.label` verbatim,
-                        which is a forty-word sentence naming both bounds and
-                        explaining what partial means. Repeated down two hundred
-                        rows it wrapped into a narrow column, made every row
-                        about 450px tall, and pushed the token address off the
-                        screen. CONSTRAINTS 3 requires the counts to carry their
-                        window; it does not require the window to be restated in
-                        prose on every line. It is stated once above the table,
-                        which is where a reader can actually read it. */}
-                    <td className="fig n">
-                      {formatCount(row.window.fromBlock)}
-                      {row.window.partial ? (
-                        <span className="mono is-partial" title="Counts start at this block; trades before it are not counted">
-                          {" "}· partial
-                        </span>
-                      ) : null}
-                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          <ul className="graveyard-cards" aria-label="Launches at zero buys, sortable">
+            {pageRows.map((row) => (
+              <GraveyardCard key={row.token} row={row} onOpen={panel.open} />
+            ))}
+          </ul>
+
+          <p className="note note--fine">
+            {countLine(body)} · page {clampedPage} of {pages} · sorted by{" "}
+            {SORT_LABEL[body.sortedBy]}
+            {" · "}
+            <span className={body.live.stale ? "mono is-stale" : "mono"}>
+              observed {formatAge(Math.max(0, Math.round((Date.now() - Date.parse(body.observedAt)) / 1000)))} ago
+            </span>
+          </p>
+          {stalenessNote(body)}
 
           <Pager page={clampedPage} totalPages={pages} onChange={choosePage} label="Page through the graveyard" />
 
@@ -388,6 +475,28 @@ export function GraveyardBoard(): ReactElement {
           ) : filteredRows.length === 0 ? (
             <p className="note note--fine">No launch matches these filters.</p>
           ) : null}
+
+          <details className="board-what-counts">
+            <summary>What this can and cannot see</summary>
+            <p className="lede">
+              A launch appears here only after at least 72 hours with no buy since its own launch
+              block. The activity index that feeds this page only began recording curve trades
+              recently: a launch that finished its whole life before that start has no row here at
+              all, and its absence means it was never measured -- it does not mean the launch took a
+              buy. The exact count of launches the index currently holds, and the oldest one among
+              them, is printed above the table on every load.
+            </p>
+            <p className="lede">
+              Buys and sells are counted from indexed curve trades. A row's buy count is always
+              zero -- that is the gate a launch has to meet to appear here at all -- and its sell
+              count is whatever LEDGE indexed regardless. A launch older than the indexed record has
+              a partial count, and its own row says so.
+            </p>
+            <p className="note">
+              Distinct first-block buyers is absent, never zero, when that launch's own block was
+              never indexed. Zero means the block was read and nobody bought in it.
+            </p>
+          </details>
         </>
       ) : null}
       {panel.token ? (

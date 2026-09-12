@@ -7,6 +7,13 @@ import { pairUnits } from "../../src/board";
    of magnitude -- decimals.ts's rule, which this must not quietly break for
    the sake of a tidier board. The board resolves units from the pair-token
    map alone: 121 rows could never afford a decimals() call each. */
+/* 2026-09-12: pairUnits gained a second parameter, the live `pair_token`
+   table cache, consulted BEFORE the static registry map so a real pair token
+   the registry has never classified (a tokenized-stock pair, say) can still
+   show real units once worker/src/reserve.ts has read it once. Every call
+   below that exercises the registry-only path now passes `null` for that new
+   first map, which reproduces the exact old "registry alone" behaviour these
+   tests were written to check. */
 describe("the board's pair units", () => {
   const map = {
     "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": { class: "stable", symbol: "USDG", decimals: 6 },
@@ -14,30 +21,76 @@ describe("the board's pair units", () => {
   };
 
   it("reads the zero address as ETH at 18, by the factory's own definition", () => {
-    expect(pairUnits("0x0000000000000000000000000000000000000000", null)).toEqual({
+    expect(pairUnits("0x0000000000000000000000000000000000000000", null, null)).toEqual({
       pairDecimals: 18,
       pairSymbol: "ETH",
     });
   });
 
   it("takes decimals and symbol from the map when the map carries them", () => {
-    expect(pairUnits("0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", map)).toEqual({
+    expect(pairUnits("0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", null, map)).toEqual({
       pairDecimals: 6,
       pairSymbol: "USDG",
     });
   });
 
   it("returns null decimals rather than assuming 18 when the map has none", () => {
-    expect(pairUnits("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", map)).toEqual({
+    expect(pairUnits("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", null, map)).toEqual({
       pairDecimals: null,
       pairSymbol: "TSLAX",
     });
   });
 
   it("returns null for both when the pair token is not in the map at all", () => {
-    expect(pairUnits("0xcccccccccccccccccccccccccccccccccccccccc", map)).toEqual({
+    expect(pairUnits("0xcccccccccccccccccccccccccccccccccccccccc", null, map)).toEqual({
       pairDecimals: null,
       pairSymbol: null,
+    });
+  });
+});
+
+/* The `pair_token` table lookup path (2026-09-12): board.ts's own D1-backed
+   cache, checked before the static registry map and never fallen through on
+   a NULL field within a row that exists -- only a genuine table MISS falls
+   back to the registry. */
+describe("the board's pair units — pair_token table cache", () => {
+  const registry = {
+    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": { class: "stable", symbol: "USDG", decimals: 6 },
+  };
+
+  it("table hit: uses the table's decimals/symbol, not the registry's", () => {
+    const db = new Map([
+      ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", { decimals: 8, symbol: "USDG8" }],
+    ]);
+    expect(pairUnits("0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", db, registry)).toEqual({
+      pairDecimals: 8,
+      pairSymbol: "USDG8",
+    });
+  });
+
+  it("table miss: falls back to the registry map", () => {
+    const db = new Map([["0xdddddddddddddddddddddddddddddddddddddddd", { decimals: 18, symbol: "OTHER" }]]);
+    expect(pairUnits("0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", db, registry)).toEqual({
+      pairDecimals: 6,
+      pairSymbol: "USDG",
+    });
+  });
+
+  it("a table row with NULL decimals never guesses from the registry", () => {
+    const db = new Map([
+      ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", { decimals: null, symbol: null }],
+    ]);
+    expect(pairUnits("0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", db, registry)).toEqual({
+      pairDecimals: null,
+      pairSymbol: null,
+    });
+  });
+
+  it("the zero address is ETH/18 before either map is consulted", () => {
+    const db = new Map([["0x0000000000000000000000000000000000000000", { decimals: 6, symbol: "WRONG" }]]);
+    expect(pairUnits("0x0000000000000000000000000000000000000000", db, null)).toEqual({
+      pairDecimals: 18,
+      pairSymbol: "ETH",
     });
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { GraveyardBoard } from "../components/Graveyard";
 import graveyard from "./api-fixtures/graveyard-ok.json";
 import { PAGE_SIZE, totalPagesFor } from "../lib/paginate";
@@ -60,7 +60,7 @@ describe("the graveyard's filters", () => {
     const { container } = render(<GraveyardBoard />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(PAGE_SIZE));
 
-    const pairSelect = container.querySelector('select[id]') as HTMLSelectElement;
+    const pairSelect = screen.getByLabelText("Pair token") as HTMLSelectElement;
     fireEvent.change(pairSelect, { target: { value: "stable" } });
 
     // 55 rows, odd index -> stable: 27

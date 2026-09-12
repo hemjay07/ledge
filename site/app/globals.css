@@ -1689,16 +1689,40 @@ footer {
   margin-top: var(--s-3);
 }
 
-/* The sort control on /live: the same ruled-index vocabulary as .sheet-nav,
-   not a control panel. The active sort is set plain and bold rather than in
-   colour — CONSTRAINTS 1 permits the ordering, not a highlight that reads as
-   a verdict on the column itself. */
-.live-sort {
-  padding-top: 0;
+/* /live's own controls row (REVAMP.md 2026-09-12, "the homepage direction"):
+   one `<select>` for sort, in the same `.picker-*` vocabulary FilterField.tsx
+   already uses, and a `<details>` disclosure holding the five filters -- open
+   by default at >=64rem, closed below, so a phone's first screen is the board
+   itself rather than five empty fields (LIVE-FINDINGS.md #4). */
+.board-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--s-4) var(--s-8);
+  margin-top: var(--s-3);
 }
-.live-sort-current {
-  color: var(--ink);
-  font-weight: 700;
+.live-sort-field {
+  min-width: 12rem;
+}
+.board-filter-disclosure > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  list-style: none;
+  padding: 0.4rem 0;
+}
+.board-filter-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.board-filter-disclosure > summary::before {
+  content: "▸ ";
+}
+.board-filter-disclosure[open] > summary::before {
+  content: "▾ ";
 }
 
 /* The filter row: the same ruled fields as .picker (ConfigGrid), reused
@@ -1729,6 +1753,23 @@ footer {
   padding-bottom: var(--s-1);
 }
 
+/* "How these are counted" (REVAMP.md 2026-09-12): the full method note, kept
+   in the document in full and collapsed by default -- a <details> rather than
+   a folio-numbered section, since the board it explains is now the whole
+   page. */
+.board-what-counts {
+  margin-top: var(--s-5);
+}
+.board-what-counts > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: 0.4rem 0;
+}
+.board-what-counts .lede {
+  margin-top: var(--s-3);
+}
+
 /* The pager: .sheet-nav's own vocabulary, plain links either side of the
    position stated in words -- "Page 3 of 51" is what keeps a slice of the
    record from reading as the whole of it. */
@@ -1752,6 +1793,21 @@ footer {
   font-weight: 600;
 }
 
+/* The one state fact CONSTRAINTS 1 permits printing about a token itself:
+   "graduated", or "partial" for a row whose own window predates the indexed
+   record. Quieter than the address it follows -- a fact travelling with the
+   door, not a second door and not a verdict. */
+.state-tag {
+  display: block;
+  font-size: var(--fs-fine);
+  color: var(--ink-3);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+.state-tag.is-partial {
+  font-weight: 600;
+}
+
 /* The fill rule. A launch's own net quote against its own threshold — never
    a borrowed constant, never a lone percentage: the two base-unit figures
    stand beside the bar, the percentage (when the threshold parses) beside
@@ -1760,8 +1816,66 @@ footer {
    the two cannot compete on the same row because they are never the same
    property on the same element. */
 .fill-cell {
-  min-width: 14rem;
   white-space: normal;
+  vertical-align: middle;
+}
+/* `table-layout: auto` (the default) was handing spare width to whichever
+   column had the least constrained content -- "Pair" ended up 145px wide to
+   fill the table's own 100% even though "Tokenized stock" never needs that
+   much -- which starved Fill of the room its own figures need and forced
+   them onto three lines, well past the ~3.2rem row budget. Fixed widths on
+   every head give Fill the room instead. */
+.live-table-wrap table {
+  table-layout: fixed;
+}
+.live-table-wrap th:nth-child(1) {
+  width: 21%;
+}
+.live-table-wrap th:nth-child(2) {
+  width: 13%;
+}
+.live-table-wrap th:nth-child(3) {
+  width: 9%;
+}
+.live-table-wrap th:nth-child(4) {
+  width: 8%;
+}
+.live-table-wrap th:nth-child(5) {
+  width: 7.5%;
+}
+.live-table-wrap th:nth-child(6) {
+  width: 7.5%;
+}
+.live-table-wrap th:nth-child(7) {
+  width: 9%;
+}
+.live-table-wrap th:nth-child(8) {
+  width: 25%;
+}
+/* "Tokenized stock" is the one Pair value that does not fit its column on
+   one line -- table-layout: fixed does not clip an overflowing nowrap cell,
+   it lets it run into the next column, which read as "Tokenized100tbpk"
+   colliding with Creator tax. Wrapping is the plainer fix than truncating a
+   fact this board exists to show in full. */
+.live-table-wrap td:nth-child(2) {
+  white-space: normal;
+}
+/* The address is the door: it never wraps to a second line, which is what
+   was inflating a row past ~3.2rem (REVAMP.md 2026-09-12, "the homepage
+   direction" -- the /live pass; th:first-child's own default is
+   white-space: normal, sized for prose columns elsewhere, not an address). */
+.live-table-wrap th:first-child {
+  white-space: nowrap;
+}
+/* Eight columns still have to fit inside the sheet's own 52rem measure at
+   1280px without a horizontal scroll (REVAMP.md 2026-09-12). A column head
+   set in nowrap uppercase mono is otherwise the widest thing in its column
+   -- "FIRST-BLOCK BUYERS" alone forces a column wider than its own figures
+   need -- so heads wrap onto a second line instead; nothing here touches
+   tbody, which is where the ~3.2rem row-height budget lives. */
+.live-table-wrap thead th {
+  white-space: normal;
+  max-width: 6.5rem;
 }
 .fill-track {
   height: 0.5rem;
@@ -1777,21 +1891,28 @@ footer {
   margin: var(--s-1) 0 0;
   font-size: var(--fs-fine);
   color: var(--ink-2);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-/* ---- the live board below the table's breakpoint (REVAMP.md 1.2) ----
+/* ---- the live board below the table's breakpoint (REVAMP.md 2026-09-12) ----
 
-   Thirteen columns do not fit a phone, so under 50rem -- the same measure
-   config-grids reflows at above -- the table steps aside and one ruled card
-   per token takes over. Same rules and hues as the table it replaces: no
-   radius, no shadow, no lift off the page, --fill the only accent, --stale
-   the only colour that means "this reading is old". Above 50rem the reverse:
-   the table is what analysts use and it is unchanged. */
+   Eight columns still do not fit a phone, so under 64rem -- the same measure
+   the homepage grid picks up its desktop layout at -- the table steps aside
+   and one ruled card per token takes over. Same rules and hues as the table
+   it replaces: no radius, no shadow, no lift off the page, --fill the only
+   accent, --stale the only colour that means "this reading is old". Above
+   64rem the reverse: the table is what analysts use and it is unchanged. */
+.live-board {
+  margin-top: var(--s-6);
+}
 .live-cards {
   display: none;
 }
-@media (max-width: 50rem) {
+.live-cards-note {
+  margin-top: var(--s-3);
+}
+@media (max-width: 64rem) {
   .live-table-wrap {
     display: none;
   }
@@ -1800,6 +1921,15 @@ footer {
     list-style: none;
     margin: var(--s-3) 0 0;
     padding: 0;
+  }
+}
+/* A raw uint256 must never appear on a phone (LIVE-FINDINGS.md #3): below
+   40rem -- the same width the homepage's own NOW card hides them at -- the
+   card drops the base-unit figures beside the bar and keeps only the
+   percentage; from 40rem to 64rem there is room and they come back. */
+@media (max-width: 40rem) {
+  .live-cards .fill-quantities {
+    display: none;
   }
 }
 .live-card {
@@ -1820,25 +1950,28 @@ footer {
 .live-card .fill {
   margin-top: var(--s-3);
 }
+/* One line, not three two-line blocks: "17 buys · 5 sells · 1 first-block
+   buyers", value then its word, the way the homepage NOW rows read. The
+   two-line blocks made every card ~15rem on a phone; twenty of them were
+   longer than the page they replaced (REVAMP.md 2026-09-12). */
 .live-card-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--s-4) var(--s-8);
-  margin-top: var(--s-4);
+  gap: 0.1rem var(--s-3);
+  margin-top: var(--s-2);
 }
 .live-card-stat {
-  min-width: 5.5rem;
+  min-width: 0;
+  white-space: nowrap;
 }
 .live-card-stat-v {
-  display: block;
   font-size: var(--fs-body);
   font-weight: 500;
 }
 .live-card-stat-k {
-  display: block;
   font-size: var(--fs-fine);
   color: var(--ink-3);
-  margin-top: 0.125rem;
+  margin-left: 0.3rem;
 }
 .live-card > .note {
   margin-top: var(--s-3);
@@ -1850,6 +1983,74 @@ footer {
    quiet one". */
 .live-card-analyst {
   color: var(--ink-3);
+}
+
+/* ==================================================================
+   /graduated and /graveyard (REVAMP.md 2026-09-12, "the amendment" -- boards
+   rebuilt page by page rather than as two copies of /live). Each board's own
+   column count differs from /live's eight, so each gets its own table/card
+   responsive toggle rather than inheriting /live's fixed nth-child widths;
+   the shared visual vocabulary -- .card, .live-card, .live-card-token,
+   .state-tag, .board-controls, .board-filter-disclosure, .board-what-counts
+   -- is reused unchanged. ================================================== */
+.graduated-table-wrap,
+.graveyard-table-wrap {
+  margin-top: var(--s-3);
+}
+.graduated-cards,
+.graveyard-cards {
+  display: none;
+}
+@media (max-width: 64rem) {
+  .graduated-table-wrap,
+  .graveyard-table-wrap {
+    display: none;
+  }
+  .graduated-cards,
+  .graveyard-cards {
+    display: block;
+    list-style: none;
+    margin: var(--s-3) 0 0;
+    padding: 0;
+  }
+}
+
+/* /graduated's own lead figure: the duration first, larger and mono, because
+   the job of this board is "what did this graduation look like" and the
+   duration is the answer. */
+.graduated-card-duration {
+  margin-top: var(--s-2);
+  font-size: 1.375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* /graveyard's own lead figure: the 93.5% made concrete. Same display face
+   and size the homepage LIVE pulse uses, but plain ink -- --fill means "this
+   is moving and it is good news", and a count of dead launches is neither. */
+.graveyard-lead {
+  margin-top: var(--s-4);
+}
+.graveyard-figure {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.75rem, 10vw, 4.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.graveyard-lead-caption {
+  margin-top: var(--s-2);
+  max-width: 48ch;
+}
+/* Deliberately quieter than /live's or /graduated's own cards: nobody
+   browses this list, so it is sized to be skimmed past rather than read. */
+.graveyard-card {
+  padding: var(--s-3) 0;
+}
+.graveyard-card .live-card-token {
+  font-size: var(--fs-fine);
 }
 
 /* ==================================================================

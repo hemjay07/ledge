@@ -69,6 +69,16 @@ export interface ActivityRow {
   /** Null when the launch block itself was never read, and 0 when it was read
       and nobody bought — which is the finding, not a gap. */
   first_block_buyers: number | null;
+  /** realQuoteReserve(), read from the curve by worker/src/reserve.ts — never
+      folded here. Present on this type only so a row read back out of D1
+      (worker/src/tick.ts readActivityRows, `SELECT *`) carries it, letting
+      the tick preserve a previous reading across a REPLACE that touches the
+      other nine columns. Optional: rows this module constructs itself never
+      set it. */
+  reserve_wei?: string | null;
+  /** The block reserve_wei was read at. Same carry-forward purpose as
+      reserve_wei, and NULL exactly when it is. */
+  reserve_block?: number | null;
 }
 
 export interface ActivityInput {

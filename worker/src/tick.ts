@@ -37,6 +37,8 @@ import {
 import { pairClassOf } from "./buckets";
 import { activityBlocks, planActivity, type ActivityRow } from "./activity";
 import { loadPairTokens } from "./numberFile";
+import { readReservesAndPairTokens, RESERVE_POPULATION_QUERY, type CurveTarget } from "./reserve";
+import { ZERO_ADDRESS } from "./decimals";
 import {
   GRAVEYARD_QUERY,
   buildGraveyardRows,
@@ -606,12 +608,19 @@ export async function tick(
        happened before this batch and the write happens inside it, and the
        tick is the only writer. */
     for (const row of activity.rows) {
+      /* reserve_wei/reserve_block are carried forward from whatever this
+         token held before this REPLACE, never zeroed by it: this loop folds
+         the other nine columns and has no reserve reading of its own, and an
+         INSERT OR REPLACE sets every column its statement does not name back
+         to its default -- NULL -- which would silently erase a real reading
+         on every token this tick merely traded. */
+      const previous = existingActivity.get(row.token);
       statements.push(
         db
           .prepare(
             `INSERT OR REPLACE INTO token_activity
-               (token, from_block, buys, sells, quote_in, quote_out, first_buy_ts, last_activity_ts, first_block_buyers)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               (token, from_block, buys, sells, quote_in, quote_out, first_buy_ts, last_activity_ts, first_block_buyers, reserve_wei, reserve_block)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
             row.token,
@@ -623,6 +632,8 @@ export async function tick(
             row.first_buy_ts,
             row.last_activity_ts,
             row.first_block_buyers,
+            previous?.reserve_wei ?? null,
+            previous?.reserve_block ?? null,
           ),
       );
     }
@@ -635,6 +646,79 @@ export async function tick(
           )
           .bind(activity.unattributed, nowSeconds),
       );
+    }
+
+    /* The curve reserve read (2026-09-12), extended the same day to also
+       cache pair-token decimals()/symbol() the board cannot otherwise show
+       units for (worker/schema.sql's `pair_token` table). Both are one
+       Multicall3 call, spent from the same subrequest budget as everything
+       else this tick does -- readReservesAndPairTokens folds the reserve
+       calls and the pair-token calls into one aggregate3 array rather than
+       making two eth_calls, so this costs exactly what the reserve read
+       alone used to. Downstream of the tick's own job -- the activity fold
+       above and the cursor write below -- so nothing here may block or delay
+       either: a budget already spent, a malformed response, or any other
+       failure is caught and logged, and every row this tick does not read
+       keeps whatever reading (or NULL, "never read") it already held. The
+       next tick tries again. */
+    try {
+      const populationResult = await db
+        .prepare(RESERVE_POPULATION_QUERY)
+        .all<{ token: string; curve: string; pair_token: string }>();
+      const population = populationResult.results ?? [];
+      const targets: CurveTarget[] = population.map((row) => ({
+        token: row.token,
+        curve: row.curve,
+        pairToken: row.pair_token,
+      }));
+
+      /* Only genuinely unknown pair tokens are worth a call: the zero
+         address is defined as ETH/18 and never read, and `pair_token` is a
+         read-once cache -- an address already in it, success or failure, is
+         skipped rather than re-read every minute. */
+      const candidatePairTokens = [
+        ...new Set(
+          population
+            .map((row) => row.pair_token?.toLowerCase())
+            .filter((address): address is string => !!address && address !== ZERO_ADDRESS),
+        ),
+      ];
+      const knownPairTokens = await selectChunked<{ address: string }>(
+        db,
+        (placeholders) => `SELECT address FROM pair_token WHERE address IN (${placeholders})`,
+        candidatePairTokens,
+      );
+      const known = new Set(knownPairTokens.map((row) => row.address.toLowerCase()));
+      const unknownPairTokens = candidatePairTokens.filter((address) => !known.has(address));
+
+      if (targets.length > 0 || unknownPairTokens.length > 0) {
+        const { reserves, pairTokens } = await readReservesAndPairTokens(
+          rpc,
+          targets,
+          unknownPairTokens,
+          head,
+        );
+        for (const reading of reserves) {
+          if (reading.reserveWei === null) continue; // never write a failed sub-call as a fresh reading
+          statements.push(
+            db
+              .prepare(`UPDATE token_activity SET reserve_wei = ?, reserve_block = ? WHERE token = ?`)
+              .bind(reading.reserveWei, head, reading.token),
+          );
+        }
+        for (const reading of pairTokens) {
+          statements.push(
+            db
+              .prepare(
+                `INSERT INTO pair_token (address, decimals, symbol, read_block) VALUES (?, ?, ?, ?)
+                 ON CONFLICT (address) DO UPDATE SET decimals = excluded.decimals, symbol = excluded.symbol, read_block = excluded.read_block`,
+              )
+              .bind(reading.address.toLowerCase(), reading.decimals, reading.symbol, head),
+          );
+        }
+      }
+    } catch (error) {
+      console.error("reserve read skipped", error instanceof Error ? error.message : String(error));
     }
 
     statements.push(

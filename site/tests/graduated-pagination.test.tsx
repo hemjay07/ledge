@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { GraduatedBoard } from "../components/Graduated";
 import { PAGE_SIZE, totalPagesFor } from "../lib/paginate";
 import type { GraduatedFile, GraduatedRow } from "../lib/graduated-schema";
@@ -9,7 +9,12 @@ import type { GraduatedFile, GraduatedRow } from "../lib/graduated-schema";
    suite exercises the fetch-on-demand path a hand-built fixture is small
    enough to hit deliberately: totalCount is set ABOVE initialRows.length, so
    GraduatedBoard's own needsFetch gate is true and a sort/filter/page change
-   reaches for /graduated.json exactly as it would in production. */
+   reaches for /graduated.json exactly as it would in production.
+
+   2026-09-12 (REVAMP.md "the amendment"): the sort control became a
+   `<select>` labelled "Sort", the same vocabulary /live's own board uses,
+   replacing the row of plain `.live-sort` links -- assertions below target
+   it by label rather than by the old link text. */
 
 function row(i: number, overrides: Partial<GraduatedRow> = {}): GraduatedRow {
   const hex = i.toString(16).padStart(40, "0");
@@ -36,6 +41,14 @@ const FULL_FILE: GraduatedFile = {
   rows: FULL_ROWS,
 };
 
+const BOARD_PROPS = {
+  generatedAt: FULL_FILE.generatedAt,
+  staleAfterSeconds: FULL_FILE.staleAfterSeconds,
+  totalGraduationRows: FULL_FILE.totalGraduationRows,
+  excludedNoLaunch: FULL_FILE.excludedNoLaunch,
+  excludedUnmatched: FULL_FILE.excludedUnmatched,
+};
+
 function answerWith(payload: unknown) {
   const impl = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
   vi.stubGlobal("fetch", impl);
@@ -51,8 +64,10 @@ afterEach(() => {
 describe("GraduatedBoard's build-time first page", () => {
   it("renders only the first page and states the true total, with no fetch, on first paint", () => {
     const fetchMock = answerWith(FULL_FILE);
-    const { container } = render(<GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} />);
-    const rows = container.querySelectorAll(".graduated-board tbody tr");
+    const { container } = render(
+      <GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} {...BOARD_PROPS} />,
+    );
+    const rows = container.querySelectorAll(".graduated-table-wrap tbody tr");
     expect(rows).toHaveLength(PAGE_SIZE);
     expect(container.textContent).toContain(`${PAGE_SIZE} of 60`);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -60,22 +75,26 @@ describe("GraduatedBoard's build-time first page", () => {
 
   it("fetches /graduated.json and re-sorts across the whole record when a non-default sort is chosen", async () => {
     const fetchMock = answerWith(FULL_FILE);
-    const { container } = render(<GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} />);
+    const { container } = render(
+      <GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} {...BOARD_PROPS} />,
+    );
 
-    const slowest = [...container.querySelectorAll(".live-sort a")].find((a) => a.textContent === "Slowest first")!;
-    fireEvent.click(slowest);
+    const select = screen.getByLabelText("Sort") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "durationDesc" } });
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/graduated.json"));
-    await waitFor(() => expect(container.querySelectorAll(".graduated-board tbody tr").length).toBe(PAGE_SIZE));
+    await waitFor(() => expect(container.querySelectorAll(".graduated-table-wrap tbody tr").length).toBe(PAGE_SIZE));
 
     // slowest-first: the highest durationSeconds (row 59) leads
-    const firstRow = container.querySelector(".graduated-board tbody tr th a");
+    const firstRow = container.querySelector(".graduated-table-wrap tbody tr th a");
     expect(firstRow?.getAttribute("title")).toBe(FULL_ROWS[59]!.token);
   });
 
   it("pages past the first page once the full record is fetched", async () => {
     answerWith(FULL_FILE);
-    const { container } = render(<GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} />);
+    const { container } = render(
+      <GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} {...BOARD_PROPS} />,
+    );
 
     const next = [...container.querySelectorAll(".pager a")].find((a) => a.textContent === "Next")!;
     fireEvent.click(next);
@@ -83,42 +102,49 @@ describe("GraduatedBoard's build-time first page", () => {
     const total = FULL_ROWS.length;
     const pages = totalPagesFor(total);
     await waitFor(() => expect(container.textContent).toContain(`page 2 of ${pages}`));
-    const rows = container.querySelectorAll(".graduated-board tbody tr");
+    const rows = container.querySelectorAll(".graduated-table-wrap tbody tr");
     const secondPageRows = pages === 2 ? total - PAGE_SIZE : PAGE_SIZE;
     expect(rows).toHaveLength(secondPageRows);
   });
 
-  it("states its own filtered n, separately from the unfiltered total, and never renders a bare percentage", async () => {
+  it("states its own filtered n, separately from the unfiltered total, and never renders a bare percentage in the row list", async () => {
     answerWith(FULL_FILE);
-    const { container } = render(<GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} />);
+    const { container } = render(
+      <GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} {...BOARD_PROPS} />,
+    );
 
-    const pairSelect = container.querySelector('select[id]') as HTMLSelectElement;
-    // the first picker-select in document order is the pair-token filter
+    const pairSelect = screen.getByLabelText("Pair token") as HTMLSelectElement;
     fireEvent.change(pairSelect, { target: { value: "eth" } });
 
     await waitFor(() => expect(container.textContent).toMatch(/of 20 matching tokens shown \(20 of 60 total\)/));
-    expect(container.textContent ?? "").not.toMatch(/\d+\.\d+\s*%/);
+    // The population ladder above the row list legitimately carries a
+    // percentage (a rate with its own n, CONSTRAINTS 4) -- this checks the
+    // filtered ROW LIST never grows one of its own, scoped past the ladder.
+    const rowListText = container.querySelector(".graduated-table-wrap")?.textContent ?? "";
+    expect(rowListText).not.toMatch(/\d+\.\d+\s*%/);
   });
 
   it("carries the filter and the sort together in the address bar, merged rather than overwritten", async () => {
+    render(<GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} {...BOARD_PROPS} />);
     answerWith(FULL_FILE);
-    const { container } = render(<GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} />);
 
-    const pairSelect = container.querySelector('select[id]') as HTMLSelectElement;
+    const pairSelect = screen.getByLabelText("Pair token") as HTMLSelectElement;
     fireEvent.change(pairSelect, { target: { value: "eth" } });
     await waitFor(() => expect(window.location.search).toContain("pair=eth"));
 
-    const slowest = [...container.querySelectorAll(".live-sort a")].find((a) => a.textContent === "Slowest first")!;
-    fireEvent.click(slowest);
+    const select = screen.getByLabelText("Sort") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "durationDesc" } });
     await waitFor(() => expect(window.location.search).toContain("sort=durationDesc"));
     expect(window.location.search).toContain("pair=eth");
   });
 
   it("resets every filter and returns to the unfiltered total on request", async () => {
     answerWith(FULL_FILE);
-    const { container } = render(<GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} />);
+    const { container } = render(
+      <GraduatedBoard initialRows={FIRST_PAGE} totalCount={FULL_ROWS.length} {...BOARD_PROPS} />,
+    );
 
-    const pairSelect = container.querySelector('select[id]') as HTMLSelectElement;
+    const pairSelect = screen.getByLabelText("Pair token") as HTMLSelectElement;
     fireEvent.change(pairSelect, { target: { value: "eth" } });
     await waitFor(() => expect(container.textContent).toContain("matching tokens shown"));
 

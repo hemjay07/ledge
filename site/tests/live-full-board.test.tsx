@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { LiveBoardFull } from "../components/Live";
 import Live from "../app/live/page";
 import { fillPercent, formatBigDecimal, pairQuantity } from "../lib/format";
@@ -43,7 +43,7 @@ describe("the live board's own row model", () => {
     }
   });
 
-  it("shows the sample the pair, tax, buys, sells, age and state of every row", async () => {
+  it("shows the sample the pair, tax, buys, sells and age of every row", async () => {
     answerWith(live);
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
@@ -51,7 +51,41 @@ describe("the live board's own row model", () => {
     expect(text).toContain("300 bps");
     expect(text).toContain("not read"); // row d, creatorTaxBps: null
     expect(text).toContain("graduated");
-    expect(text).toContain("on the curve");
+  });
+
+  /* The "State" column (graduated / on the curve) was dropped 2026-09-12
+     (REVAMP.md "the homepage direction", the /live pass): a graduated row
+     keeps its own fact as a small tag beside the address, and a row on the
+     curve carries no tag at all rather than a plain-English state that read
+     as a column all its own. Eight columns, not thirteen. */
+  it("prints eight column heads on the desktop table", async () => {
+    answerWith(live);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
+    const heads = [...container.querySelectorAll(".live-table-wrap thead th")].map((th) => th.textContent);
+    expect(heads).toEqual(["Token", "Pair", "Creator tax", "Age", "Buys", "Sells", "First-block buyers", "Fill"]);
+  });
+
+  it("marks a graduated row with a small tag beside its address, and leaves an ungraduated row untagged", async () => {
+    answerWith(live);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
+    const graduatedIndex = live.rows.findIndex((r) => r.graduated);
+    const rows = [...container.querySelectorAll("tbody tr")];
+    expect(rows[graduatedIndex]!.querySelector(".state-tag")?.textContent).toContain("graduated");
+    const ungraduatedIndex = live.rows.findIndex((r) => !r.graduated && !r.window.partial);
+    expect(ungraduatedIndex).toBeGreaterThanOrEqual(0);
+    expect(rows[ungraduatedIndex]!.querySelector(".state-tag")).toBeNull();
+  });
+
+  it("states the fill's own label exactly once on the board, in the table's caption", async () => {
+    answerWith(live);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
+    const label = live.rows.find((r) => r.fill !== null)!.fill!.label;
+    const occurrences = (container.textContent ?? "").split(label).length - 1;
+    expect(occurrences).toBe(1);
+    expect(container.querySelector("caption")?.textContent).toContain(label);
   });
 
   it("tells apart a first block never indexed from one indexed with no buyers", async () => {
@@ -81,9 +115,12 @@ describe("the live board's own row model", () => {
        raw form is still what a pair with unknown decimals renders, so both
        shapes are accepted here rather than only one. A lone percentage is
        still forbidden, and that is asserted below. */
-    const withFill = live.rows.filter((r) => r.fill !== null);
+    /* 2026-09-12: a graduated curve is drained to zero and its cell reads
+       "graduated" rather than a 0% bar, so it is not in this loop. */
+    const withFill = live.rows.filter((r) => r.fill !== null && !r.graduated);
     for (const row of withFill) {
-      const net = pairQuantity(row.netQuoteWei, row.pairDecimals, null).text;
+      // 2026-09-12: the bar reads the curve's own reserve (fill.reserveWei), not the indexed net quote
+      const net = pairQuantity(row.fill!.reserveWei, row.pairDecimals, null).text;
       const threshold = pairQuantity(
         row.fill!.graduationThresholdWei,
         row.pairDecimals,
@@ -123,33 +160,45 @@ describe("the live board's own row model", () => {
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
     const row = live.rows[0]!;
-    const pct = fillPercent(row.netQuoteWei, row.fill!.graduationThresholdWei);
+    const pct = fillPercent(row.fill!.reserveWei, row.fill!.graduationThresholdWei);
     expect(pct).not.toBeNull();
     expect(container.textContent).toContain(`${(pct as number).toFixed(1)}%`);
   });
 
+  /* The window sentence moved from a per-row cell into the table's own
+     caption on 2026-09-12 (REVAMP.md "the homepage direction"): this fixture's
+     four rows do not all share one window, so the caption falls back to "the
+     indexed window" rather than printing one row's label as though every row
+     shared it. A partial row's own label is not lost -- it travels in the
+     "partial" tag's own `title`, which is where CONSTRAINTS 3's guarantee
+     ("every count carries its window") is now kept for that row. */
   it("marks a row whose window is partial, visibly, in words", async () => {
     answerWith(live);
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
     const partialRow = live.rows.find((r) => r.window.partial)!;
-    expect(container.textContent).toContain(partialRow.window.label);
     const marked = [...container.querySelectorAll(".is-partial")];
     expect(marked.length).toBeGreaterThan(0);
-    // a non-partial row's own window carries no "partial" marker
+    expect(marked.some((el) => el.getAttribute("title") === partialRow.window.label)).toBe(true);
+    expect(container.textContent).toContain("the indexed window");
+    // a non-partial row's own row carries no "partial" marker
     const nonPartialRow = [...container.querySelectorAll("tbody tr")].find(
       (r) => !r.textContent?.includes("partial"),
     );
     expect(nonPartialRow).toBeTruthy();
   });
 
+  /* The sort control became a `<select>` labelled "Sort" on 2026-09-12
+     (REVAMP.md "the homepage direction"), replacing the row of plain links --
+     the same five keys, the same labels, the same `?sort=` semantics, just a
+     control that fits one line beside the filter disclosure instead of
+     wrapping across several. */
   it("names the ranked column for every sort key, so a ranking is always of a shown fact", async () => {
     answerWith(live);
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
-    const nav = container.querySelector('nav[aria-label="Sort the live board"]');
-    expect(nav).not.toBeNull();
-    const options = [...(nav?.querySelectorAll("a, span") ?? [])].map((el) => el.textContent);
+    const select = screen.getByLabelText("Sort") as HTMLSelectElement;
+    const options = [...select.querySelectorAll("option")].map((el) => el.textContent);
     expect(options).toEqual([
       "Most buys",
       "Most recent activity",
@@ -157,8 +206,7 @@ describe("the live board's own row model", () => {
       "Highest net quote",
       "Newest launch",
     ]);
-    // one option stands as the current, un-linked, sort
-    expect(nav?.querySelector('[aria-current="true"]')).not.toBeNull();
+    expect(select.value).toBe("lastActivity");
   });
 
   it("prints no per-token score, grade or verdict word anywhere on the board", async () => {
@@ -171,21 +219,19 @@ describe("the live board's own row model", () => {
     }
   });
 
-  it("re-fetches with the chosen sort key when a sort control is used", async () => {
+  it("re-fetches with the chosen sort key when the sort select is used, and writes ?sort=", async () => {
     const fetchMock = answerWith(live);
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
 
-    const buysLink = [...container.querySelectorAll('nav[aria-label="Sort the live board"] a')].find(
-      (a) => a.textContent === "Most buys",
-    ) as HTMLAnchorElement;
-    expect(buysLink).toBeTruthy();
-    fireEvent.click(buysLink);
+    const select = screen.getByLabelText("Sort") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "buys" } });
 
     await waitFor(() => {
       const lastCall = fetchMock.mock.calls.at(-1)?.[0] as string;
       expect(lastCall).toContain("sort=buys");
     });
+    expect(window.location.search).toContain("sort=buys");
   });
 
   it("says the board did not answer rather than showing an empty table as though it had", async () => {
@@ -282,17 +328,22 @@ describe("the live board's card layout (below the table's breakpoint)", () => {
     expect(cards[1]?.textContent).toContain("not indexed");
   });
 
-  it("carries the counted-over window and its partial marker on every card (CONSTRAINTS 3)", async () => {
+  /* The window and launch block moved off the card and onto the token's own
+     panel on 2026-09-12 (REVAMP.md "the homepage direction") -- the card
+     keeps only the partial marker itself, with the row's own window label
+     carried in that tag's `title` rather than printed in running text. */
+  it("carries the partial marker on a card whose window is partial (CONSTRAINTS 3)", async () => {
     answerWith(live);
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll(".live-card").length).toBe(4));
     const cards = [...container.querySelectorAll(".live-card")];
-    live.rows.forEach((row, i) => {
-      expect(cards[i]!.textContent).toContain(row.window.label);
-    });
     const partialIndex = live.rows.findIndex((r) => r.window.partial);
     expect(partialIndex).toBeGreaterThanOrEqual(0);
-    expect(cards[partialIndex]!.querySelector(".is-partial")).not.toBeNull();
+    const tag = cards[partialIndex]!.querySelector(".is-partial");
+    expect(tag).not.toBeNull();
+    expect(tag?.getAttribute("title")).toBe(live.rows[partialIndex]!.window.label);
+    const nonPartialIndex = live.rows.findIndex((r) => !r.window.partial);
+    expect(cards[nonPartialIndex]!.querySelector(".is-partial")).toBeNull();
   });
 
   it("renders the fill rule against each launch's OWN threshold on the card, both figures, never a lone percentage", async () => {
@@ -305,7 +356,13 @@ describe("the live board's card layout (below the table's breakpoint)", () => {
         expect(cards[i]!.textContent).toContain("no threshold indexed");
         return;
       }
-      const net = pairQuantity(row.netQuoteWei, row.pairDecimals, null).text;
+      if (row.graduated) {
+        // 2026-09-12: drained curve, the word not a 0% bar
+        expect(cards[i]!.textContent).toContain("graduated");
+        return;
+      }
+      // 2026-09-12: the bar reads the curve's own reserve (fill.reserveWei), not the indexed net quote
+      const net = pairQuantity(row.fill!.reserveWei, row.pairDecimals, null).text;
       const threshold = pairQuantity(row.fill.graduationThresholdWei, row.pairDecimals, row.pairSymbol).text;
       expect(cards[i]!.textContent).toContain(net);
       expect(cards[i]!.textContent).toContain(threshold);
@@ -329,5 +386,30 @@ describe("the /live page", () => {
     answerWith(live);
     const { container } = render(<Live />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
+  });
+});
+
+/* 2026-09-12: a phone showed "not reachable" for minutes while the API was
+   answering, because one dropped poll replaced the rows with the error. The
+   reading held is still true and ages honestly on screen; it stays. */
+describe("a failed poll", () => {
+  it("keeps the last good rows on screen rather than swapping them for the error", async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        calls += 1;
+        return calls === 1
+          ? new Response(JSON.stringify(live), { status: 200 })
+          : new Response("", { status: 503 });
+      }),
+    );
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
+    await vi.advanceTimersByTimeAsync(16_000);
+    await waitFor(() => expect(calls).toBeGreaterThanOrEqual(2));
+    expect(container.querySelectorAll("tbody tr").length).toBe(4);
+    expect(container.textContent).not.toMatch(/not reachable|did not answer/i);
   });
 });

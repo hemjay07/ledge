@@ -300,12 +300,16 @@ const boardWindow = z
     }
   });
 
-/* Never a lone percentage: the threshold travels with the label that says
-   what the figure is measured against and why it disagrees with the curve's
-   own reading (worker/src/board.ts). Null, not a guess, when the launch
-   carries no threshold. */
+/* The curve's own reserve, read from the curve at a named block
+   (worker/src/reserve.ts), against the launch's own threshold. Never a lone
+   percentage: both figures travel, and the label says when the reading was
+   taken. Null when the launch carries no threshold or the reserve was never
+   read -- never a guess, and never the indexed net quote, which was found on
+   2026-09-12 to be wrong by orders of magnitude on wash-traded curves. */
 const boardFill = z.object({
   graduationThresholdWei: z.string(),
+  reserveWei: z.string(),
+  readAtBlock: z.number().int().nonnegative(),
   label: z.string().min(1),
 });
 

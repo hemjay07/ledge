@@ -35,7 +35,7 @@ function seedRow(opts: SeedOptions): D1PreparedStatement[] {
       opts.launchTs,
       `0xtx${opts.token}`,
     ),
-    env.LEDGE_DB.prepare(`INSERT INTO token_activity VALUES (?, ?, ?, ?, '0', '0', NULL, ?, ?)`).bind(
+    env.LEDGE_DB.prepare(`INSERT INTO token_activity VALUES (?, ?, ?, ?, '0', '0', NULL, ?, ?, NULL, NULL)`).bind(
       opts.token,
       opts.launchBlock,
       opts.buys ?? 0,

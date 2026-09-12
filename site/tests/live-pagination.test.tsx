@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { LiveBoardFull } from "../components/Live";
 import live from "./api-fixtures/live-ok.json";
 import { PAGE_SIZE, totalPagesFor } from "../lib/paginate";
@@ -68,13 +68,22 @@ describe("the live board's pagination", () => {
     fireEvent.click(next);
     await waitFor(() => expect(window.location.search).toContain("page=2"));
 
-    const buys = [...container.querySelectorAll('nav[aria-label="Sort the live board"] a')].find(
-      (a) => a.textContent === "Most buys",
-    )!;
-    fireEvent.click(buys);
+    const select = screen.getByLabelText("Sort") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "buys" } });
     await waitFor(() => expect(window.location.search).not.toContain("page=2"));
   });
 });
+
+/* Every filter now lives inside the `<details class="board-filter-disclosure">`
+   a sort `<select>` sits beside on the controls row (REVAMP.md 2026-09-12,
+   "the homepage direction") -- `select[id]` alone finds the sort select
+   first, so these look up the pair field by its own option text instead,
+   the way the "has taken buys" test already did. */
+function pairSelectIn(container: HTMLElement): HTMLSelectElement {
+  return [...container.querySelectorAll("select")].find((s) =>
+    [...s.querySelectorAll("option")].some((o) => o.textContent === "All pair tokens"),
+  ) as HTMLSelectElement;
+}
 
 describe("the live board's filters", () => {
   it("narrows by pair token and states its own n against the unfiltered total", async () => {
@@ -82,11 +91,29 @@ describe("the live board's filters", () => {
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(PAGE_SIZE));
 
-    const pairSelect = container.querySelector('select[id]') as HTMLSelectElement;
+    const pairSelect = pairSelectIn(container);
     fireEvent.change(pairSelect, { target: { value: "eth" } });
 
     await waitFor(() => expect(container.textContent).toMatch(/of 20 matching tokens shown \(20 of 60 total\)/));
     expect(container.querySelectorAll("tbody tr").length).toBe(20);
+  });
+
+  it("counts active filters in the disclosure's own summary", async () => {
+    answerWith(PAYLOAD);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(PAGE_SIZE));
+
+    const summary = container.querySelector(".board-filter-disclosure > summary") as HTMLElement;
+    expect(summary.textContent).toBe("Filter");
+
+    fireEvent.change(pairSelectIn(container), { target: { value: "eth" } });
+    await waitFor(() => expect(summary.textContent).toBe("Filter · 1 active"));
+
+    const buysSelect = [...container.querySelectorAll("select")].find((s) =>
+      [...s.querySelectorAll("option")].some((o) => o.textContent === "Has taken no buys"),
+    ) as HTMLSelectElement;
+    fireEvent.change(buysSelect, { target: { value: "no" } });
+    await waitFor(() => expect(summary.textContent).toBe("Filter · 2 active"));
   });
 
   it("narrows by whether a token has taken any buys, naming the column rather than a verdict", async () => {
@@ -108,7 +135,7 @@ describe("the live board's filters", () => {
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(PAGE_SIZE));
 
-    const pairSelect = container.querySelector('select[id]') as HTMLSelectElement;
+    const pairSelect = pairSelectIn(container);
     fireEvent.change(pairSelect, { target: { value: "eth" } });
     await waitFor(() => expect(container.textContent).toContain("matching tokens shown"));
 
