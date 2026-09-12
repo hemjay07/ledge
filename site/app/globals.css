@@ -1606,6 +1606,12 @@ footer {
   flex-basis: 100%;
   margin-top: var(--s-1);
 }
+/* A sentence, not a quantity: it wraps. (.mono is nowrap on purpose, for
+   "12 of 3,347"; a sentence set in it ran out of the card on 2026-09-12.) */
+.pulse-stale-line {
+  font-family: var(--font-mono);
+  white-space: normal;
+}
 
 /* The capability line and the facts behind it: what LEDGE lets a reader do,
    set ahead of the shape that proves it. Indented with the pulse and the

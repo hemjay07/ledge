@@ -254,7 +254,7 @@ export function PulseBody({ result }: { result: LiveResult | null }): ReactEleme
       </div>
       <p className="note note--fine pulse-age">
         {body.live.stale ? (
-          <span className="mono is-stale">
+          <span className="is-stale pulse-stale-line">
             {lastRan === null
               ? "the live index has not completed a run yet; these are the last counts it held"
               : `the live index last ran ${formatAge(lastRan)} ago; these counts are from then`}
