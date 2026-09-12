@@ -153,6 +153,46 @@ re-folded, and a reorg inside it would leave a bar slightly wrong rather
 than double-counted. About five minutes of chain, and the alternative
 (keeping every swap key) costs more than the error.
 
+## What a backfill costs — measured 2026-09-12, before building one
+
+The record starts at block 55,173,069 and runs to about 61,042,000: 5.87
+million blocks, roughly **seven days of chain**, holding 3,038 graduations.
+A backfill can therefore recover the +1 h and +24 h marks for most of them
+and the +7 d mark for almost none — which is the ceiling on what step 5 can
+be worth, and worth saying before anyone builds it.
+
+Measured against `rpc.ordofi.network` (`design/measure-backfill.py` and a
+follow-up probe):
+
+| Query | Result |
+|---|---|
+| pons pools per 24,000 blocks (~40 min) | **8** — about 290 a day, ~2,000 over the record |
+| Swap, 20 pool ids, 10,000 blocks | 13,020 logs, 134 s |
+| Swap, 20 pool ids, 50,000 blocks | 19,811 logs, 204 s |
+| Swap, 20 pool ids, 200,000 blocks | refused, "the network is busy" |
+| Swap, 20 pool ids, 2,000,000 blocks | refused: "this range needed more than 40 upstream queries" |
+| Swap, **one** pool, 500 blocks | 39 logs, 1.0 s |
+| Swap, one pool, 2,000 blocks | 293 logs, 10 s |
+| five `eth_getLogs` in one JSON-RPC batch | answered, 10.7 s |
+
+**So a full replay is out.** Pons pools trade hard: twenty of them produced
+19,811 swaps in 50,000 blocks. Extrapolated across ~2,000 pools and the
+whole record that is tens of millions of logs, which no public endpoint
+will serve and no runner will hold.
+
+**And it is not needed.** The statistics want one thing per pool per mark:
+the price of the **last swap at or before** it. That is a narrow window
+ending at the mark, filtered to one pool id — 39 logs and a second at 500
+blocks. About 2,000 pools times three marks is ~6,000 probes; batched five
+to a request at ~10 s, that is two to three hours, once, resumable, and it
+fits on a laptop or in chunked CI runs. No box is required for it.
+
+The price of that shortcut, stated plainly: a backfilled mark is a **price
+point from a bounded window scan, not an hour bar built from every swap in
+the hour.** It must be stored and labelled as its own thing, and
+`METHOD.md` must say so, so that no reader believes the backfilled hours
+carry the same swap counts and volumes the forward crawl produces.
+
 ## Order of work
 
 1. `pipeline/rpc.py`: decode `Initialize` and `Swap`; price from
