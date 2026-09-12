@@ -681,12 +681,12 @@ export function LiveBoardFull(): ReactElement {
               options={hasBuysOptions}
             />
             <FilterNumber
-              label="Age from (s)"
+              label="Min age (s)"
               value={filters.ageMin}
               onChange={(value) => updateFilters({ ageMin: value })}
             />
             <FilterNumber
-              label="Age to (s)"
+              label="Max age (s)"
               value={filters.ageMax}
               onChange={(value) => updateFilters({ ageMax: value })}
             />

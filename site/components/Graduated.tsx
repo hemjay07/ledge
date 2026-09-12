@@ -570,22 +570,22 @@ export function GraduatedBoard({
               options={GRADUATED_IN_OPTIONS}
             />
             <FilterNumber
-              label="Time to graduate from (s)"
+              label="Min time (s)"
               value={filters.ttgMin}
               onChange={(value) => updateFilters({ ttgMin: value })}
             />
             <FilterNumber
-              label="Time to graduate to (s)"
+              label="Max time (s)"
               value={filters.ttgMax}
               onChange={(value) => updateFilters({ ttgMax: value })}
             />
             <FilterDate
-              label="Graduated from"
+              label="From date"
               value={filters.fromDate}
               onChange={(value) => updateFilters({ fromDate: value })}
             />
             <FilterDate
-              label="Graduated to"
+              label="To date"
               value={filters.toDate}
               onChange={(value) => updateFilters({ toDate: value })}
             />

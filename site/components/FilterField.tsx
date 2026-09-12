@@ -57,11 +57,14 @@ export function FilterNumber({
   value,
   onChange,
   min = 0,
+  placeholder = "any",
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   min?: number;
+  /** What an empty bound means, printed in the field: "any", never a 0. */
+  placeholder?: string;
 }): ReactElement {
   const id = useId();
   return (
@@ -76,6 +79,7 @@ export function FilterNumber({
           type="number"
           inputMode="numeric"
           min={min}
+          placeholder={placeholder}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -88,10 +92,12 @@ export function FilterDate({
   label,
   value,
   onChange,
+  placeholder = "any",
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
 }): ReactElement {
   const id = useId();
   return (
@@ -104,6 +110,7 @@ export function FilterDate({
           className="picker-select mono"
           id={id}
           type="date"
+          placeholder={placeholder}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />

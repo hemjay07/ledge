@@ -1291,7 +1291,7 @@ footer {
 }
 .picker-field {
   margin: 0;
-  min-width: 9rem;
+  min-width: 8rem;
 }
 .picker-label {
   display: block;
@@ -1302,12 +1302,21 @@ footer {
   text-transform: uppercase;
   color: var(--ink-3);
 }
+/* A control reads as a control: a box, not a rule under empty space. The
+   bottom-rule form left the number fields looking like stray lines with
+   nothing in them (2026-09-12), and set every field at the width of its
+   longest option. */
 .picker-line {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--s-2);
-  margin-top: var(--s-1);
-  border-bottom: var(--rw-mid) solid var(--rule-mid);
+  margin-top: 0.2rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--rule-mid);
+  background: var(--ground);
+}
+.picker-line:focus-within {
+  border-color: var(--ink);
 }
 .picker-select {
   flex: 1 1 auto;
@@ -1316,14 +1325,16 @@ footer {
   background: none;
   border: 0;
   border-radius: 0;
-  padding: var(--s-2) 0;
+  padding: 0.35rem 0;
   color: var(--ink);
-  font-size: var(--fs-note);
+  font-size: var(--fs-fine);
   letter-spacing: 0;
 }
+.picker-select::placeholder {
+  color: var(--ink-3);
+}
 .picker-select:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  outline: none;
 }
 /* the field's own mark that it opens: a printed caret, not chrome */
 .picker-caret {
@@ -1703,12 +1714,18 @@ footer {
 .board-controls {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--s-4) var(--s-8);
+  align-items: flex-end;
+  gap: var(--s-3) var(--s-4);
   margin-top: var(--s-3);
 }
 .live-sort-field {
   min-width: 12rem;
+}
+/* The disclosure takes its own full-width row under the sort, so the filter
+   grid can spread across the card instead of stacking in one narrow column
+   sized by the summary's own text (2026-09-12). */
+.board-filter-disclosure {
+  flex: 1 1 100%;
 }
 .board-filter-disclosure > summary {
   cursor: pointer;
@@ -1739,13 +1756,13 @@ footer {
    filter is not a ranking and must never read as a preset with a verdict in
    its name). */
 .board-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-4) var(--s-8);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--s-3);
   margin-top: var(--s-3);
 }
 .board-filters .picker-field {
-  min-width: 9rem;
+  min-width: 0;
 }
 .board-filters-reset {
   align-self: flex-end;
@@ -1835,7 +1852,7 @@ footer {
   table-layout: fixed;
 }
 .live-table-wrap th:nth-child(1) {
-  width: 21%;
+  width: 24%;
 }
 .live-table-wrap th:nth-child(2) {
   width: 13%;
@@ -1856,7 +1873,7 @@ footer {
   width: 9%;
 }
 .live-table-wrap th:nth-child(8) {
-  width: 25%;
+  width: 22%;
 }
 /* "Tokenized stock" is the one Pair value that does not fit its column on
    one line -- table-layout: fixed does not clip an overflowing nowrap cell,
@@ -2341,16 +2358,31 @@ footer {
   margin-top: 0.2rem;
 }
 
-/* The token's own name in front of its address. Whatever a deployer wrote,
-   on one line: never wraps, never pushes the address off the row. */
+/* The token's own name, above its address. Whatever a deployer wrote, on one
+   clipped line of its own: in a fixed-layout table a name beside a nowrap
+   address overflowed its column and printed over the next one (2026-09-12).
+   The name leads because it is what a reader recognises; the address stays
+   under it because it is the identity. */
 .token-name {
+  display: block;
   font-family: var(--font-body);
   font-weight: 600;
-  margin-right: 0.4rem;
-  max-width: 9rem;
-  display: inline-block;
+  font-size: var(--fs-note);
+  line-height: 1.2;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
+}
+.live-table-wrap th[scope="row"] a,
+.graveyard-table-wrap th[scope="row"] a,
+.live-card-token {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* the address under a name is the quieter of the two */
+.token-name + * {
+  font-size: 0.8125rem;
 }
