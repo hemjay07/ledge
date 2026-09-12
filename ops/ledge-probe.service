@@ -1,0 +1,17 @@
+[Unit]
+Description=LEDGE outcomes backfill probe (pipeline/backfill_pools.py in its own clone)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ledge
+Group=ledge
+WorkingDirectory=/home/ledge/ledge-probe
+EnvironmentFile=/etc/ledge/env
+ExecStart=/home/ledge/ledge/ops/probe.sh
+# A full first pass is two to three hours; nothing here should need more
+# than six. Started by hand (`systemctl start ledge-probe`), not by a timer,
+# until it has been watched through one complete pass.
+TimeoutStartSec=6h
+Nice=10
