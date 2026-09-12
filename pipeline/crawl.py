@@ -637,10 +637,21 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
                 raw_pool_inits.append(decoded)
                 known_pool_ids.add(decoded["id"])
         time.sleep(LOG_PACING_SECONDS)
-        if known_pool_ids:
-            for log in rpc_client.get_logs(frm, to, TOPIC_V4_SWAP, address=POOL_MANAGER, topic1=sorted(known_pool_ids)):
-                raw_swaps.append(decode_swap(log))
-        time.sleep(LOG_PACING_SECONDS)
+        # Swaps are NOT read here. They were, until 2026-09-12, and it cost
+        # the crawl its reliability: pons pools trade hard (twenty of them
+        # produced 19,811 swaps in 50,000 blocks), every swap's block needs
+        # a header to be placed in an hour, and _fetch_block_timestamps
+        # batches fifty headers a request with two seconds between batches.
+        # Two scheduled runs in a row were cancelled at the 45-minute
+        # timeout with the data uncommitted, which is worse than having no
+        # bars at all.
+        #
+        # The statistics do not need every swap. They need the price of the
+        # last swap at or before +1 h, +24 h and +7 d, which
+        # pipeline/backfill_pools.py asks for directly, one narrow window
+        # per mark, and which stats.py already reads as a probe reading
+        # (`fromProbe`). Hour bars stay in the format and the writer stays
+        # in place for a future reader that can afford them.
 
     if now is None:
         now = datetime.now(timezone.utc)

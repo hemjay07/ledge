@@ -218,6 +218,17 @@ def test_a_pool_with_no_known_launch_on_either_side_records_null_token(run_dir, 
 
 
 # --- Swap -> data/pools/YYYY-MM-DD.jsonl hour bars -----------------------
+
+# ---------------------------------------------------------------------------
+# 2026-09-12: the forward crawl no longer reads Swap logs. Two scheduled runs
+# in a row were cancelled at the 45-minute timeout because every swap's block
+# needs a header to be placed in an hour, and pons pools trade hard. The hour
+# bar format, its writer and its merge rule all stay -- they are exercised
+# below through the folding helpers directly -- but the three tests that drove
+# them through a whole `run()` are marked skipped rather than deleted, so the
+# day a reader can afford the swaps again they are the tests to unskip.
+# pipeline/backfill_pools.py is where prices come from meanwhile.
+@pytest.mark.skip(reason="the forward crawl no longer reads Swap logs; see the note above")
 def test_swaps_fold_into_the_right_hour_bar_with_correct_ohlc(run_dir, monkeypatch):
     monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
     _write_launch(run_dir, TOKEN)
@@ -247,6 +258,7 @@ def test_swaps_fold_into_the_right_hour_bar_with_correct_ohlc(run_dir, monkeypat
     assert bar["volumeQuote"] == str(10**18 + 4 * 10**18)
 
 
+@pytest.mark.skip(reason="the forward crawl no longer reads Swap logs; see the note above")
 def test_a_second_run_merges_into_the_existing_hour_bar_rather_than_replacing_it(run_dir, monkeypatch):
     monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
     _write_launch(run_dir, TOKEN)
@@ -281,6 +293,7 @@ def test_a_second_run_merges_into_the_existing_hour_bar_rather_than_replacing_it
     assert bar["volumeQuote"] == str(10**18 + int(0.25 * 10**18))
 
 
+@pytest.mark.skip(reason="the forward crawl no longer reads Swap logs; see the note above")
 def test_unknown_decimals_give_null_prices_but_keep_swaps_and_volume(run_dir, monkeypatch):
     monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
     # pair-tokens.json carries no entry for this pair token, so its decimals
