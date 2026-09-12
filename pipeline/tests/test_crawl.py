@@ -627,3 +627,47 @@ def test_crawl_writes_the_same_number_file_recompute_would(committed_data_dir):
     expected = canonical_dumps(recompute_mod.recompute(committed_data_dir))
     assert "raisedNothing" in written, "the crawl dropped the sample block"
     assert written == expected
+
+
+# 2026-09-12: one empty item in a header batch cost the box its first run.
+# The empty ones are asked for again, alone; only what is still missing after
+# the retries fails the run.
+def test_missing_header_is_retried_alone_before_failing(monkeypatch):
+    from pipeline import crawl
+
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    calls = []
+
+    class _FlakyOnce:
+        def call_batch(self, requests):
+            calls.append([int(r["params"][0], 16) for r in requests])
+            out = []
+            for r in requests:
+                block = int(r["params"][0], 16)
+                # block 7 is empty the first time it is asked for, then fine
+                if block == 7 and len(calls) == 1:
+                    out.append(None)
+                else:
+                    out.append({"timestamp": hex(1_000 + block)})
+            return out
+
+    got = crawl._fetch_block_timestamps(_FlakyOnce(), [5, 7, 9])
+    assert got == {5: 1005, 7: 1007, 9: 1009}
+    assert calls == [[5, 7, 9], [7]]  # the retry asked only for the missing one
+
+
+def test_header_still_missing_after_retries_fails_the_run(monkeypatch):
+    from pipeline import crawl
+
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+
+    class _NeverSeven:
+        def call_batch(self, requests):
+            return [None if int(r["params"][0], 16) == 7 else {"timestamp": "0x10"} for r in requests]
+
+    try:
+        crawl._fetch_block_timestamps(_NeverSeven(), [5, 7], retries=2)
+    except RuntimeError as exc:
+        assert "block 7" in str(exc) and "after 2 retries" in str(exc)
+    else:
+        raise AssertionError("a header that never arrives must still fail the run")

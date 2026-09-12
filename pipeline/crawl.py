@@ -65,7 +65,7 @@ from pipeline.pool import (
     quote_per_token,
 )
 from pipeline.recompute import crawled_at_for, load_partitions, load_samples, resolve_pair_class
-from pipeline.rpc import TOPIC_POOL_GRADUATED, TOPIC_TOKEN_LAUNCHED, decode_pool_graduated, decode_token_launched
+from pipeline.rpc import BATCH_PACING_SECONDS, TOPIC_POOL_GRADUATED, TOPIC_TOKEN_LAUNCHED, decode_pool_graduated, decode_token_launched
 from pipeline.stats import build_number, format_iso
 
 REORG_WINDOW = 3000
@@ -262,17 +262,46 @@ def _load_existing_keys(data_dir: Path, kind: str, days: set) -> set:
     return keys
 
 
-def _fetch_block_timestamps(rpc_client, blocks: list) -> dict:
-    unique_blocks = sorted(set(blocks))
-    if not unique_blocks:
+HEADER_RETRIES = 3
+
+
+def _fetch_block_timestamps(rpc_client, blocks: list, retries: int = HEADER_RETRIES) -> dict:
+    """Every record's block header, or a hard failure -- never a guess.
+
+    A batch can come back with one item empty while the rest are fine: the
+    endpoint answered, but not for that block. On 2026-09-12 that cost the
+    box its first run -- 4,825 headers asked for, one missing, thirty-five
+    minutes of scanning thrown away -- because a single empty item was
+    treated as final. It is not final: the blocks that came back empty are
+    asked for again, alone, a few times, and only what is still missing
+    after that is fatal. The all-or-nothing guarantee is unchanged -- a
+    header that never arrives still fails the run -- it just stops a
+    momentary gap in one answer from being the whole run's answer."""
+    pending = sorted(set(blocks))
+    if not pending:
         return {}
-    requests = [{"method": "eth_getBlockByNumber", "params": [hex(b), False]} for b in unique_blocks]
-    results = rpc_client.call_batch(requests)
-    timestamps = {}
-    for block, result in zip(unique_blocks, results):
-        if not result:
-            raise RuntimeError(f"crawl: missing block header for block {block}")
-        timestamps[block] = int(result["timestamp"], 16)
+    timestamps: dict = {}
+    for attempt in range(retries + 1):
+        requests = [{"method": "eth_getBlockByNumber", "params": [hex(b), False]} for b in pending]
+        results = rpc_client.call_batch(requests)
+        missing = []
+        for block, result in zip(pending, results):
+            if not result:
+                missing.append(block)
+                continue
+            timestamps[block] = int(result["timestamp"], 16)
+        pending = missing
+        if not pending:
+            break
+        if attempt < retries:
+            _log(f"crawl: {len(pending)} block header(s) missing, retrying (attempt {attempt + 1} of {retries})")
+            time.sleep(BATCH_PACING_SECONDS * (attempt + 1))
+    if pending:
+        raise RuntimeError(
+            f"crawl: missing block header for block {pending[0]}"
+            + (f" and {len(pending) - 1} more" if len(pending) > 1 else "")
+            + f" after {retries} retries"
+        )
     return timestamps
 
 
