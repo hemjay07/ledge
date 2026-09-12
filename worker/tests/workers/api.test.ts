@@ -587,13 +587,13 @@ describe("the other endpoints", () => {
 
   // 2026-09-12, REVAMP.md 1.1: the decision surface gained the site's own
   // shell, a redirecting lookup form, and a collapsed long form.
-  it("the shell carries the top bar's form and all four nav links", async () => {
+  it("the shell carries the top bar's form and every nav link", async () => {
     await seedLaunch(Math.floor(Date.now() / 1000) - 811);
     chainAnswers(launchedTokenReturn());
     const html = await (await get(`/t/${ADDRESS}`)).text();
     expect(html).toContain('<form class="topbar-find" method="get" action="/t">');
     expect(html).toContain('name="address"');
-    for (const label of ["Live", "Graduated", "Graveyard", "Reference"]) {
+    for (const label of ["Live", "Graduated", "Graveyard", "Token", "Reference"]) {
       expect(html).toContain(`>${label}</a>`);
     }
   });

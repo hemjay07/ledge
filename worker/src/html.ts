@@ -380,6 +380,7 @@ function topBar(siteOrigin: string): string {
         <a href="${siteOrigin}/live">Live</a>
         <a href="${siteOrigin}/graduated">Graduated</a>
         <a href="${siteOrigin}/graveyard">Graveyard</a>
+        <a href="${siteOrigin}/token">Token</a>
         <a href="${siteOrigin}/method">Reference</a>
       </nav>
     </div>
