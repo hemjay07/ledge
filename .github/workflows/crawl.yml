@@ -1,8 +1,17 @@
 name: crawl
 
+# 2026-09-12: the crawl itself moved to the box (INDEXER.md, ops/crawl.sh),
+# which pushes its data commits here. GitHub's `schedule:` is gone -- it
+# skipped four hours this morning and killed two catch-up runs at the
+# 45-minute ceiling -- and this workflow now does two things: publish
+# (KV, oracle) whenever a data commit lands, from wherever it came; and
+# crawl on `workflow_dispatch` only, as the fallback that can be fired from
+# a phone if the box is down.
 on:
-  schedule:
-    - cron: "7 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "data/number.json"
   workflow_dispatch:
 
 concurrency:
@@ -14,6 +23,7 @@ permissions:
 
 jobs:
   crawl:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
@@ -95,7 +105,9 @@ jobs:
   # and never blocks, dirties or delays the dataset.
   kv:
     needs: crawl
-    if: needs.crawl.outputs.committed == 'true' && vars.LEDGE_KV_NAMESPACE_ID != ''
+    # `always()` so a skipped crawl (a data push from the box) does not skip
+    # this too; the condition then decides on its own.
+    if: always() && !cancelled() && vars.LEDGE_KV_NAMESPACE_ID != '' && (github.event_name == 'push' || needs.crawl.outputs.committed == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     continue-on-error: false
@@ -137,8 +149,9 @@ jobs:
     needs: crawl
     # Cadence: publish at 00/06/12/18 UTC only (measured ~$30-45/month hourly on
     # Robinhood Chain at current gas; 6-hourly is ~$6). Set LEDGE_ORACLE_EVERY_RUN=1
-    # as a repo variable to publish hourly.
-    if: needs.crawl.outputs.committed == 'true' && vars.LEDGE_ORACLE_ADDRESS != '' && (vars.LEDGE_ORACLE_EVERY_RUN == '1' || contains('00 06 12 18', needs.crawl.outputs.hour))
+    # as a repo variable to publish hourly. On a data push from the box the
+    # hour is read off the clock, since there is no crawl job to report it.
+    if: always() && !cancelled() && vars.LEDGE_ORACLE_ADDRESS != '' && (github.event_name == 'push' || needs.crawl.outputs.committed == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # The data commit happens in the crawl job; this job runs after it, so a
@@ -159,8 +172,29 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The box pushes data every ten minutes; publishing on every push would
+      # multiply the gas bill by six. The hour gate that used to live in the
+      # job condition (off the crawl job's own clock) is applied here off
+      # this runner's clock instead, with the same four hours and the same
+      # override. A push at 06:03 publishes; one at 06:13 does not, and the
+      # next chance is 12:0x.
+      - name: hour gate
+        id: gate
+        run: |
+          hour=$(date -u +%H)
+          if [ "${{ vars.LEDGE_ORACLE_EVERY_RUN }}" = "1" ] || echo "00 06 12 18" | grep -qw "$hour"; then
+            if [ "${{ github.event_name }}" = "push" ]; then
+              minute=$(date -u +%M)
+              if [ "$minute" -ge 10 ]; then echo "publish=false" >> "$GITHUB_OUTPUT"; echo "hour $hour minute $minute: not the first push of the hour"; exit 0; fi
+            fi
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "hour $hour: not a publishing hour"
+          fi
+
       - name: publish reading
-        if: env.LEDGE_ORACLE_KEY != ''
+        if: env.LEDGE_ORACLE_KEY != '' && steps.gate.outputs.publish == 'true'
         run: python pipeline/publish_oracle.py
 
       - name: report a missing key
