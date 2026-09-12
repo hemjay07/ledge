@@ -5,6 +5,10 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/t",
+      "destination": "https://ledge-api.ledge-worker.workers.dev/t"
+    },
+    {
       "source": "/t/:address",
       "destination": "https://ledge-api.ledge-worker.workers.dev/t/:address"
     },

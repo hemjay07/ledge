@@ -577,9 +577,71 @@ describe("the other endpoints", () => {
     expect(html).toContain(`<meta property="og:image" content="${env.SITE_ORIGIN}/og/t/${ADDRESS}.png">`);
     expect(html).toContain(`${env.SITE_ORIGIN}/t/${ADDRESS}`);
     expect(html).toContain("minute 13");
-    expect(html).toContain("LEDGE.TOOLS");
+    // 2026-09-12, REVAMP.md 1.1: the old shell printed a static "LEDGE.TOOLS"
+    // <h1>; the rebuilt page carries the site's own top bar instead, whose
+    // mark reads "LEDGE" and links home, matching site/components/TopBar.tsx.
+    expect(html).toContain('class="topbar-mark">LEDGE</a>');
     // the facts are in the HTML, not only in a script
     expect(html).toContain("graduated");
+  });
+
+  // 2026-09-12, REVAMP.md 1.1: the decision surface gained the site's own
+  // shell, a redirecting lookup form, and a collapsed long form.
+  it("the shell carries the top bar's form and all four nav links", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    chainAnswers(launchedTokenReturn());
+    const html = await (await get(`/t/${ADDRESS}`)).text();
+    expect(html).toContain('<form class="topbar-find" method="get" action="/t">');
+    expect(html).toContain('name="address"');
+    for (const label of ["Live", "Graduated", "Graveyard", "Reference"]) {
+      expect(html).toContain(`>${label}</a>`);
+    }
+  });
+
+  it("GET /t?address= redirects to the token's own page, bare or inside a pasted URL", async () => {
+    const bare = await get(`/t?address=${ADDRESS}`);
+    expect(bare.status).toBe(302);
+    expect(bare.headers.get("Location")).toBe(`/t/${ADDRESS}`);
+
+    const pasted = await get(`/t?address=${encodeURIComponent(`https://ponsfamily.com/token/${ADDRESS}?ref=tg`)}`);
+    expect(pasted.status).toBe(302);
+    expect(pasted.headers.get("Location")).toBe(`/t/${ADDRESS}`);
+  });
+
+  it("GET /t?address= with no address 400s with the site's own wording", async () => {
+    const response = await get("/t?address=not-an-address");
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe("That is not a 20-byte address.");
+
+    const missing = await get("/t");
+    expect(missing.status).toBe(400);
+    expect(await missing.text()).toBe("That is not a 20-byte address.");
+  });
+
+  it("the pair token's zero address prints as ETH, never as hex, on the shell", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    chainAnswers(launchedTokenReturn());
+    const html = await (await get(`/t/${ADDRESS}`)).text();
+    expect(html).toContain("ETH · creator tax");
+    // The zero address legitimately appears once, inside the embedded JSON
+    // data island (`config.pairToken`, for programmatic consumers) -- never
+    // in the rendered cards, header or sentences a reader actually reads.
+    const visible = html.split('<script type="application/json"')[0] as string;
+    expect(visible).not.toContain("0x0000000000000000000000000000000000000000");
+  });
+
+  it("the sentences render inside a collapsed <details>, buyers before fill in the DOM", async () => {
+    await seedLaunch(Math.floor(Date.now() / 1000) - 811);
+    chainAnswers(launchedTokenReturn());
+    const html = await (await get(`/t/${ADDRESS}`)).text();
+    expect(html).toMatch(/<details class="fact-details">[\s\S]*<summary>As text/);
+    expect(html).toMatch(/<div id="fact">[\s\S]*<\/details>/);
+
+    const buyersAt = html.indexOf("Distinct buyers, launch block");
+    const fillAt = html.indexOf(">Curve fill<");
+    expect(buyersAt).toBeGreaterThan(-1);
+    expect(fillAt).toBeGreaterThan(-1);
+    expect(buyersAt).toBeLessThan(fillAt);
   });
 
   it("renders the death card as a PNG at 1200x630", async () => {

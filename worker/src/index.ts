@@ -441,6 +441,27 @@ export default {
       return handleToken(env, address, nowMs);
     }
 
+    // The shell's own lookup form (worker/src/html.ts topBar) posts here as a
+    // plain GET, so it works with no client script: a bare address, or one
+    // inside a pasted ponsfamily.com launch URL, redirects straight to that
+    // token's own page. Same address-anywhere-in-the-string match and the
+    // same objection wording site/components/TopBar.tsx uses, so a reader
+    // gets one answer whether JavaScript ran or not.
+    if (path === "/t") {
+      const raw = url.searchParams.get("address") ?? "";
+      const found = raw.match(/0x[0-9a-fA-F]{40}/);
+      if (!found) {
+        return new Response("That is not a 20-byte address.", {
+          status: 400,
+          headers: { "Content-Type": "text/plain; charset=utf-8", ...CORS },
+        });
+      }
+      return new Response(null, {
+        status: 302,
+        headers: { Location: `/t/${found[0].toLowerCase()}`, ...CORS },
+      });
+    }
+
     // /og/t/{address}.png is the unfurled card; /t/{address}/og.png is the
     // same image under the shell's own path, so a reader guessing either
     // lands on it.

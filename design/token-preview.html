@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minute 13 · on the curve · cohort 1.46% (n=2,324) · ETH · 2–3% — LEDGE</title>
+<link rel="canonical" href="https://ledge.tools/t/0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2">
+<meta name="description" content="minute 13 · on the curve · cohort 1.46% (n=2,324) · ETH · 2–3%">
+<meta property="og:type" content="article">
+<meta property="og:title" content="minute 13 · on the curve · cohort 1.46% (n=2,324) · ETH · 2–3%">
+<meta property="og:description" content="Launches configured this way, all time: 34 of 2,324 graduated, 1.46%. Excluding launches that graduated inside 5 min: 17 of 2,324, 0.73% (1 in 137).">
+<meta property="og:image" content="https://ledge.tools/og/t/0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2.png">
+<meta property="og:url" content="https://ledge.tools/t/0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://ledge.tools/og/t/0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #EFEAE0;
+    --ground-alt: #E5DFD1;
+    --ink: #16130F;
+    --ink-2: #45413A;
+    --ink-muted: #57503F;
+    --ink-3: #645E4E;
+    --rule-hair: #CDC6B3;
+    --rule-mid: #A9A18C;
+    --rule-heavy: #16130F;
+    --stale: #B3321C;
+    --stale-ink: #FFFFFF;
+    --fill: #2F6690;
+    --font-display: "Anton", Impact, "Arial Narrow", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font-body: "Newsreader", Georgia, "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #121110;
+      --ground-alt: #1C1A17;
+      --ink: #E8E3D8;
+      --ink-2: #B4AEA0;
+      --ink-muted: #A39B8A;
+      --ink-3: #918B80;
+      --rule-hair: #38342C;
+      --rule-mid: #565046;
+      --rule-heavy: #E8E3D8;
+      --stale: #F2704A;
+      --stale-ink: #121110;
+      --fill: #6FA8D8;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--ground); color: var(--ink); color-scheme: light dark; }
+  body {
+    margin: 0;
+    padding: 0 0 3rem;
+    font: 16px/1.5 var(--font-body);
+    background: var(--ground);
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  a { color: inherit; }
+
+  /* ---- top bar: same job as site/components/TopBar.tsx, static HTML ---- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--ground);
+    border-bottom: 1px solid var(--rule-heavy);
+  }
+  .topbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 30rem;
+    margin: 0 auto;
+    padding: 0.55rem 1rem;
+  }
+  .topbar-mark {
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    color: var(--ink);
+    text-decoration: none;
+    flex: none;
+  }
+  .topbar-find {
+    display: flex;
+    align-items: stretch;
+    flex: 1 1 100%;
+    order: 2;
+    min-width: 0;
+    border: 1px solid var(--rule-mid);
+  }
+  .topbar-find-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .topbar-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: 0.8125rem;
+    padding: 0.4rem 0.55rem;
+  }
+  .topbar-input::placeholder { color: var(--ink-3); }
+  .topbar-input:focus-visible { outline: 2px solid var(--fill); outline-offset: -2px; }
+  .topbar-go {
+    flex: none;
+    border: 0;
+    border-left: 1px solid var(--rule-mid);
+    background: transparent;
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0 0.7rem;
+    cursor: pointer;
+  }
+  .topbar-go:hover, .topbar-go:focus-visible { color: var(--ink); }
+  .topbar-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1 1 100%;
+    order: 3;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .topbar-nav a {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    text-decoration: none;
+    border-bottom: 1px solid var(--rule-hair);
+    white-space: nowrap;
+  }
+  .topbar-nav a:hover, .topbar-nav a:focus-visible { color: var(--ink); border-bottom-color: var(--ink); }
+
+  main { max-width: 30rem; margin: 0 auto; padding: 1.5rem 1rem 0; }
+
+  /* ---- the header: the address and the token's own facts, not a card --- */
+  .token-header { margin: 0 0 1.25rem; }
+  .addr-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .addr-full {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    word-break: break-all;
+    color: var(--ink);
+    flex: 1 1 auto;
+    min-width: 0;
+    -webkit-user-select: all;
+    user-select: all;
+  }
+  .copy-btn {
+    flex: none;
+    border: 1px solid var(--rule-mid);
+    background: transparent;
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+  }
+  .copy-btn:hover, .copy-btn:focus-visible { color: var(--ink); border-color: var(--ink); }
+  .token-meta-line {
+    margin: 0.5rem 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--ink-2);
+    word-break: break-word;
+  }
+
+  .card {
+    border: 1px solid var(--rule-hair);
+    background: var(--ground-alt);
+    padding: 1rem;
+    margin: 0 0 0.75rem;
+  }
+  .card.headline { border-color: var(--rule-mid); text-align: left; }
+  .k {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin: 0 0 0.4rem;
+  }
+  /* The homepage LIVE pulse's own display face and size (globals.css
+     .pulse-figure), in ink rather than the --fill accent: this is a fact
+     about one token, not "live and good news". */
+  .fig {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(2.75rem, 15vw, 4.5rem);
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.35rem;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  .fig-2 { font-size: clamp(1.375rem, 6vw, 1.75rem); font-family: var(--font-mono); font-weight: 600; letter-spacing: 0; }
+  .fig-dash { color: var(--ink-muted); }
+  .note { font-size: 0.8125rem; color: var(--ink-2); margin: 0.35rem 0 0; font-family: var(--font-body); }
+  .note:first-child { margin-top: 0; }
+  .bar {
+    height: 0.5rem;
+    background: var(--ground);
+    border: 1px solid var(--rule-hair);
+    margin: 0.6rem 0 0.5rem;
+    overflow: hidden;
+  }
+  .bar-fill { height: 100%; background: var(--fill); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem 0.75rem; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .cell { min-width: 0; }
+  .cell-wide { grid-column: 1 / -1; }
+  .cell-k {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin: 0 0 0.15rem;
+  }
+  .cell-v { display: block; font-family: var(--font-mono); font-size: 0.9375rem; word-break: break-word; }
+  .stale-banner {
+    color: var(--stale-ink);
+    background: var(--stale);
+    font-family: var(--font-mono);
+    font-weight: 500;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8125rem;
+    margin: 0 0 0.75rem;
+  }
+  .meta-line {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    word-break: break-word;
+    margin: 0.25rem 0 1.25rem;
+  }
+  hr { border: 0; border-top: 2px solid var(--rule-heavy); margin: 0.5rem 0 1rem; }
+
+  /* ---- the sentences: unchanged from lookupText, collapsed by default --- */
+  details.fact-details { margin: 0 0 1rem; }
+  details.fact-details summary {
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    padding: 0.1rem 0;
+  }
+  details.fact-details summary:hover, details.fact-details summary:focus-visible { color: var(--ink); }
+  #fact { margin-top: 0.75rem; }
+  #fact p { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--ink-2); font-family: var(--font-body); }
+
+  footer { color: var(--ink-muted); font-size: 0.8125rem; word-break: break-all; padding: 0 0 1rem; }
+  footer p { margin: 0 0 0.4rem; }
+</style>
+</head>
+<body>
+  
+  <header class="topbar">
+    <div class="topbar-row">
+      <a href="https://ledge.tools/" class="topbar-mark">LEDGE</a>
+      <form class="topbar-find" method="get" action="/t">
+        <label class="topbar-find-label" for="topbar-address">Look up a token</label>
+        <input id="topbar-address" name="address" class="topbar-input mono" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Paste a token address">
+        <button class="topbar-go" type="submit">Go</button>
+      </form>
+      <nav class="topbar-nav" aria-label="Sections">
+        <a href="https://ledge.tools/live">Live</a>
+        <a href="https://ledge.tools/graduated">Graduated</a>
+        <a href="https://ledge.tools/graveyard">Graveyard</a>
+        <a href="https://ledge.tools/method">Reference</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    
+    
+    
+    <div class="token-header">
+      <div class="addr-row">
+        <code class="addr-full mono" id="token-addr">0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2</code>
+        <button type="button" class="copy-btn" aria-label="Copy the token address" onclick="try{var t=document.getElementById('token-addr').textContent;navigator.clipboard.writeText(t);var b=this,o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1200);}catch(err){}">Copy</button>
+      </div>
+      <p class="token-meta-line">ETH · creator tax 2–3% · launched 14 min ago · on the curve</p>
+    </div>
+    
+    <section class="card headline">
+      <div class="k">Distinct buyers, launch block 56,172,001</div>
+      <div class="fig">7</div>
+      <div class="note">Bought in the block the token launched in.</div>
+    </section>
+    
+    <section class="card">
+      <div class="k">Curve fill</div>
+      <div class="fig fig-2">2.245 ETH of 4.2 ETH (53.5% of the threshold)</div>
+      <div class="bar"><div class="bar-fill" style="width:53.5%"></div></div>
+      
+      <div class="note">Read from the curve just now — Measured 7 Nov 2025 · 17:32 UTC.</div>
+    </section>
+    
+    <section class="card">
+      <div class="k">Tokens configured this way — ETH · 2–3%</div>
+      <div class="grid grid-2">
+        <div class="cell"><span class="cell-k">Last 24 hours</span><span class="cell-v">1.46% (n=2,324)</span></div>
+        <div class="cell"><span class="cell-k">All time</span><span class="cell-v">1.46% (n=2,324)</span></div>
+      </div>
+      <div class="note">Share of launches that graduated.</div>
+      <!-- outcomes: what tokens in this cohort did after graduating; lands with the outcomes tracker -->
+    </section>
+    
+    <section class="card">
+      <div class="k">Activity, counted over blocks 56172001 to 56172588</div>
+      <div class="grid">
+        <div class="cell"><span class="cell-k">Buys</span><span class="cell-v">41</span></div>
+        <div class="cell"><span class="cell-k">Sells</span><span class="cell-v">12</span></div>
+        <div class="cell"><span class="cell-k">Quote in</span><span class="cell-v">1.7432 ETH</span></div>
+        <div class="cell"><span class="cell-k">Quote out</span><span class="cell-v">0.22 ETH</span></div>
+        <div class="cell"><span class="cell-k">First buy</span><span class="cell-v">17:18 UTC · 11 s after launch</span></div>
+        <div class="cell"><span class="cell-k">Last activity</span><span class="cell-v">17:31 UTC · 40 s ago</span></div>
+      </div>
+    </section>
+    
+    <p class="meta-line">
+      launch block 56,172,001 · on the curve · Measured 7 Nov 2025 · 17:32 UTC ·
+      <a href="https://ledge.tools/method">https://ledge.tools/method</a>
+    </p>
+    <hr>
+    <details class="fact-details">
+      <summary>As text — what the bot posts</summary>
+      <div id="fact">
+        <p>0x23fe54b3…f98fe2 · Pons</p>
+        <p>ETH · 2–3% · on the bonding curve</p>
+        <p>minute 13 · on the curve · cohort 1.46% (n=2,324) · ETH · 2–3%</p>
+        <p>Launches configured this way, all time: 34 of 2,324 graduated, 1.46%. Excluding launches that graduated inside 5 min: 17 of 2,324, 0.73% (1 in 137).</p>
+        <p>In the last 24 hours: 34 of 2,324 graduated, 1.46%. Excluding launches that graduated inside 5 min: 17 of 2,324, 0.73% (1 in 137).</p>
+        <p>By 10 min, 76.4% of the 535 graduations measured in this window had already happened.</p>
+        <p>Curve fill: 2.245 ETH of 4.2 ETH (53.5% of the threshold).</p>
+        <p>Activity, counted over blocks 56172001 to 56172588: 41 buys, 12 sells, 1.7432 ETH in and 0.22 ETH out.</p>
+        <p>First buy: Measured 7 Nov 2025 · 17:18 UTC. Last activity: Measured 7 Nov 2025 · 17:31 UTC.</p>
+        <p>Distinct buyers in the launch's own block (block 56,172,001): 7.</p>
+        <p>Measured 7 Nov 2025 · 17:20 UTC</p>
+        <p>https://ledge.tools/method</p>
+      </div>
+    </details>
+    <hr>
+    <footer>
+      <p>0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2</p>
+      <p><a href="https://ledge.tools/method">https://ledge.tools/method</a></p>
+    </footer>
+  </main>
+  <script type="application/json" id="ledge-data">{"schemaVersion":1,"address":"0x23fe54b3bf9e1d2816822043c0b02b6a12f98fe2","venue":"pons","observedAt":"2025-11-07T17:32:15Z","source":"chain","config":{"pairToken":"0x0000000000000000000000000000000000000000","pairClass":"eth","pairSymbol":"ETH","pairDecimals":18,"creatorTaxBps":300,"taxBucket":"2-3%"},"state":{"phase":0,"phaseLabel":"on the bonding curve","curveFilledWei":"2245000707691451167","graduationThresholdWei":"4200000000000000000","curveFilledShare":0.534524,"fillNote":null,"launchBlock":56172001,"launchedAt":"2025-11-07T17:18:44Z","elapsedSeconds":811,"graduated":false,"graduatedAt":null,"timeToGraduationSeconds":null,"indexed":true},"cohort":{"crawledAt":"2025-11-07T17:20:15Z","definitionsVersion":"2026-09-06","key":{"pairClass":"eth","taxBucket":"2-3%"},"h24":{"window":"24h","crawledAt":"2025-11-07T17:20:15Z","launches":2324,"graduations":34,"rate":0.01463,"insufficient":false,"excludingFast":{"cutoffSeconds":300,"graduations":17,"rate":0.007315,"oneIn":137,"insufficient":false}},"allTime":{"window":"allTime","crawledAt":"2025-11-07T17:20:15Z","launches":2324,"graduations":34,"rate":0.01463,"insufficient":false,"excludingFast":{"cutoffSeconds":300,"graduations":17,"rate":0.007315,"oneIn":137,"insufficient":false}}},"activity":{"window":{"fromBlock":56172001,"toBlock":56172588,"label":"counted over blocks 56172001 to 56172588"},"buys":41,"sells":12,"quoteIn":"1743200000000000000","quoteOut":"220000000000000000","firstBuyAt":"2025-11-07T17:18:55Z","lastActivityAt":"2025-11-07T17:31:35Z","firstBlock":{"block":56172001,"distinctBuyers":7}},"freshness":{"crawledAt":"2025-11-07T17:20:15Z","ageSeconds":720,"staleAfterSeconds":7200,"stale":false},"placement":{"crawledAt":"2025-11-07T17:20:15Z","window":"allTime","elapsedSeconds":811,"rung":{"atSeconds":600,"cumulative":409,"cumulativeShare":0.764486},"n":535,"insufficient":false,"reason":"ok"},"live":{"stale":false,"lastSuccessAt":"2025-11-07T17:31:55Z","lastIndexedBlock":56172588},"notice":null,"links":{"method":"https://ledge.tools/method","numberJson":"https://ledge.tools/number.json"}}</script>
+</body>
+</html>
