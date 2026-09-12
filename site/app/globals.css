@@ -60,6 +60,12 @@
      the wheel entirely (CONSTRAINTS.md's NOT-THIS list), so the two things
      this site spends colour on can never be mistaken for each other. */
   --fill: #2f6690;
+  /* The discovery card's one-step tonal background (REVAMP.md 2026-09-12,
+     "the cards have a 1px --rule-mid border and a one-step tonal
+     background"). Aliases --ground-alt, which is already themed above, so a
+     card reads as one step up from the page rather than a second, unrelated
+     surface, in both themes. */
+  --surface: var(--ground-alt);
   --pad-x: 1.25rem;
 }
 @media (prefers-color-scheme: dark) {
@@ -1844,4 +1850,227 @@ footer {
    quiet one". */
 .live-card-analyst {
   color: var(--ink-3);
+}
+
+/* ==================================================================
+   The home page grid (REVAMP.md 2026-09-12, "the homepage direction").
+
+   Phone (the default, below 64rem): the grid is not a grid at all -- the
+   children stack in DOM order, which is already the order item 1-9 of the
+   build brief asks for, so nothing here has to reorder anything for a
+   screen reader or a tab sequence. Only at 64rem does `.home-grid` become
+   a 12-column grid and pick each child up by name into the desktop
+   layout -- grid-area is inert everywhere narrower than that.
+   ================================================================== */
+
+.home-grid {
+  margin-top: var(--s-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+
+/* The framed card: instrument's skeleton (design/homepage-instrument.html)
+   -- a hairline border, one tonal step up from the page, no shadow, sharp
+   corners, one flat fill. */
+.card {
+  border: 1px solid var(--rule-mid);
+  background: var(--surface);
+  padding: var(--s-4);
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  padding-bottom: var(--s-3);
+  margin-bottom: var(--s-3);
+  border-bottom: var(--rw-hair) solid var(--rule-mid);
+}
+.card-kicker {
+  margin-bottom: 0;
+}
+/* The stale colour, spent on the LIVE card's own header exactly as
+   CONSTRAINTS 7 asks: the card says its own age, and past staleAfterSeconds
+   or a stale live index, the header takes the one hue this site reserves
+   for "this figure is old". Never the --fill accent, which means the
+   opposite thing. */
+.is-stale-card .card-header {
+  border-bottom-color: var(--stale);
+}
+
+/* ---- the hook: not a card -- prose set the way the fold sets it -------- */
+.home-hook .kicker {
+  margin-bottom: var(--s-2);
+}
+.home-hook .capability-line {
+  font-family: var(--font-body);
+  font-size: 1.5rem;
+  line-height: 1.3;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.home-dek {
+  margin-top: var(--s-3);
+  max-width: 52ch;
+}
+
+/* ---- the table --------------------------------------------------------- */
+.home-table {
+  margin-top: 0;
+}
+.home-table table th[scope="row"] {
+  font-weight: 500;
+}
+
+/* ---- the callout: equal visual weight to the hook ---------------------- */
+.home-callout {
+  border-left: var(--rw-mid) solid var(--rule-heavy);
+  padding: var(--s-1) 0 var(--s-1) var(--s-4);
+}
+.callout-figure {
+  font-family: var(--font-body);
+  font-size: 1.5rem;
+  line-height: 1.3;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.callout-figure .mono {
+  font-weight: 600;
+}
+
+/* ---- the doors: framed links, one line each, no figures ---------------- */
+.home-door {
+  transition: border-color 150ms ease;
+}
+.home-door:hover,
+.home-door:focus-visible {
+  border-color: var(--ink);
+}
+.home-door:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.home-door .kicker {
+  margin-bottom: var(--s-2);
+}
+.home-door .note {
+  color: var(--ink-2);
+}
+
+/* ---- the NOW card's own link to /live ----------------------------------- */
+.home-now-link {
+  margin-top: var(--s-3);
+}
+.home-now-note {
+  margin-bottom: var(--s-3);
+}
+/* On a phone the five rows are laid out as blocks, not squeezed as columns:
+   the address on its own line, the counts on the next with their unit
+   written after them (the column heads are off screen), and the fill bar
+   across the whole width, because the bar is the reading the card exists
+   for and a column past the right edge is a column nobody sees. The head
+   row stays in the document for assistive tech; it is only moved off screen. */
+@media (max-width: 40rem) {
+  .home-now-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .home-now-table,
+  .home-now-table tbody,
+  .home-now-table caption {
+    display: block;
+    width: 100%;
+  }
+  .home-now-table tr {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    column-gap: var(--s-3);
+    row-gap: 0.2rem;
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--rule-hair);
+  }
+  .home-now-table th[scope="row"] {
+    grid-column: 1 / -1;
+    text-align: left;
+    padding: 0;
+    border: 0;
+  }
+  .home-now-table td {
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+  .home-now-table td[data-unit]::after {
+    content: " " attr(data-unit);
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    color: var(--ink-2);
+  }
+  .home-now-table .home-now-sells {
+    display: none;
+  }
+  .home-now-table .fill-cell {
+    grid-column: 1 / -1;
+    padding-top: 0.2rem;
+  }
+  .home-now-table .fill-quantities {
+    display: none;
+  }
+}
+
+/* ---- desktop: the 12-column grid --------------------------------------- */
+@media (min-width: 64rem) {
+  .home-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    column-gap: var(--s-8);
+    row-gap: var(--s-6);
+    grid-template-areas:
+      "hook hook hook hook hook hook hook live live live live live"
+      "table table table table table table table live live live live live"
+      "table table table table table table table callout callout callout callout callout"
+      "finding finding finding finding finding finding finding finding finding finding finding finding"
+      "now now now now now now now now now now now now"
+      "d1 d1 d1 d1 d2 d2 d2 d2 d3 d3 d3 d3";
+    align-items: start;
+  }
+  .home-hook {
+    grid-area: hook;
+  }
+  .home-table {
+    grid-area: table;
+  }
+  .home-callout {
+    grid-area: callout;
+  }
+  .home-live {
+    grid-area: live;
+  }
+  .home-finding {
+    grid-area: finding;
+  }
+  .home-now {
+    grid-area: now;
+  }
+  .home-door-1 {
+    grid-area: d1;
+  }
+  .home-door-2 {
+    grid-area: d2;
+  }
+  .home-door-3 {
+    grid-area: d3;
+  }
+}
+
+.home-rest {
+  margin: var(--s-8) 0 0;
 }

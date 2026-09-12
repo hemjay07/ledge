@@ -119,10 +119,15 @@ describe("the registers that moved to /cohorts", () => {
     expect(text).toContain("inside 60 seconds");
   });
 
+  /* 2026-09-12: the "#h-cohorts" LedgerEntry this pinned was dropped with the
+     rest of the sheet's ledger entries in REVAMP.md's homepage rebuild -- the
+     home page no longer numbers entries at all. The guarantee survives on the
+     "where the rest is" line the build replaced it with, linked once. */
   it("points at the cohorts page from the sheet, once", () => {
     const { container } = render(<Home />);
-    const entry = container.querySelector("#h-cohorts")?.closest(".entry");
-    expect(plain(entry)).toContain("Creator tax, hour of day, day of week");
-    expect(entry?.querySelector('a[href="/cohorts"]')).not.toBeNull();
+    const rest = container.querySelector(".home-rest");
+    expect(rest).not.toBeNull();
+    const links = [...(rest?.querySelectorAll('a[href="/cohorts"]') ?? [])];
+    expect(links).toHaveLength(1);
   });
 });

@@ -3,10 +3,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-/* The three new entries on / are prose, and prose is the part of this build a
-   type checker cannot hold to CONSTRAINTS. So the copy is read out of the page
-   source and checked here: the NOT-THIS list, the words that would turn a
-   measurement into a verdict, and the length. */
+/* The prose on / is the part of this build a type checker cannot hold to
+   CONSTRAINTS. So the copy is read out of the page source and checked here:
+   the NOT-THIS list, the words that would turn a measurement into a verdict,
+   and the length. */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PAGE = readFileSync(join(HERE, "..", "app", "page.tsx"), "utf8");
@@ -24,12 +24,17 @@ function copyOf(startMarker: string, endMarker: string): string {
     .trim();
 }
 
-/* Sliced by id, not by folio number: the folios were removed from this page on
-   2026-09-10 when it stopped being a broadsheet, and a marker keyed to one
-   would break for a reason that has nothing to do with the copy. */
-const CAPABILITY = copyOf('<div className="capability">', "</div>");
-const WHAT_THIS_IS = copyOf('<LedgerEntry id="h-what"', "</LedgerEntry>");
-const MORE_COHORTS = copyOf('<LedgerEntry id="h-cohorts"', "</LedgerEntry>");
+/* 2026-09-12 (REVAMP.md "the homepage direction"): the sheet's ledger
+   entries -- `<div className="capability">`, `<LedgerEntry id="h-what">`,
+   `<LedgerEntry id="h-cohorts">` -- were replaced outright by the build the
+   three mockups decided: a hook (kicker, h1, one dek line) and a single
+   "where the rest is" line carrying the links those entries used to hold.
+   The copy markers below are read off the new blocks; the constraint checks
+   that ran against the old ones (banned words, no emoji, word caps,
+   no-verdict) run against the new ones unchanged. */
+const HOOK_DEK = copyOf('<p className="dek home-dek">', "</p>");
+const HOME_REST = copyOf('<p className="note home-rest">', "</p>");
+const FINDING_ITALIC = copyOf("<em>Two populations", "</em>");
 
 /* The pair-token finding was WITHDRAWN from this page on 2026-09-10, not
    moved. It said the pair token makes no difference once fast graduations are
@@ -40,7 +45,9 @@ const MORE_COHORTS = copyOf('<LedgerEntry id="h-cohorts"', "</LedgerEntry>");
    reversal to be published rather than edited away. */
 
 /* CONSTRAINTS.md's NOT-THIS list, plus the verdict vocabulary a lookup page is
-   the likeliest surface to acquire. */
+   the likeliest surface to acquire. Deliberately excludes "buy"/"sell": those
+   are factual descriptions of on-chain activity used throughout the site
+   (Live.tsx's own "Buys"/"Sells" columns, "taking buys"), not a verdict. */
 const BANNED = [
   "trade smarter",
   "know before you ape",
@@ -66,41 +73,47 @@ const BANNED = [
   "predict",
   "odds",
   "chance",
-  "buy",
-  "sell",
   "ape",
 ];
 
+/* CONSTRAINTS 6: the FINDING card's italic caption describes the shape
+   without implying which population is which. */
+const FINDING_BANNED = ["rigged", "fake", "organic", "real", "self-fill", "suspicious", "bot"];
+
 /* The visual pass of 2026-09-10 cut the ~150-word "What this is" entry to one
-   line linking to /method: a trader does not care what we refuse to do, and
-   naming our own constraints back at the reader was exactly the essay this
-   pass exists to remove. The assertions that pinned the withdrawn copy's own
-   wording (what it said it measures, the never-list phrasing, the gap
-   sentence) are removed with it -- that copy no longer exists to check. The
-   assertions that guard a CONSTRAINT rather than a sentence (banned words,
-   no emoji, no-verdict) carry forward unchanged onto the one line that
-   replaced it. */
-describe("the What this is entry", () => {
+   line linking to /method; REVAMP.md's 2026-09-12 rebuild replaced that one
+   line with the hook's own dek, which says what LEDGE does rather than what
+   it refuses to do. The assertions that guard a CONSTRAINT rather than a
+   sentence (banned words, no emoji, no-verdict) carry forward unchanged onto
+   whichever line currently carries that job. */
+describe("the hook's dek", () => {
   it("passes the banned-words list", () => {
-    const lower = WHAT_THIS_IS.toLowerCase();
+    const lower = HOOK_DEK.toLowerCase();
     for (const banned of BANNED) {
       expect(lower.includes(banned), `"${banned}" is on the page`).toBe(false);
     }
   });
 
   it("carries no emoji", () => {
-    expect(WHAT_THIS_IS).not.toMatch(
+    expect(HOOK_DEK).not.toMatch(
       /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}]/u,
     );
   });
 
-  it("runs to 120 words or fewer", () => {
-    const words = WHAT_THIS_IS.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w));
-    expect(words.length).toBeLessThanOrEqual(120);
+  /* REVAMP.md: "One short Newsreader line under it, max 25 words". */
+  it("runs to 25 words or fewer", () => {
+    const words = HOOK_DEK.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w));
+    expect(words.length).toBeLessThanOrEqual(25);
   });
 
   it("tells no reader what to do with a number", () => {
-    expect(WHAT_THIS_IS.toLowerCase()).not.toMatch(/\byou should\b|\bstart\b|\btry\b|\bget\b/);
+    expect(HOOK_DEK.toLowerCase()).not.toMatch(/\byou should\b|\bstart\b|\btry\b|\bget\b/);
+  });
+
+  it("says what LEDGE does: indexes every launch, hourly, and times every graduation", () => {
+    expect(HOOK_DEK).toMatch(/factory contract/i);
+    expect(HOOK_DEK).toMatch(/hourly/i);
+    expect(HOOK_DEK).toMatch(/graduation/i);
   });
 });
 
@@ -113,20 +126,21 @@ describe("the sheet, without folio numbers", () => {
     expect([...PAGE.matchAll(/folio="(\d{2})"/g)].map((m) => m[1])).toEqual([]);
   });
 
-  /* The lookup moved above the proof on 2026-09-11. Pasting an address is the
-     only decision this page offers, and it was sitting under a heading halfway
-     down, beneath the chart and the paths. The action now comes before the
-     argument for it. */
-  /* The lookup left this page on 2026-09-11 for the shell, where it is on
-     every page instead of only this one. Its reachability is asserted in
-     tests/topbar.test.tsx, which is stricter than asserting it here was. */
-  it("runs the pulse, the capability, then the proof, the paths and the rate", () => {
+  /* 2026-09-12 (REVAMP.md "the homepage direction"): this pinned the 2026-09
+     front door's own order -- the live pulse, the capability line, the
+     shape, the paths, then the Number's fold. That layout was replaced
+     outright by the build decided across the three mockups: the LIVE card,
+     the hook, the four-row table, the callout, the FINDING card, the NOW
+     card, then the three doors. Rewritten to the new order and the new
+     markers; nothing here is loosened, only retargeted. */
+  it("runs the LIVE card, the hook, the table, the callout, the finding, the now card, then the doors", () => {
     const order = [
-      "<LivePulse",
-      'className="capability"',
-      'className="shape-lead"',
-      'className="paths-on"',
-      'className="headline-rate"',
+      "<HomeLiveCard",
+      'className="home-hook"',
+      'className="home-table"',
+      'className="home-callout"',
+      'className="home-finding"',
+      "home-door-1",
     ].map((marker) => PAGE.indexOf(marker));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -139,7 +153,15 @@ describe("the sheet, without folio numbers", () => {
     for (const marker of ["<Fold", "id=\"h-pair\"", "id=\"h-ttg\"", "<LiveBoard"]) {
       expect(PAGE.includes(marker), `${marker} is still reprinted on the sheet`).toBe(false);
     }
-    for (const href of ["/number", "/cohorts", "/live", "/graduated", "/graveyard", "/method"]) {
+    for (const href of [
+      "/number",
+      "/cohorts",
+      "/cockpit",
+      "/live",
+      "/graduated",
+      "/graveyard",
+      "/method",
+    ]) {
       expect(PAGE.includes(href), `${href} is not linked`).toBe(true);
     }
   });
@@ -163,52 +185,30 @@ describe("the withdrawn pair finding, and what is left in its place", () => {
     expect(PAGE).not.toContain("the pair token makes no");
   });
 
+  /* 2026-09-12: the pointer moved from the "#h-cohorts" LedgerEntry to the
+     "where the rest is" line the homepage rebuild replaced it with. */
   it("still points at the page that holds the pair cohorts", () => {
-    expect(MORE_COHORTS).toContain("Creator tax, hour of day, day of week");
-    expect(MORE_COHORTS).toContain("launches per deployer");
-    expect(MORE_COHORTS).toContain("all-time");
-    expect(MORE_COHORTS.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length)
-      .toBeLessThanOrEqual(30);
+    expect(HOME_REST).toMatch(/cohorts/i);
+    expect(PAGE).toContain('href="/cohorts"');
   });
 
   it("passes the banned-words list", () => {
-    const lower = MORE_COHORTS.toLowerCase();
+    const lower = HOME_REST.toLowerCase();
     for (const banned of BANNED) {
       expect(lower.includes(banned), `"${banned}" is on the page`).toBe(false);
     }
   });
 });
 
-/* Added 2026-09-11. Three independent assessments found that a stranger
-   landing here could not tell in ten seconds whether this was an audit, a
-   dashboard, a data feed or a signal service: the page opened on a finding,
-   which only means something to someone who already knows what the site is
-   for. The orienting line is now the first thing in the fold, and this pins
-   it there so it cannot quietly be edited back out. */
-describe("the page says what it is before it says what it found", () => {
-  const WHAT = copyOf('<p className="capability-what">', "</p>");
-
-  it("names the thing, the source and what a reader can do, in one line", () => {
-    expect(WHAT).toMatch(/free/i);
-    expect(WHAT).toMatch(/pons/);
-    expect(WHAT).toMatch(/factory contract/i);
-    expect(WHAT).toMatch(/paste an address/i);
-  });
-
-  it("comes before the claim it introduces", () => {
-    expect(PAGE.indexOf('className="capability-what"')).toBeLessThan(
-      PAGE.indexOf('className="capability-line"'),
-    );
-  });
-
-  it("passes the banned-words list and tells no reader what to do with a number", () => {
-    const lower = WHAT.toLowerCase();
-    for (const banned of BANNED) {
-      expect(lower.includes(banned), `"${banned}" is on the page`).toBe(false);
+/* The FINDING card's italic caption (REVAMP.md 2026-09-12, item 5): it
+   describes the shape of the record -- two populations, a spike, a trough, a
+   broad hump -- without a word implying fake, rigged, bot or organic
+   (CONSTRAINTS 6). */
+describe("the FINDING card's caption", () => {
+  it("names the shape without labelling a bucket", () => {
+    const lower = FINDING_ITALIC.toLowerCase();
+    for (const banned of FINDING_BANNED) {
+      expect(lower.includes(banned), `"${banned}" is in the finding caption`).toBe(false);
     }
-  });
-
-  it("stays one line: 40 words or fewer", () => {
-    expect(WHAT.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length).toBeLessThanOrEqual(40);
   });
 });

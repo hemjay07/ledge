@@ -21,7 +21,16 @@
    plain column on the same row a reader can already see (CONSTRAINTS 1);
    nothing here composes a verdict out of them. */
 
-import { useEffect, useMemo, useState, type MouseEvent, type ReactElement } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { fetchLive, stripAddresses, type LiveResult, type LiveSortKey } from "../lib/api";
 import { LIVE_SORT_KEYS } from "../lib/api-schema";
 import type { LiveResponse } from "../lib/api-schema";
@@ -43,7 +52,7 @@ import {
 } from "../lib/format";
 
 const REFRESH_MS = 15_000;
-const DEFAULT_SORT: LiveSortKey = "lastActivity";
+export const DEFAULT_SORT: LiveSortKey = "lastActivity";
 
 type Row = LiveResponse["rows"][number];
 
@@ -118,7 +127,7 @@ function applyLiveFilters(rows: Row[], f: LiveFilters): Row[] {
   });
 }
 
-function useLiveBoard(sort: LiveSortKey) {
+export function useLiveBoard(sort: LiveSortKey) {
   const [result, setResult] = useState<LiveResult | null>(null);
 
   useEffect(() => {
@@ -167,30 +176,49 @@ function stalenessNote(body: LiveResponse): ReactElement | null {
 
 const HOUR_SECONDS = 3600;
 
-export function LivePulse(): ReactElement {
-  const result = useLiveBoard(DEFAULT_SORT);
+/** The pulse's two counts, off the same rows every caller of a live result
+    reads. Pulled out so the standalone pulse and the home page's LIVE card
+    -- which lifts its own fetch (REVAMP.md 2026-09-12, "do ONE fetch loop
+    for the page") -- cannot compute them two different ways. */
+export function pulseCounts(body: LiveResponse): { takingBuys: number; lastHour: number } {
+  return {
+    takingBuys: body.rows.filter((r) => r.buys > 0).length,
+    lastHour: body.rows.filter((r) => r.ageSeconds <= HOUR_SECONDS).length,
+  };
+}
+
+/** The pulse's own age, in seconds, off its own measurement time. */
+export function pulseAgeSeconds(body: LiveResponse): number {
+  return Math.max(0, Math.round((Date.now() - Date.parse(body.observedAt)) / 1000));
+}
+
+/* The failure state is the first line a visitor reads when the live layer is
+   unreachable, so it says which reading is missing and nothing else. It used
+   to print the API's own message, which is written for the token lookup and
+   opens "The lookup did not answer" -- the wrong noun, and a failure as the
+   first sentence on the page. The rest of the page is static and correct
+   without this, so nothing here is estimated and nothing is filled in. */
+export function PulseQuiet(): ReactElement {
+  return (
+    <p className="pulse-quiet">
+      The live count is not reachable right now — everything below is unaffected.
+    </p>
+  );
+}
+
+/** The two readings and the age line, given a result rather than fetching
+    one. `LivePulse` below is this, self-fetching, for a caller that owns no
+    fetch of its own; the home page's LIVE card renders this same body
+    against the fetch it lifted, so the two never read a different rate of
+    the same rows. */
+export function PulseBody({ result }: { result: LiveResult | null }): ReactElement {
   const body = result?.kind === "live" ? result.body : null;
 
-  /* The failure state is the first line a visitor reads when the live layer is
-     unreachable, so it says which reading is missing and nothing else. It used
-     to print the API's own message, which is written for the token lookup and
-     opens "The lookup did not answer" -- the wrong noun, and a failure as the
-     first sentence on the page. The rest of the page is static and correct
-     without this, so nothing here is estimated and nothing is filled in. */
-  if (result !== null && result.kind === "error") {
-    return (
-      <p className="pulse-quiet">
-        The live count is not reachable right now — everything below is unaffected.
-      </p>
-    );
-  }
-  if (body === null) {
-    return <div className="hairline-pulse" />;
-  }
+  if (result !== null && result.kind === "error") return <PulseQuiet />;
+  if (body === null) return <div className="hairline-pulse" />;
 
-  const takingBuys = body.rows.filter((r) => r.buys > 0).length;
-  const lastHour = body.rows.filter((r) => r.ageSeconds <= HOUR_SECONDS).length;
-  const ageSeconds = Math.max(0, Math.round((Date.now() - Date.parse(body.observedAt)) / 1000));
+  const { takingBuys, lastHour } = pulseCounts(body);
+  const ageSeconds = pulseAgeSeconds(body);
 
   return (
     <div className="live-pulse">
@@ -226,6 +254,11 @@ export function LivePulse(): ReactElement {
   );
 }
 
+export function LivePulse(): ReactElement {
+  const result = useLiveBoard(DEFAULT_SORT);
+  return <PulseBody result={result} />;
+}
+
 /* null and 0 are different findings: the launch block was never indexed,
    versus it was indexed and nobody bought in it. Collapsing them to the
    same reading would erase that difference. Shared by the table cell and the
@@ -249,7 +282,12 @@ function firstBlockBuyersCell(value: number | null): ReactElement {
    guessing would be exactly the fake precision CONSTRAINTS 4 bans. A
    percentage may stand beside them; it never stands alone. A row with no
    threshold renders no bar at all. */
-function FillBody({ row }: { row: Row }): ReactElement {
+/* `compact` prints the bar and the figures and leaves the label to the table's
+   caption, which states it once. The label is a forty-word sentence; printed
+   on every row it made each row ~450 px on a phone (REVAMP.md, "a failure
+   worth recording"). The rule -- the threshold travels with what it is
+   measured against -- is kept by the caption, not dropped. */
+export function FillBody({ row, compact = false }: { row: Row; compact?: boolean }): ReactElement {
   const pct = fillPercent(row.netQuoteWei, row.fill!.graduationThresholdWei);
   const width = pct === null ? 0 : Math.min(100, Math.max(0, pct));
   /* In the pair token's own units where they are known -- "1.5232 of 4.2 ETH"
@@ -266,27 +304,30 @@ function FillBody({ row }: { row: Row }): ReactElement {
         <div className="fill-bar" style={{ width: `${width}%` }} />
       </div>
       <p className="fill-figures mono">
-        {figures}
-        {pct === null ? null : <> · {pct.toFixed(1)}%</>}
+        <span className={compact ? "fill-quantities" : undefined}>
+          {figures}
+          {pct === null ? null : " · "}
+        </span>
+        {pct === null ? null : <>{pct.toFixed(1)}%</>}
       </p>
-      {threshold.scaled ? null : (
+      {compact || threshold.scaled ? null : (
         <p className="note note--fine">
           Raw base units. This pair token&rsquo;s decimals are not known, so the figures are not
           scaled.
         </p>
       )}
-      <p className="note note--fine">{row.fill!.label}</p>
+      {compact ? null : <p className="note note--fine">{row.fill!.label}</p>}
     </div>
   );
 }
 
-function FillCell({ row }: { row: Row }): ReactElement {
+function FillCell({ row, compact = false }: { row: Row; compact?: boolean }): ReactElement {
   if (row.fill === null) {
     return <td className="thin">no threshold indexed</td>;
   }
   return (
     <td className="fill-cell">
-      <FillBody row={row} />
+      <FillBody row={row} compact={compact} />
     </td>
   );
 }
@@ -307,7 +348,7 @@ function windowCell(row: Row): ReactElement {
 /* The address, shortened the way Graduated.tsx and worker/src/text.ts shorten
    it, so the same token reads identically on every board. The full address
    is the link target and the title, so nothing is lost. */
-function shortAddress(address: string): string {
+export function shortAddress(address: string): string {
   return `${address.slice(0, 10)}…${address.slice(-6)}`;
 }
 
@@ -636,6 +677,145 @@ export function LiveBoardFull(): ReactElement {
         <TokenPanel token={panel.token} onClose={panel.close} returnFocusTo={panel.returnFocusTo} />
       ) : null}
     </div>
+  );
+}
+
+/* ---- the home page's LIVE and NOW cards (REVAMP.md 2026-09-12) ---------
+
+   The build puts the LIVE card at the top of the page and the NOW card much
+   further down, beneath the FINDING card -- two different places in the DOM
+   for what has to stay one fetch (REVAMP.md item 6: "do ONE fetch loop for
+   the page ... not two"). A single component returning both as siblings
+   cannot be placed in two spots, so the fetch is lifted one level further,
+   into a context: `HomeLiveProvider` calls `useLiveBoard` once, and
+   `HomeLiveCard` and `HomeNowCard` each read the same result back out of it
+   from wherever the page's grid puts them. The NOW card's "ranked by buys"
+   is a client-side sort of the rows that one fetch already holds -- not a
+   second request with a different `sort` -- so the two cards can never show
+   a different snapshot of the board. */
+
+const NOW_ROWS = 5;
+
+const HomeLiveContext = createContext<LiveResult | null | undefined>(undefined);
+
+export function HomeLiveProvider({ children }: { children: ReactNode }): ReactElement {
+  const result = useLiveBoard(DEFAULT_SORT);
+  return <HomeLiveContext.Provider value={result}>{children}</HomeLiveContext.Provider>;
+}
+
+function useHomeLiveResult(): LiveResult | null {
+  const ctx = useContext(HomeLiveContext);
+  if (ctx === undefined) {
+    throw new Error("HomeLiveCard/HomeNowCard must render inside a HomeLiveProvider");
+  }
+  return ctx;
+}
+
+export function HomeLiveCard({ staleAfterSeconds }: { staleAfterSeconds: number }): ReactElement {
+  const result = useHomeLiveResult();
+  const body = result?.kind === "live" ? result.body : null;
+  const ageSeconds = body === null ? null : pulseAgeSeconds(body);
+  const stale = body !== null && (body.live.stale || (ageSeconds !== null && ageSeconds >= staleAfterSeconds));
+
+  const ageText =
+    result !== null && result.kind === "error"
+      ? "unreachable"
+      : body === null
+        ? "…"
+        : `updated ${formatAge(ageSeconds ?? 0)} ago`;
+
+  return (
+    <section className={`card home-live${stale ? " is-stale-card" : ""}`} aria-label="Live pulse">
+      <div className="card-header">
+        <span className={`kicker card-kicker${stale ? " is-stale" : ""}`}>LIVE</span>
+        <span className={`note note--fine mono${stale ? " is-stale" : ""}`}>{ageText}</span>
+      </div>
+      <div className="card-body">
+        {result !== null && result.kind === "error" ? <PulseQuiet /> : <PulseBody result={result} />}
+      </div>
+    </section>
+  );
+}
+
+export function HomeNowCard(): ReactElement {
+  const result = useHomeLiveResult();
+  const body = result?.kind === "live" ? result.body : null;
+
+  const topByBuys = useMemo(
+    () => (body === null ? [] : [...body.rows].sort((a, b) => b.buys - a.buys).slice(0, NOW_ROWS)),
+    [body],
+  );
+
+  return (
+    <section className="card home-now" aria-label="Curves taking buys right now">
+      <div className="card-header">
+        <span className="kicker card-kicker">NOW · taking buys · ranked by buys</span>
+      </div>
+      <div className="card-body">
+        {result === null ? <div className="hairline-pulse" /> : null}
+        {result !== null && result.kind === "error" ? (
+          <p className="pulse-quiet">The live board is not reachable right now.</p>
+        ) : null}
+        {body !== null ? (
+          <>
+            {/* The note sits outside the scroller so it wraps to the card's width
+                instead of scrolling sideways with the table and clipping. */}
+            <p className="note note--fine home-now-note">
+              Fill is the indexed net quote against each launch&rsquo;s own graduation
+              threshold, an upper bound on the curve&rsquo;s reserve; the full reading is on
+              each token&rsquo;s own page.
+            </p>
+            <div className="scroller">
+              <table className="home-now-table">
+                <caption>The first five tracked curves, ranked by buys.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Token</th>
+                    <th scope="col">Buys</th>
+                    <th scope="col" className="home-now-sells">
+                      Sells
+                    </th>
+                    <th scope="col">First-block buyers</th>
+                    <th scope="col">Fill against own threshold</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topByBuys.map((row) => (
+                    <tr key={row.token}>
+                      <th scope="row" className="mono">
+                        <a href={`/t/${row.token}`} title={row.token}>
+                          {shortAddress(row.token)}
+                        </a>
+                      </th>
+                      <td className="fig n" data-unit="buys">
+                        {formatCount(row.buys)}
+                      </td>
+                      <td className="fig n home-now-sells" data-unit="sells">
+                        {formatCount(row.sells)}
+                      </td>
+                      <td
+                        className={row.firstBlockBuyers === null ? "thin" : "fig n"}
+                        data-unit={row.firstBlockBuyers === null ? undefined : "first-block"}
+                      >
+                        {firstBlockBuyersText(row.firstBlockBuyers)}
+                      </td>
+                      <FillCell row={row} compact />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {topByBuys.length === 0 ? (
+              <p className="note note--fine">No launch has activity in the indexed window.</p>
+            ) : (
+              <p className="note note--fine home-now-link">
+                <a href="/live">All {formatCount(body.count)} on the live board</a>
+              </p>
+            )}
+          </>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

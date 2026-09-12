@@ -149,18 +149,23 @@ describe("the sample, on both surfaces", () => {
      REACHABILITY, not about which page leads. So the home page must still
      carry the figure and a way to the full treatment, and that is asserted
      here rather than deleted. */
+  /* 2026-09-12: the home page stopped stating the trailing-24h rate
+     (".headline-rate") and started stating the raisedNothing sample itself,
+     in the callout REVAMP.md's dated entry gives equal visual weight to the
+     hook -- a stronger reading of CONSTRAINTS 5 than a link onward, since the
+     ugly number is printed on the front door rather than one click away from
+     it. The guarantee this test pins is unchanged: the value is never typed
+     here (this page renders the LIVE file while this suite's fixture is
+     frozen), only that a value is stated with its window and denominator,
+     and that /number and /method are still one click away. */
   it("is reachable from the sheet, which states the rate and links to it", () => {
     const { container } = render(<Home />);
-    /* The value itself is not pinned here: this page renders the LIVE file
-       while this suite's fixture is frozen, and pinning a live figure is what
-       has broken these tests before. What is pinned is the guarantee — the
-       rate is stated with the window and the denominator it was counted over,
-       and both the full treatment and the method are one click away. */
-    const stated = container.querySelector(".headline-rate");
+    const stated = container.querySelector(".home-callout");
     expect(stated).not.toBeNull();
-    const text = plain(stated);
-    expect(text).toMatch(/launches in the last 24 hours/);
-    expect(text).toMatch(/\d/);
+    const stat = stated?.querySelector('[data-stat="raised-nothing"]');
+    expect(stat).not.toBeNull();
+    expect(stat?.getAttribute("data-window")).toBe("sampled");
+    expect(stat?.getAttribute("data-n")).toMatch(/\d/);
     expect(container.querySelector('a[href="/number"]')).not.toBeNull();
     expect(container.querySelector('a[href="/method"]')).not.toBeNull();
   });

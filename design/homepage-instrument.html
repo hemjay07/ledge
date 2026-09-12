@@ -1,0 +1,942 @@
+<!--
+  LEDGE — homepage, "instrument" direction
+  Designer: structure-and-depth pass (information/interaction design).
+
+  THESIS
+  One page, one reading order: the hook first, the tool to check any token
+  second, and three framed instruments underneath it that each prove a
+  different claim — none of them competing for the same glance.
+
+  WHY THE PAGE FAILS TODAY
+  Everything sits at the same visual weight on one column, so a reader has to
+  read every word to find the one number that matters. That is a document's
+  reading model, not an instrument's. An instrument tells you where to look
+  before you decide to read.
+
+  THREE BIGGEST DECISIONS
+
+  1. KEPT the type identity (Anton / IBM Plex Mono / Newsreader) and the
+     bone-and-ink palette, and ADDED depth on top of it rather than replacing
+     it. It is already distinctive — no competitor on a launch-timing site is
+     running a poster face and a ledger mono together — and the brief's real
+     complaint was never the fonts, it was the absence of a grid. Replacing a
+     working identity to solve a layout problem would be solving the wrong
+     problem. What I added: a card is drawn with a 1px hairline rule and a
+     background-tone step (never a shadow, never a radius past 2px) — depth
+     that reads as "a separate ledger entry," not "a floating UI panel." No
+     box-shadow appears anywhere in this file.
+
+  2. THREE FRAMES, THREE VERBS. The live pulse is stamped LIVE, the
+     distribution chart is stamped FINDING, the board preview is stamped NOW.
+     Each frame's label is a claim about what kind of fact is inside it —
+     current state, a finding you can check, a live document — so the eye
+     sorts the page by type of information before it reads a single number.
+     This is the direct answer to "no hierarchy": hierarchy here is not size,
+     it's category.
+
+  3. THE LOOKUP IS TREATED AS THE PRIMARY CONTROL, not a form buried in a
+     footer. It sits beside the hook at the top of the reading order, at full
+     tap-target height, because the one action a reader can take on this page
+     — check the token someone just linked them — should look like the most
+     important thing on the screen, not an afterthought below three charts.
+
+  ONE ACCENT COLOUR, AND WHY
+  A single steel-blue (`--accent`) marks live activity only — the pulse dot,
+  the lookup's focus ring, the fill bars in the board preview. It never
+  appears near the stale state, whose warm red (`--stale`) is the only other
+  colour in the system and is never reused for anything else. This matches
+  the 2026-09-10 relaxation in CONSTRAINTS.md: one accent for live activity is
+  permitted provided it stays unambiguous against stale. The accent is always
+  a flat fill or a 1px rule, nothing blurred, and no other hue appears on the
+  page outside these two.
+
+  STATE MAP
+  Live pulse: live (default, shown), stale (own red banner + aged timestamp),
+  loading (skeleton bar), empty (dash + explicit n=0) — all four are drawn
+  once, small, in the "how this page marks state" strip near the footer, so
+  the four states are checkable against each other rather than described in
+  prose.
+
+  DENOMINATORS
+  Every rate on this page keeps its n or its window in the same visual unit
+  as the number — never a separate footnote the reader has to hunt for.
+
+  WHAT I LEFT OUT
+  No per-token verdict of any kind (the board preview ranks by buys, a shown
+  quantity, not by a judgment). No wallet connect, no gate of any figure, no
+  score. No second accent colour, no illustration, no motion beyond a
+  reduced-motion-safe pulse on the live dot. The board preview rows are
+  labelled illustrative rather than presented as a live snapshot, because a
+  static mock that claimed to be the current board would be exactly the
+  "faked precision" CONSTRAINTS.md bans — the real page wires this table to
+  the live feed.
+
+  Real figures used throughout: 165,000 indexed launches, ~18,000/day,
+  93.5% of 165,000 take zero buys, 2,922 graduations, 15/26/37/61% at
+  10s/30s/60s/5min, median 156s, the 14-bucket doubling histogram
+  (158, 96, 116, 136, 247, 254, 230, 285, 249, 205, 159, 110, 72, 157 —
+  n=2,474 of 2,922 graduations with a resolved bucket), and the live pulse
+  placeholder (183 of 200 tracked curves taking buys, 0 launched in the last
+  hour).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEDGE — pons, timed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ground:#EFEAE0;
+    --ground-alt:#E5DFD1;
+    --surface:#F6F3EA;
+    --ink:#16130F;
+    --ink-2:#45413A;
+    --ink-muted:#57503F;
+    --ink-3:#645E4E;
+    --rule-hair:#CDC6B3;
+    --rule-mid:#A9A18C;
+    --rule-heavy:#16130F;
+    --stale:#B3321C;
+    --stale-ink:#FFFFFF;
+    --accent:#2F6B8C;
+    --accent-ink:#F6F3EA;
+    --accent-wash:#DCE6E9;
+
+    --fs-figure: clamp(2.75rem, 13vw, 5.5rem);
+    --fs-stat: clamp(1.5rem, 5vw, 2.25rem);
+    --fs-lede: clamp(1.0625rem, .5vw + 1rem, 1.25rem);
+    --fs-body: 1rem;
+    --fs-note: .875rem;
+    --fs-fine: .8125rem;
+    --fs-label: .6875rem;
+    --fs-micro: .625rem;
+
+    --s-1:.25rem; --s-2:.5rem; --s-3:.75rem; --s-4:1rem;
+    --s-6:1.5rem; --s-8:2rem; --s-12:3rem; --s-16:4rem;
+
+    --rw-hair:1px; --rw-mid:3px; --rw-heavy:6px;
+    --radius:2px;
+    color-scheme: light dark;
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#121110;
+      --ground-alt:#1C1A17;
+      --surface:#18160F14;
+      --surface:#1B1915;
+      --ink:#E8E3D8;
+      --ink-2:#B4AEA0;
+      --ink-muted:#A39B8A;
+      --ink-3:#918B80;
+      --rule-hair:#38342C;
+      --rule-mid:#565046;
+      --rule-heavy:#E8E3D8;
+      --stale:#F2704A;
+      --stale-ink:#121110;
+      --accent:#7FB3D3;
+      --accent-ink:#0E1B22;
+      --accent-wash:#17262B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#121110;
+    --ground-alt:#1C1A17;
+    --surface:#1B1915;
+    --ink:#E8E3D8;
+    --ink-2:#B4AEA0;
+    --ink-muted:#A39B8A;
+    --ink-3:#918B80;
+    --rule-hair:#38342C;
+    --rule-mid:#565046;
+    --rule-heavy:#E8E3D8;
+    --stale:#F2704A;
+    --stale-ink:#121110;
+    --accent:#7FB3D3;
+    --accent-ink:#0E1B22;
+    --accent-wash:#17262B;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:'Newsreader', Georgia, serif;
+    font-size:var(--fs-body);
+    line-height:1.5;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+  .mono{ font-family:'IBM Plex Mono', 'SF Mono', monospace; }
+  .display{ font-family:'Anton', sans-serif; font-weight:400; letter-spacing:.01em; }
+
+  a{ color:inherit; }
+  img,svg{ max-width:100%; }
+
+  .wrap{
+    max-width:72rem;
+    margin:0 auto;
+    padding-inline: 1.25rem;
+  }
+  @media (min-width: 64rem){
+    .wrap{ padding-inline: 2.5rem; }
+  }
+
+  /* ---------- header ---------- */
+  header.site{
+    border-bottom: var(--rw-mid) solid var(--rule-heavy);
+    padding-block: var(--s-4);
+  }
+  .header-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: var(--s-4);
+  }
+  .wordmark{
+    font-family:'Anton', sans-serif;
+    font-size: clamp(1.25rem, 3vw, 1.5rem);
+    letter-spacing: .03em;
+  }
+  .site-nav{
+    display:flex;
+    gap: var(--s-4);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: var(--fs-fine);
+    text-transform: uppercase;
+    letter-spacing:.06em;
+  }
+  .site-nav a{ text-decoration:none; border-bottom:1px solid transparent; }
+  .site-nav a:hover, .site-nav a:focus-visible{ border-color: currentColor; }
+  .site-nav a:focus-visible{ outline: 2px solid var(--accent); outline-offset:3px; }
+
+  /* ---------- reading-order grid ---------- */
+  main{ padding-block: var(--s-8) var(--s-16); }
+
+  .grid{
+    display:grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-6);
+  }
+  @media (min-width: 64rem){
+    .grid{
+      grid-template-columns: repeat(12, 1fr);
+      gap: var(--s-8);
+    }
+    .col-hook{ grid-column: 1 / 8; }
+    .col-lookup{ grid-column: 8 / 13; }
+    .col-pulse{ grid-column: 1 / 5; }
+    .col-chart{ grid-column: 5 / 13; }
+    .col-board{ grid-column: 1 / 13; }
+    .col-nav3{ grid-column: 1 / 13; }
+  }
+
+  /* ---------- hook ---------- */
+  .hook{
+    padding-block: var(--s-4) 0;
+  }
+  .kicker{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: var(--fs-label);
+    text-transform: uppercase;
+    letter-spacing:.1em;
+    color: var(--ink-3);
+    margin: 0 0 var(--s-3);
+  }
+  h1{
+    font-family:'Newsreader', serif;
+    font-weight:600;
+    font-size: clamp(1.6rem, 4.4vw, 2.6rem);
+    line-height:1.18;
+    margin: 0 0 var(--s-4);
+    max-width: 22ch;
+  }
+  h1 .figure{
+    font-family:'Anton', sans-serif;
+    font-size: 1em;
+    color: var(--ink);
+  }
+  .hook-sub{
+    font-size: var(--fs-lede);
+    color: var(--ink-2);
+    max-width: 52ch;
+    margin: 0 0 var(--s-4);
+  }
+  .hook-facts{
+    display:flex;
+    flex-wrap:wrap;
+    gap: var(--s-4) var(--s-6);
+    padding-top: var(--s-3);
+    border-top: var(--rw-hair) solid var(--rule-hair);
+  }
+  .hook-fact{ min-width: 8rem; }
+  .hook-fact .num{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size: var(--fs-stat);
+    display:block;
+    line-height:1;
+  }
+  .hook-fact .cap{
+    font-size: var(--fs-fine);
+    color: var(--ink-muted);
+    display:block;
+    margin-top: var(--s-1);
+  }
+
+  /* ---------- card base: depth via tone + hairline, never shadow ---------- */
+  .card{
+    background: var(--surface);
+    border: var(--rw-hair) solid var(--rule-hair);
+    border-radius: var(--radius);
+  }
+  .frame{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: var(--s-2);
+    padding: var(--s-3) var(--s-4);
+    border-bottom: var(--rw-hair) solid var(--rule-hair);
+    background: var(--ground-alt);
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .frame-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: var(--fs-label);
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    display:inline-flex;
+    align-items:center;
+    gap: var(--s-2);
+  }
+  .frame-label .dot{
+    width:7px; height:7px; border-radius:50%;
+    background: var(--accent);
+    flex: none;
+  }
+  .frame-note{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: var(--fs-micro);
+    color: var(--ink-3);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+  .card-body{ padding: var(--s-4); }
+
+  @media (prefers-reduced-motion: no-preference){
+    .frame-label .dot.live{ animation: pulse-dot 2.4s ease-in-out infinite; }
+  }
+  @keyframes pulse-dot{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.35; }
+  }
+
+  /* ---------- lookup ---------- */
+  .lookup-card .card-body{ display:flex; flex-direction:column; gap: var(--s-3); }
+  .lookup-label{
+    font-size: var(--fs-note);
+    color: var(--ink-2);
+    margin:0;
+  }
+  form.lookup-form{
+    display:flex;
+    flex-direction:column;
+    gap: var(--s-2);
+  }
+  .lookup-input-row{
+    display:flex;
+    border: var(--rw-hair) solid var(--rule-mid);
+    border-radius: var(--radius);
+    overflow:hidden;
+    background: var(--ground);
+  }
+  .lookup-input-row input{
+    flex:1;
+    min-width:0;
+    border:0;
+    background:transparent;
+    color: var(--ink);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: var(--fs-note);
+    padding: var(--s-3) var(--s-3);
+  }
+  .lookup-input-row input:focus{ outline:none; }
+  .lookup-input-row:focus-within{
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+  .lookup-input-row input::placeholder{ color: var(--ink-3); }
+  button.lookup-submit{
+    border:0;
+    border-left: var(--rw-hair) solid var(--rule-mid);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size: var(--fs-note);
+    letter-spacing:.03em;
+    padding: 0 var(--s-4);
+    min-height: 48px;
+    cursor:pointer;
+  }
+  button.lookup-submit:hover{ filter: brightness(1.08); }
+  button.lookup-submit:focus-visible{ outline: 2px solid var(--ink); outline-offset:2px; }
+  .lookup-hint{
+    font-size: var(--fs-fine);
+    color: var(--ink-3);
+    margin:0;
+  }
+
+  /* ---------- live pulse ---------- */
+  .pulse-primary{ display:flex; align-items:baseline; gap: var(--s-2); flex-wrap:wrap; }
+  .pulse-primary .frac{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size: var(--fs-figure);
+    line-height:1;
+  }
+  .pulse-primary .frac .den{ color: var(--ink-3); font-size:.55em; }
+  .pulse-caption{
+    font-size: var(--fs-note);
+    color: var(--ink-2);
+    margin: var(--s-2) 0 var(--s-4);
+  }
+  .meter{
+    height:8px;
+    background: var(--ground-alt);
+    border: var(--rw-hair) solid var(--rule-hair);
+    border-radius:4px;
+    overflow:hidden;
+    margin-bottom: var(--s-3);
+  }
+  .meter > span{
+    display:block;
+    height:100%;
+    background: var(--accent);
+  }
+  .pulse-secondary{
+    display:flex;
+    justify-content:space-between;
+    gap: var(--s-3);
+    padding-top: var(--s-3);
+    border-top: var(--rw-hair) solid var(--rule-hair);
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .pulse-secondary .k{ font-size: var(--fs-stat); font-weight:600; display:block; }
+  .pulse-secondary .v{ font-size: var(--fs-fine); color: var(--ink-muted); }
+
+  /* ---------- chart ---------- */
+  .chart-lede{
+    font-size: var(--fs-note);
+    color: var(--ink-2);
+    margin: 0 0 var(--s-4);
+    max-width: 62ch;
+  }
+  .chart-svg-wrap{ width:100%; overflow-x:auto; }
+  .chart-caption{
+    font-size: var(--fs-fine);
+    color: var(--ink-3);
+    margin-top: var(--s-2);
+  }
+  .cum-row{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--s-3);
+    margin: var(--s-4) 0;
+    padding: var(--s-3) 0;
+    border-top: var(--rw-hair) solid var(--rule-hair);
+    border-bottom: var(--rw-hair) solid var(--rule-hair);
+  }
+  @media (min-width: 30rem){
+    .cum-row{ grid-template-columns: repeat(4, 1fr); }
+  }
+  .cum-item .num{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size: 1.375rem;
+    display:block;
+  }
+  .cum-item .cap{
+    font-size: var(--fs-micro);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color: var(--ink-3);
+    display:block;
+    margin-top:2px;
+  }
+
+  /* ---------- board table ---------- */
+  .table-scroll{ width:100%; overflow-x:auto; }
+  table.board{
+    width:100%;
+    border-collapse:collapse;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: var(--fs-note);
+    min-width: 30rem;
+  }
+  table.board thead th{
+    text-align:left;
+    font-size: var(--fs-micro);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color: var(--ink-3);
+    font-weight:500;
+    padding: 0 var(--s-3) var(--s-2);
+    border-bottom: var(--rw-hair) solid var(--rule-mid);
+  }
+  table.board td{
+    padding: var(--s-2) var(--s-3);
+    border-bottom: var(--rw-hair) solid var(--rule-hair);
+  }
+  table.board tbody tr:last-child td{ border-bottom:0; }
+  table.board td.num, table.board th.num{ text-align:right; }
+  .fill-cell{ display:flex; align-items:center; gap: var(--s-2); justify-content:flex-end; }
+  .fill-bar{
+    width:44px; height:6px;
+    background: var(--ground-alt);
+    border: var(--rw-hair) solid var(--rule-hair);
+    border-radius:3px;
+    overflow:hidden;
+    flex:none;
+  }
+  .fill-bar > span{ display:block; height:100%; background: var(--accent); }
+  .board-note{
+    font-family:'Newsreader', serif;
+    font-style:italic;
+    font-size: var(--fs-fine);
+    color: var(--ink-3);
+    margin-top: var(--s-3);
+  }
+
+  /* ---------- three boards nav ---------- */
+  .nav3{
+    display:grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-3);
+  }
+  @media (min-width: 40rem){
+    .nav3{ grid-template-columns: repeat(3, 1fr); }
+  }
+  a.nav3-card{
+    display:block;
+    text-decoration:none;
+    color: inherit;
+    padding: var(--s-4);
+    background: var(--surface);
+    border: var(--rw-hair) solid var(--rule-hair);
+    border-radius: var(--radius);
+  }
+  a.nav3-card:hover, a.nav3-card:focus-visible{
+    border-color: var(--rule-mid);
+  }
+  a.nav3-card:focus-visible{ outline: 2px solid var(--accent); outline-offset:2px; }
+  .nav3-card .t{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    font-size: var(--fs-note);
+    display:block;
+    margin-bottom: var(--s-2);
+  }
+  .nav3-card .d{ font-size: var(--fs-fine); color: var(--ink-2); margin:0; }
+  .nav3-card .arrow{ color: var(--ink-3); }
+
+  /* ---------- state key ---------- */
+  .statekey{
+    margin-top: var(--s-12);
+    padding-top: var(--s-4);
+    border-top: var(--rw-mid) solid var(--rule-heavy);
+  }
+  .statekey h2{
+    font-family:'IBM Plex Mono', monospace;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-size: var(--fs-label);
+    color: var(--ink-3);
+    margin: 0 0 var(--s-4);
+    font-weight:500;
+  }
+  .statekey-grid{
+    display:grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-3);
+  }
+  @media (min-width: 40rem){
+    .statekey-grid{ grid-template-columns: repeat(4, 1fr); }
+  }
+  .state-sample{
+    padding: var(--s-3);
+    background: var(--surface);
+    border: var(--rw-hair) solid var(--rule-hair);
+    border-radius: var(--radius);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: var(--fs-fine);
+  }
+  .state-sample .tag{
+    display:flex; align-items:center; gap: var(--s-2);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-size: var(--fs-micro);
+    margin-bottom: var(--s-2);
+    color: var(--ink-3);
+  }
+  .state-sample .tag .dot{ width:6px; height:6px; border-radius:50%; }
+  .state-sample.is-live .tag .dot{ background: var(--accent); }
+  .state-sample.is-stale{ border-color: var(--stale); }
+  .state-sample.is-stale .tag{ color: var(--stale); }
+  .state-sample.is-stale .tag .dot{ background: var(--stale); }
+  .state-sample.is-stale .band{
+    background: var(--stale);
+    color: var(--stale-ink);
+    padding: var(--s-1) var(--s-2);
+    border-radius: 2px;
+    display:inline-block;
+    margin-top: var(--s-1);
+  }
+  .skeleton{
+    height:10px;
+    background: var(--ground-alt);
+    border-radius:3px;
+    margin-top: var(--s-2);
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .skeleton{ animation: skeleton-fade 1.6s ease-in-out infinite; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .frame-label .dot.live{ animation:none; }
+  }
+  @keyframes skeleton-fade{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.45; }
+  }
+  .state-sample.is-empty .dash{
+    font-size: 1.25rem;
+    color: var(--ink-3);
+  }
+
+  /* ---------- footer ---------- */
+  footer.site{
+    margin-top: var(--s-12);
+    padding-top: var(--s-4);
+    padding-bottom: var(--s-8);
+    border-top: var(--rw-hair) solid var(--rule-hair);
+    font-size: var(--fs-fine);
+    color: var(--ink-3);
+    display:flex;
+    flex-wrap:wrap;
+    gap: var(--s-2) var(--s-4);
+    justify-content:space-between;
+  }
+  footer.site a{ text-decoration: underline; text-underline-offset:2px; }
+
+  .sr-only{
+    position:absolute; width:1px; height:1px;
+    padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap header-row">
+    <div class="wordmark">LEDGE</div>
+    <nav class="site-nav" aria-label="Boards">
+      <a href="/live">Live</a>
+      <a href="/graduated">Graduated</a>
+      <a href="/creators">Creators</a>
+      <a href="/method">Method</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="grid">
+
+    <!-- 1. THE HOOK — reading order starts here -->
+    <section class="col-hook hook" aria-labelledby="hook-heading">
+      <p class="kicker">pons, timed</p>
+      <h1 id="hook-heading">Of 2,922 graduations on pons, <span class="figure">15%</span> finished in under 10 seconds.</h1>
+      <p class="hook-sub">
+        LEDGE indexes every token launch on pons from the factory contract, hourly, and times
+        every graduation. "Graduated" is the only success signal on the chain, and for most of
+        these it happened before anyone could have clicked buy.
+      </p>
+      <div class="hook-facts">
+        <div class="hook-fact">
+          <span class="num">165,000</span>
+          <span class="cap">launches indexed, ~18,000/day</span>
+        </div>
+        <div class="hook-fact">
+          <span class="num">93.5%</span>
+          <span class="cap">of 165,000 launches take zero buys, ever</span>
+        </div>
+        <div class="hook-fact">
+          <span class="num">156s</span>
+          <span class="cap">median time to graduate, n=2,922</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. THE PRIMARY CONTROL — beside the hook, not below it -->
+    <section class="col-lookup card lookup-card" aria-labelledby="lookup-heading">
+      <div class="frame">
+        <span class="frame-label" id="lookup-heading">Look up a token</span>
+      </div>
+      <div class="card-body">
+        <p class="lookup-label">Paste any address launched on pons to see its own buys, sells, fill, and first-block buyers.</p>
+        <form class="lookup-form" action="/t" method="get">
+          <label for="addr" class="sr-only">Token address</label>
+          <div class="lookup-input-row">
+            <input id="addr" name="address" type="text" inputmode="text" autocomplete="off"
+                   placeholder="0x… token address on pons" aria-describedby="lookup-hint">
+            <button type="submit" class="lookup-submit">Look up</button>
+          </div>
+        </form>
+        <p class="lookup-hint" id="lookup-hint">No account. No wallet. Every figure here is public and free to read.</p>
+      </div>
+    </section>
+
+    <!-- 3. LIVE — current state of the system -->
+    <section class="col-pulse card" aria-labelledby="pulse-heading">
+      <div class="frame">
+        <span class="frame-label" id="pulse-heading"><span class="dot live" aria-hidden="true"></span>Live</span>
+        <span class="frame-note">updated 38s ago</span>
+      </div>
+      <div class="card-body">
+        <div class="pulse-primary">
+          <span class="frac">183<span class="den">/200</span></span>
+        </div>
+        <p class="pulse-caption">tracked curves are taking buys right now.</p>
+        <div class="meter" role="img" aria-label="183 of 200 tracked curves are currently taking buys">
+          <span style="width:91.5%"></span>
+        </div>
+        <div class="pulse-secondary">
+          <div>
+            <span class="k">0</span>
+            <span class="v">launched in the last hour</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. FINDING — the histogram, the central proof -->
+    <section class="col-chart card" aria-labelledby="chart-heading">
+      <div class="frame">
+        <span class="frame-label" id="chart-heading">Finding</span>
+        <span class="frame-note">time to graduate</span>
+      </div>
+      <div class="card-body">
+        <p class="chart-lede">
+          The distribution is bimodal: a spike at the instant end, a trough, then a broad hump.
+          Each bar below is graduations finishing inside that window — not cumulative.
+        </p>
+
+        <div class="cum-row">
+          <div class="cum-item"><span class="num">15%</span><span class="cap">under 10s</span></div>
+          <div class="cum-item"><span class="num">26%</span><span class="cap">under 30s</span></div>
+          <div class="cum-item"><span class="num">37%</span><span class="cap">under 60s</span></div>
+          <div class="cum-item"><span class="num">61%</span><span class="cap">under 5 min</span></div>
+        </div>
+
+        <div class="chart-svg-wrap">
+          <svg viewBox="0 0 720 300" role="img" aria-labelledby="chart-title chart-desc" preserveAspectRatio="xMinYMin meet" style="width:100%; height:auto; min-width:640px;">
+            <title id="chart-title">Graduations by time-to-graduate bucket</title>
+            <desc id="chart-desc">
+              Fourteen doubling time buckets from under 1 second to over 68 minutes, counts:
+              158, 96, 116, 136, 247, 254, 230, 285, 249, 205, 159, 110, 72, 157. n=2,474 of 2,922
+              graduations with a resolved bucket. Median time to graduate is 156 seconds, which
+              falls in the 128 to 256 second bucket.
+            </desc>
+            <!-- baseline -->
+            <line x1="40" y1="230" x2="700" y2="230" stroke="var(--rule-mid)" stroke-width="1"></line>
+            <!-- bars: 14 buckets, chart area x:40-700 (660px/14=~47.1px per slot), max value 285 -> plot height 190px from y=230 up to y=40 -->
+            <g class="mono" font-size="10">
+              <!--
+                Bucket values and computed geometry (barWidth=34, gap≈13, slotWidth=47.14):
+                idx: value -> height(px)=value/285*190, y=230-height
+              -->
+              <!-- 1: 158 -->
+              <rect x="42" y="125.7" width="34" height="104.3" fill="var(--accent)"></rect>
+              <!-- 2: 96 -->
+              <rect x="89" y="166.0" width="34" height="64.0" fill="var(--ink-3)"></rect>
+              <!-- 3: 116 -->
+              <rect x="136" y="153.3" width="34" height="76.7" fill="var(--ink-3)"></rect>
+              <!-- 4: 136 -->
+              <rect x="183" y="140.7" width="34" height="89.3" fill="var(--ink-3)"></rect>
+              <!-- 5: 247 -->
+              <rect x="230" y="65.3" width="34" height="164.7" fill="var(--ink-3)"></rect>
+              <!-- 6: 254 -->
+              <rect x="277" y="60.6" width="34" height="169.4" fill="var(--ink-3)"></rect>
+              <!-- 7: 230 -->
+              <rect x="324" y="76.6" width="34" height="153.4" fill="var(--ink-3)"></rect>
+              <!-- 8: 285 (max) -->
+              <rect x="371" y="40" width="34" height="190" fill="var(--ink)"></rect>
+              <!-- 9: 249 (median bucket, 128-256s) -->
+              <rect x="418" y="64.0" width="34" height="166.0" fill="var(--accent)"></rect>
+              <!-- 10: 205 -->
+              <rect x="465" y="93.0" width="34" height="137.0" fill="var(--ink-3)"></rect>
+              <!-- 11: 159 -->
+              <rect x="512" y="125.0" width="34" height="105.0" fill="var(--ink-3)"></rect>
+              <!-- 12: 110 -->
+              <rect x="559" y="157.3" width="34" height="72.7" fill="var(--ink-3)"></rect>
+              <!-- 13: 72 -->
+              <rect x="606" y="182.0" width="34" height="48.0" fill="var(--ink-3)"></rect>
+              <!-- 14: 157 -->
+              <rect x="653" y="126.3" width="34" height="103.7" fill="var(--ink-3)"></rect>
+            </g>
+            <!-- axis labels, every bucket, small, non-overlapping at this width -->
+            <g class="mono" font-size="9" fill="var(--ink-3)" text-anchor="middle">
+              <text x="59" y="244">&lt;1s</text>
+              <text x="106" y="244">1-2s</text>
+              <text x="153" y="244">2-4s</text>
+              <text x="200" y="244">4-8s</text>
+              <text x="247" y="244">8-16s</text>
+              <text x="294" y="244">16-32s</text>
+              <text x="341" y="244">32-64s</text>
+              <text x="388" y="244">1-2m</text>
+              <text x="435" y="244">2-4m</text>
+              <text x="482" y="244">4-9m</text>
+              <text x="529" y="244">9-17m</text>
+              <text x="576" y="244">17-34m</text>
+              <text x="623" y="244">34-68m</text>
+              <text x="670" y="244">&gt;68m</text>
+            </g>
+            <!-- value labels on the two called-out bars -->
+            <g class="mono" font-size="11" fill="var(--ink)" text-anchor="middle" font-weight="600">
+              <text x="59" y="118">158</text>
+              <text x="435" y="56">249</text>
+            </g>
+            <g class="mono" font-size="9" fill="var(--ink-3)" text-anchor="middle">
+              <text x="59" y="20">instant spike</text>
+              <text x="435" y="266">median (156s) falls here</text>
+            </g>
+          </svg>
+        </div>
+        <p class="chart-caption">
+          n = 2,474 of 2,922 graduations with a resolved time-to-graduate bucket. Bucket edges
+          double from under 1 second to over 68 minutes.
+        </p>
+      </div>
+    </section>
+
+    <!-- 5. NOW — the live board preview -->
+    <section class="col-board card" aria-labelledby="board-heading">
+      <div class="frame">
+        <span class="frame-label" id="board-heading">Now</span>
+        <span class="frame-note">ranked by buys</span>
+      </div>
+      <div class="card-body">
+        <div class="table-scroll">
+          <table class="board">
+            <thead>
+              <tr>
+                <th scope="col">Token</th>
+                <th scope="col" class="num">Buys</th>
+                <th scope="col" class="num">Sells</th>
+                <th scope="col" class="num">1st-block buyers</th>
+                <th scope="col" class="num">Fill</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>0x71a4…4c9f</td>
+                <td class="num">41</td>
+                <td class="num">12</td>
+                <td class="num">9</td>
+                <td class="num"><span class="fill-cell"><span class="fill-bar"><span style="width:78%"></span></span>78%</span></td>
+              </tr>
+              <tr>
+                <td>0x0d92…e211</td>
+                <td class="num">33</td>
+                <td class="num">8</td>
+                <td class="num">3</td>
+                <td class="num"><span class="fill-cell"><span class="fill-bar"><span style="width:61%"></span></span>61%</span></td>
+              </tr>
+              <tr>
+                <td>0x5be8…7a02</td>
+                <td class="num">27</td>
+                <td class="num">15</td>
+                <td class="num">1</td>
+                <td class="num"><span class="fill-cell"><span class="fill-bar"><span style="width:44%"></span></span>44%</span></td>
+              </tr>
+              <tr>
+                <td>0x9f13…c680</td>
+                <td class="num">19</td>
+                <td class="num">4</td>
+                <td class="num">7</td>
+                <td class="num"><span class="fill-cell"><span class="fill-bar"><span style="width:30%"></span></span>30%</span></td>
+              </tr>
+              <tr>
+                <td>0x2c77…1d3e</td>
+                <td class="num">14</td>
+                <td class="num">6</td>
+                <td class="num">2</td>
+                <td class="num"><span class="fill-cell"><span class="fill-bar"><span style="width:22%"></span></span>22%</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="board-note">Illustrative rows for this preview. The live board updates continuously — see /live for current values.</p>
+      </div>
+    </section>
+
+    <!-- 6. THE WAY IN — three boards -->
+    <section class="col-nav3" aria-labelledby="nav3-heading">
+      <h2 id="nav3-heading" class="sr-only">The three boards</h2>
+      <div class="nav3">
+        <a class="nav3-card" href="/live">
+          <span class="t">Live <span class="arrow">&gt;</span></span>
+          <p class="d">Every curve taking buys right now, ranked by buys.</p>
+        </a>
+        <a class="nav3-card" href="/graduated">
+          <span class="t">Graduated <span class="arrow">&gt;</span></span>
+          <p class="d">Every timed graduation, n=2,922, with the full distribution.</p>
+        </a>
+        <a class="nav3-card" href="/creators">
+          <span class="t">Creators <span class="arrow">&gt;</span></span>
+          <p class="d">Aggregate distributions by deployer cohort. No individual named.</p>
+        </a>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- state map — every state this page can be in, shown side by side -->
+  <div class="statekey">
+    <h2>How this page marks state</h2>
+    <div class="statekey-grid">
+      <div class="state-sample is-live">
+        <span class="tag"><span class="dot"></span>Live</span>
+        183/200 curves active, updated 38s ago.
+      </div>
+      <div class="state-sample is-stale">
+        <span class="tag"><span class="dot"></span>Stale</span>
+        <span class="band">Last update 14 min ago — stale</span>
+      </div>
+      <div class="state-sample is-loading">
+        <span class="tag">Loading</span>
+        Fetching current count…
+        <div class="skeleton"></div>
+      </div>
+      <div class="state-sample is-empty">
+        <span class="tag">Empty</span>
+        <span class="dash">— no data yet (n=0)</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="site wrap">
+  <span>LEDGE indexes public data from pons. Not official, not a partner, not endorsed by pons.</span>
+  <span><a href="/method">How every number here is computed</a></span>
+</footer>
+
+</body>
+</html>

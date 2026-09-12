@@ -260,3 +260,44 @@ A person who has never heard of this arrives from a Telegram link on a phone,
 understands what it is in five seconds, pastes a token address, gets an answer,
 and can tell that the numbers are checkable. Nothing on the site promises
 anything that does not exist.
+
+---
+
+## 2026-09-12 — the homepage direction, decided page by page
+
+Three complete homepage mockups were built against `design/DESIGN-BRIEF` (kept
+in `design/homepage-{terminal,editorial,instrument}.html` with screenshots at
+390 and 1280, both themes). None was taken whole. The build is:
+
+- **Instrument's skeleton**: framed cards with a tonal step and a hairline, a
+  12-column grid on desktop (hook left, lookup and live right; finding and board
+  full width), explicit live / stale / loading / empty states drawn, not
+  described.
+- **Terminal's order and density**: on a phone, lookup, live, headline, the
+  four-row table (share *and* count on every row), the 93.5% callout with equal
+  weight to the hook, the chart, five board rows, three doors. The stale clock
+  is behaviour, not a colour swatch.
+- **Editorial's one sentence** as the kicker: *"Graduated" is not one thing.*
+  The headline under it carries the denominator in the sentence: *Of 2,922
+  graduations on pons, 15% finished in under 10 seconds.*
+- **Chart bars are one colour.** All three mockups coloured the first, last or
+  peak bucket differently. That is a verdict about which population is which,
+  CONSTRAINTS 6 bans it, and the existing Shape test fails it.
+
+**Two surfaces the mockups did not have, added because the operator named what
+was missing (`PLAN.md`, "what is allowed to change this plan", item 2):**
+
+1. **`/token`** — written from `LAUNCH.md` "What the token is": the three things
+   holders get, the list of what they do not, and one sentence that the agent is
+   what fees would build — exactly the allowance `PLAN.md` Phase 2 gives the
+   launch post, and no more. Built before launch. A buyer who follows the pons
+   listing to ledge.tools must find that the token exists and what it is for.
+2. **A homepage slot for LEDGE's own launch.** Before launch it holds the
+   pre-registration (1.5). After launch it is *LEDGE, measured by LEDGE*: the
+   `/t/{our address}` facts on the front page under the same rules as every
+   other token (`LAUNCH.md` §1). The place is reserved in the homepage build;
+   the content lands with 1.5.
+
+Sequence for this pass, one page at a time, each screenshotted at 390 and 1280
+in both themes and reviewed before the next: home → `/live` → `/t/{address}` →
+`/graduated` → `/graveyard` → `/token` → pre-registration → evidence pages.

@@ -1,259 +1,245 @@
 import type { ReactElement } from "react";
 import Link from "next/link";
-import { ColophonStrip, RunningHead } from "../components/ColophonStrip";
-import { Fold } from "../components/Fold";
 import { Footer } from "../components/Footer";
-import { LedgerEntry } from "../components/LedgerEntry";
-import { LiveBoard } from "../components/LiveBoard";
-import { LivePulse } from "../components/Live";
-import { Register } from "../components/Register";
-import { Scale } from "../components/Scale";
+import { HomeLiveCard, HomeLiveProvider, HomeNowCard } from "../components/Live";
 import { Shape } from "../components/Shape";
 import { StaleBanner } from "../components/StaleBanner";
 import { Stat } from "../components/Stat";
-import { allTime, h24, numberFile } from "../lib/number";
-import type { CohortRow, WindowData } from "../lib/schema";
+import { allTime, numberFile } from "../lib/number";
 import {
   formatCount,
   formatDuration,
-  formatDurationLong,
-  formatStamp,
-  pairLabel,
+  isInsufficient,
   renderableSample,
-  formatOneIn,
-  insufficientText,
+  sampleFact,
+  sampleProvenance,
 } from "../lib/format";
-import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow } from "../lib/rows";
-import { fastShareFacts, underSecondsFact } from "../lib/summary";
-import { sameMeasurement } from "../lib/windows";
+import { underSecondsFact } from "../lib/summary";
+import type { LadderRung } from "../lib/schema";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 
-/* The dated sample the fold leads with. Null when the file carries none, and
-   null when the one it carries has no denominator: the fold prints nothing
-   rather than a share with nothing under it. */
-const raisedNothing = renderableSample(numberFile.samples, "raisedNothing");
-
-/* keyed off the data: while all-time holds exactly what the trailing 24 hours
-   holds, the second pair sentence would restate one measurement as two */
-const allTimeIsSameMeasurement = sameMeasurement(h24, allTime);
-
-/* The capability line's own fact, off the whole record rather than the
-   trailing 24 hours: it is a claim about what "graduated" means at all, not
-   about today, so it is measured over the same window the shape below it
-   draws from. */
+/* The hook's own fact, over the whole record rather than a trailing window:
+   it is a claim about what "graduated" means at all, so it is measured over
+   the same window the shape below it draws from. */
 const UNDER_TEN_SECONDS_THRESHOLD = 10;
 const underTen = underSecondsFact(allTime, UNDER_TEN_SECONDS_THRESHOLD);
 
-/** A pair bucket, or an empty one standing in its place: a missing bucket has
-    measured nothing, so it carries n = 0 and prints its sample size. */
-function pairRow(w: WindowData, bucket: string): CohortRow {
+/* The dated sample the callout leads with. Null when the file carries none,
+   and null when the one it carries has no denominator: the callout prints
+   nothing rather than a share with nothing under it. */
+const raisedNothing = renderableSample(numberFile.samples, "raisedNothing");
+
+/** A rung of the published time-to-graduation ladder, by its own threshold.
+    `ttg.ladder` carries the cumulative counts and shares at 30, 60 and 300
+    seconds already computed by the pipeline -- this reads the rung off the
+    file rather than inventing a cutoff here (CONSTRAINTS 9). */
+function ladderRung(atSeconds: number): LadderRung | undefined {
+  return allTime.ttg.ladder.find((r) => r.atSeconds === atSeconds);
+}
+
+/** One row of the four-row table: a threshold, its cumulative share and its
+    cumulative count, both read off the same rung so they can never diverge. */
+function TableRow({
+  label,
+  count,
+  rate,
+  n,
+  insufficient,
+  statName,
+}: {
+  label: string;
+  count: number;
+  rate: number | null;
+  n: number;
+  insufficient: boolean;
+  statName: string;
+}): ReactElement {
   return (
-    w.cohorts.pair.find((r) => r.bucket === bucket) ?? {
-      bucket,
-      launches: 0,
-      graduations: 0,
-      rate: null,
-      insufficient: true,
-      excludingFast: { cutoffSeconds: 300, graduations: 0, rate: null, oneIn: null, insufficient: true },
-    }
+    <tr>
+      <th scope="row">{label}</th>
+      <td className="fig">
+        <Stat
+          className="mono"
+          name={statName}
+          value={rate}
+          n={n}
+          window="all-time"
+          updatedAt={crawledAt}
+          insufficient={insufficient}
+        />
+      </td>
+      <td className="fig n mono">{formatCount(count)}</td>
+    </tr>
   );
 }
 
 export default function Home(): ReactElement {
-  const exFast = h24.excludingFast;
+  const r30 = ladderRung(30);
+  const r60 = ladderRung(60);
+  const r300 = ladderRung(300);
+  const ttgInsufficient = allTime.ttg.insufficient;
+  const ttgN = allTime.ttg.n;
 
-/* "1 in N", or the sample size when the sample cannot support a rate.
-   CONSTRAINTS 4: below the minimum this prints its n, never a ratio. */
-const exFastOneIn =
-  exFast.insufficient || exFast.oneIn === null
-    ? insufficientText(h24.launches)
-    : formatOneIn(exFast.oneIn);
-  const cutoffWords = formatDurationLong(exFast.cutoffSeconds);
-  const fast = fastShareFacts(h24);
-
-  const stable = pairRow(h24, "stable");
-  const eth = pairRow(h24, "eth");
-  const stableAll = pairRow(allTime, "stable");
-  const ethAll = pairRow(allTime, "eth");
-
-  /* the rate slot of a pair sentence: the shared gate decides whether a
-     percentage may stand there, exactly as it does in the table below it */
-  const pairRate = (row: CohortRow, name: string, window: string) => (
-    <Stat
-      className="mono"
-      name={name}
-      value={row.rate}
-      n={row.launches}
-      window={window}
-      updatedAt={crawledAt}
-      insufficient={row.insufficient}
-    />
-  );
-
-  /* the same slot for the row's excluding-fast rate. The finding below is a
-     comparison BETWEEN buckets, and the page's headline says the raw rate is
-     contaminated by graduations the deployer arranged -- so a comparison
-     printed on the raw rate would invite exactly the reading the headline
-     spends its whole fold refusing. */
-  const pairSlowRate = (row: CohortRow, name: string, window: string) => (
-    <Stat
-      className="mono"
-      name={name}
-      value={row.excludingFast.rate}
-      n={row.launches}
-      window={window}
-      updatedAt={crawledAt}
-      insufficient={row.excludingFast.insufficient}
-    />
-  );
-
-  const counts = (row: CohortRow) => (
-    <span className="mono">
-      {formatCount(row.graduations)} of {formatCount(row.launches)}
-    </span>
-  );
+  const raisedNothingFact = raisedNothing ? sampleFact(raisedNothing) : null;
 
   return (
     <>
       <StaleBanner crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
 
       <main className="sheet">
-        <RunningHead mark="LEDGE" win="Trailing 24 hours" />
+        <div className="home-grid">
+          <HomeLiveProvider>
+          <HomeLiveCard staleAfterSeconds={staleAfterSeconds} />
 
-        {/* ---- the front door: live pulse, capability, proof, paths ---- */}
+          {/* ---- the hook ------------------------------------------------ */}
+          <div className="home-hook">
+            <h2 className="kicker">&ldquo;Graduated&rdquo; is not one thing.</h2>
+            <h1 className="capability-line">
+              Of <span className="mono">{formatCount(allTime.graduations)}</span> graduations on
+              pons,{" "}
+              <Stat
+                className="mono"
+                name="under-ten-seconds"
+                value={underTen.rate}
+                n={underTen.n}
+                window="all-time"
+                updatedAt={crawledAt}
+                insufficient={underTen.insufficient}
+                precision={0}
+              />{" "}
+              finished in under 10&nbsp;seconds.
+            </h1>
+            <p className="dek home-dek">
+              LEDGE indexes every launch from the pons factory contract, hourly, and times every
+              graduation.
+            </p>
+          </div>
 
-        <div className="discovery-lead">
-          <h2 className="kicker">Live now</h2>
-          <LivePulse />
+          {/* ---- the table: finished inside | share | count -------------- */}
+          <div className="home-table">
+            <div className="scroller">
+              <table>
+                <caption>
+                  Every graduation on pons, all-time, by how long it took to finish.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Finished inside</th>
+                    <th scope="col">Share</th>
+                    <th scope="col">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <TableRow
+                    label="10 seconds"
+                    statName="ttg-10s"
+                    count={underTen.count}
+                    rate={underTen.rate}
+                    n={underTen.n}
+                    insufficient={underTen.insufficient}
+                  />
+                  <TableRow
+                    label="30 seconds"
+                    statName="ttg-30s"
+                    count={r30?.cumulative ?? 0}
+                    rate={r30?.cumulativeShare ?? null}
+                    n={ttgN}
+                    insufficient={ttgInsufficient}
+                  />
+                  <TableRow
+                    label="60 seconds"
+                    statName="ttg-60s"
+                    count={r60?.cumulative ?? 0}
+                    rate={r60?.cumulativeShare ?? null}
+                    n={ttgN}
+                    insufficient={ttgInsufficient}
+                  />
+                  <TableRow
+                    label="5 minutes"
+                    statName="ttg-300s"
+                    count={r300?.cumulative ?? 0}
+                    rate={r300?.cumulativeShare ?? null}
+                    n={ttgN}
+                    insufficient={ttgInsufficient}
+                  />
+                  <tr>
+                    <th scope="row">Median</th>
+                    <td className="fig mono">
+                      {ttgInsufficient || allTime.ttg.p50 === null
+                        ? "not enough data"
+                        : formatDuration(allTime.ttg.p50)}
+                    </td>
+                    <td className="fig n mono">n={formatCount(ttgN)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ---- the callout: raised nothing, equal weight to the hook --- */}
+          {raisedNothing && raisedNothingFact ? (
+            <div className="home-callout">
+              <p className="callout-figure">
+                <Stat
+                  className="mono"
+                  name="raised-nothing"
+                  value={raisedNothingFact.rate ?? null}
+                  n={raisedNothingFact.n}
+                  window="sampled"
+                  updatedAt={raisedNothing.measuredAt}
+                  insufficient={isInsufficient(raisedNothingFact)}
+                />{" "}
+                of pons launches never take a single buy.
+              </p>
+              <p className="note note--fine">{sampleProvenance(raisedNothing)}</p>
+            </div>
+          ) : null}
+
+          {/* ---- the finding: the shape of the record --------------------- */}
+          <div className="home-finding">
+            <div className="card-header">
+              <span className="kicker card-kicker">FINDING · time to graduation</span>
+            </div>
+            <div className="card-body">
+              <Shape histogram={allTime.ttg.histogram} n={allTime.ttg.n} insufficient={allTime.ttg.insufficient} />
+              <p className="note note--fine">
+                n = <span className="mono">{formatCount(allTime.ttg.n)}</span> graduations.
+              </p>
+              <p className="note note--fine">
+                <em>Two populations: a spike at the instant end, a trough, then a broad hump.</em>
+              </p>
+            </div>
+          </div>
+
+          <HomeNowCard />
+
+          {/* ---- three doors ---------------------------------------------- */}
+          <Link className="card home-door home-door-1" href="/live">
+            <span className="kicker card-kicker">Live</span>
+            <p className="note">Every curve taking buys right now, ranked however you sort it.</p>
+          </Link>
+          <Link className="card home-door home-door-2" href="/graduated">
+            <span className="kicker card-kicker">Graduated</span>
+            <p className="note">Every launch that crossed the threshold, in full.</p>
+          </Link>
+          <Link className="card home-door home-door-3" href="/graveyard">
+            <span className="kicker card-kicker">Graveyard</span>
+            <p className="note">Every launch that never graduated.</p>
+          </Link>
+
+          {/* LEDGE's own launch: pre-registration, then /t/{address} — REVAMP.md 2026-09-12 */}
+          </HomeLiveProvider>
         </div>
 
-        <div className="capability">
-          {/* What this is, before what it found.
-
-             Three independent assessments on 2026-09-11 said the same thing: a
-             stranger landing here could not tell in ten seconds whether this
-             was an audit, a dashboard, a data feed or a signal service. The
-             page opened on a finding, which only means something to a reader
-             who already knows what the site is for. One orienting line costs
-             almost nothing and it is the difference between a page that
-             explains itself and one that assumes you arrived informed. */}
-          <p className="capability-what">
-            A free, public record of every token launch on pons, read from the factory contract
-            every hour. Paste an address to see what one launch actually did.
-          </p>
-          {/* The page's h1.
-
-              The home page lost its only h1 when the Number's fold moved to
-              /number on 2026-09-11, which an end-to-end check caught. That is
-              an accessibility defect rather than a test artifact: a document
-              with no h1 has no name in a reader's outline, and the page's
-              central claim is the right thing to carry it. */}
-          <h1 className="capability-line">
-            LEDGE times every pons graduation, not just whether one happened.
-          </h1>
-          <p className="capability-facts">
-            Of <span className="mono">{formatCount(allTime.graduations)}</span> graduations,{" "}
-            <Stat
-              className="mono"
-              name="under-ten-seconds"
-              value={underTen.rate}
-              n={underTen.n}
-              window="all-time"
-              updatedAt={crawledAt}
-              insufficient={underTen.insufficient}
-            />{" "}
-            finished in under 10&nbsp;seconds, some in the same block as their own launch.
-            &ldquo;Graduated&rdquo; is not one thing.
-          </p>
-        </div>
-
-        {/* The lookup used to sit here. It moved into the shell on 2026-09-11,
-            where it is on every page rather than only this one, and where a
-            reader arriving with an address in their clipboard reaches it
-            without scrolling. Two near-identical address fields four hundred
-            pixels apart was worse than either alone. The shell's field
-            navigates to the token's own page rather than rendering a result
-            inline, which keeps that page the thing people paste onward. */}
-
-        <div className="shape-lead">
-          <h2 className="kicker">The shape of the record</h2>
-          <Shape
-            histogram={allTime.ttg.histogram}
-            n={allTime.ttg.n}
-            insufficient={allTime.ttg.insufficient}
-          />
-          <p className="note note--fine">
-            Time to graduation for every launch LEDGE holds, counted over{" "}
-            <span className="mono">{formatCount(allTime.ttg.n)}</span> graduations. The bars are
-            counts, drawn from zero; no bucket is a label.
-          </p>
-        </div>
-
-        <nav className="paths-on" aria-label="Go deeper">
-          <Link href="/live">The live board</Link>
-          <Link href="/graduated">Every graduation</Link>
-          <Link href="/graveyard">The graveyard</Link>
-        </nav>
-
-        {/* The population figures, stated and linked rather than reprinted.
-
-            They used to occupy this page in full, identically to /number, which
-            made the home page twice as long and put the most discouraging true
-            thing on the site in front of a first-time reader. CONSTRAINTS 5
-            forbids HIDING an unflattering number; it does not require it to be
-            the first thing anyone reads, and it is not hidden: the figure is
-            stated here with its denominator, /number carries it in full with
-            its card, and /method carries how it was measured. Which true thing
-            leads is a choice, and this is the choice. */}
-        <section className="headline-rate">
-          <p className="lede">
-            Of {formatCount(h24.launches)} launches in the last 24 hours,{" "}
-            {formatCount(h24.excludingFast.graduations)} graduated on demand rather than filling
-            inside {cutoffWords} — {exFastOneIn}. Counting every graduation, {formatCount(h24.graduations)}.
-          </p>
-          <p className="note">
-            <Link href="/number">The Pons Number in full</Link> ·{" "}
-            <Link href="/method">how it is measured</Link>
-          </p>
-        </section>
-        <ColophonStrip stamp={formatStamp(crawledAt)} />
-
-        {/* The ~150-word entry this used to be named our own constraints back at a
-            reader who does not care what we refuse to do (design critique,
-            2026-09-10). What it measures and how is one line, linked, on
-            /method instead. */}
-        <LedgerEntry id="h-what" heading="What this is">
-          <p className="note">
-            How LEDGE measures every figure here is on <Link href="/method">the method page</Link>.
-          </p>
-        </LedgerEntry>
-
-        <LedgerEntry id="h-cohorts" heading="More cohorts">
-          <p className="note">
-            Creator tax, hour of day, day of week, launches per deployer and the all-time window
-            are in full on <Link href="/cohorts">the cohorts page</Link>.
-          </p>
-        </LedgerEntry>
-
-        <LedgerEntry id="h-config" heading="Configurations">
-          <p className="note">
-            Pair token crossed with creator tax, all 20 cells in both windows, is on{" "}
-            <Link href="/cockpit">the configurations page</Link>.
-          </p>
-        </LedgerEntry>
+        <p className="note home-rest">
+          Where the rest is: <Link href="/number">the Pons Number in full</Link> ·{" "}
+          <Link href="/method">how it is measured</Link> · <Link href="/cohorts">more cohorts</Link>{" "}
+          · <Link href="/cockpit">pair &times; tax configurations</Link>.
+        </p>
 
         <Footer />
       </main>
     </>
   );
-}
-
-/* Nothing is said when nothing was excluded: a sentence whose only content is
-   an absence is padding, and the All footing already reconciles the buckets
-   against the population. */
-function excludedNote(excluded: number): string | null {
-  return excluded === 0
-    ? null
-    : `${formatCount(excluded)} launches were excluded from this cohort because the factory read failed. They still count in every rate.`;
 }

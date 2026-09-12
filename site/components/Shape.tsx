@@ -31,7 +31,7 @@ const BASE_Y = 210;
 const TOP_Y = 30;
 const LABEL_Y = BASE_Y + 20;
 const AXIS_CAPTION_Y = BASE_Y + 56;
-const VIEWBOX_H = BASE_Y + 98;
+const VIEWBOX_H = BASE_Y + 106;
 
 /** The tick label under a bucket: its lower edge, which is where it starts. */
 function edgeLabel(seconds: number): string {
@@ -142,7 +142,7 @@ export function Shape({
         <text x={X0 + W / 2} y={AXIS_CAPTION_Y} className="eng-text" textAnchor="middle">
           Time to graduation
         </text>
-        <text x={X0 + W / 2} y={AXIS_CAPTION_Y + 22} className="eng-text" textAnchor="middle">
+        <text x={X0 + W / 2} y={AXIS_CAPTION_Y + 30} className="eng-text" textAnchor="middle">
           Each bucket about double the last
         </text>
       </svg>
