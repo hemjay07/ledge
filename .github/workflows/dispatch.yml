@@ -40,7 +40,7 @@ jobs:
     steps:
       # The record to send is the one on main, not the SHA that scheduled
       # the run: a crawl may have committed since.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
 
