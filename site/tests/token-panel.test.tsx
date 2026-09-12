@@ -195,38 +195,39 @@ describe("closing the panel", () => {
   });
 });
 
+/* 2026-09-12: the panel shows the facts from the structured body, not the
+   bot's sentences (which stay on the full page, folded). Same facts, same
+   order, same guards -- asserted on the figures rather than on sentences. */
 describe("what the panel shows, and in what order", () => {
-  it("states the fill against this launch's own threshold, verbatim", async () => {
+  it("states the fill against this launch's own threshold, both figures and the share", async () => {
     await renderBoardWithOpenPanel();
     const dialog = screen.getByRole("dialog");
-    await waitFor(() => expect(dialog.textContent).toContain("Curve fill"));
-    expect(dialog.textContent).toContain("Curve fill: 1.7432 ETH of 4.2 ETH (41.5% of the threshold).");
+    await waitFor(() => expect(dialog.textContent).toContain("Fill"));
+    expect(dialog.textContent).toContain("1.7432 of 4.2 ETH · 41.5%");
   });
 
-  it("states buys, sells and quote with the window they were counted over, verbatim", async () => {
+  it("states buys and sells since launch", async () => {
     await renderBoardWithOpenPanel();
     const dialog = screen.getByRole("dialog");
-    await waitFor(() => expect(dialog.textContent).toContain("Activity, counted over blocks"));
-    expect(dialog.textContent).toContain(
-      "Activity, counted over blocks 56172001 to 56172588: 41 buys, 12 sells, 1.7432 ETH in and 0.22 ETH out.",
-    );
+    await waitFor(() => expect(dialog.textContent).toContain("Since launch"));
+    expect(dialog.textContent).toContain("41 buys · 12 sells");
   });
 
   it("states the cohort with its own n", async () => {
     await renderBoardWithOpenPanel();
     const dialog = screen.getByRole("dialog");
-    await waitFor(() => expect(dialog.textContent).toContain("of 2,324 graduated"));
+    await waitFor(() => expect(dialog.textContent).toContain("of 2,324, all time"));
   });
 
-  it("places the distinct-buyers reading before the fill, the fill before the activity counts, and the activity before the cohort", async () => {
+  it("places buyers before the fill, the fill before the activity counts, and the activity before the cohort", async () => {
     await renderBoardWithOpenPanel();
     const dialog = screen.getByRole("dialog");
-    await waitFor(() => expect(dialog.textContent).toContain("Distinct buyers"));
+    await waitFor(() => expect(dialog.textContent).toContain("Buyers in the launch block"));
     const text = dialog.textContent ?? "";
-    const buyersAt = text.indexOf("Distinct buyers");
-    const fillAt = text.indexOf("Curve fill");
-    const activityAt = text.indexOf("Activity, counted over");
-    const cohortAt = text.indexOf("of 2,324 graduated");
+    const buyersAt = text.indexOf("Buyers in the launch block");
+    const fillAt = text.indexOf("Fill");
+    const activityAt = text.indexOf("Since launch");
+    const cohortAt = text.indexOf("Launches like it");
     expect(buyersAt).toBeGreaterThan(-1);
     expect(buyersAt).toBeLessThan(fillAt);
     expect(fillAt).toBeLessThan(activityAt);
@@ -242,7 +243,7 @@ describe("what the panel shows, and in what order", () => {
   it("says nothing a reader could act on -- no score, grade, badge or verdict vocabulary", async () => {
     await renderBoardWithOpenPanel();
     const dialog = screen.getByRole("dialog");
-    await waitFor(() => expect(dialog.textContent).toContain("Curve fill"));
+    await waitFor(() => expect(dialog.textContent).toContain("Fill"));
     const text = (dialog.textContent ?? "").toLowerCase();
     for (const word of ["score", "grade", "badge", "risk", "safe", "rug", "likely", "predict", "odds", "chance"]) {
       expect(text).not.toContain(word);
@@ -267,11 +268,9 @@ describe("null versus zero distinct buyers", () => {
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBeGreaterThan(0));
     fireEvent.click(container.querySelector("tbody tr") as HTMLElement);
     const dialog = await screen.findByRole("dialog");
-    await waitFor(() =>
-      expect(dialog.textContent).toContain(
-        "Distinct buyers in the launch's own block (block 56,172,001): 0.",
-      ),
-    );
+    await waitFor(() => expect(dialog.textContent).toContain("Buyers in the launch block"));
+    const value = dialog.querySelector(".panel-fact .panel-fact-v")?.textContent ?? "";
+    expect(value.trim()).toBe("0");
   });
 
   it("reads a block that was never indexed as not indexed, never as a zero reading", async () => {
@@ -280,11 +279,8 @@ describe("null versus zero distinct buyers", () => {
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBeGreaterThan(0));
     fireEvent.click(container.querySelector("tbody tr") as HTMLElement);
     const dialog = await screen.findByRole("dialog");
-    await waitFor(() =>
-      expect(dialog.textContent).toContain(
-        "Distinct buyers in the launch's own block: that block was not indexed.",
-      ),
-    );
-    expect(dialog.textContent ?? "").not.toContain("): 0.");
+    await waitFor(() => expect(dialog.textContent).toContain("Buyers in the launch block"));
+    const value = dialog.querySelector(".panel-fact .panel-fact-v")?.textContent ?? "";
+    expect(value.trim()).toBe("not read");
   });
 });

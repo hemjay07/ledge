@@ -149,3 +149,27 @@
     }
   }
 }
+
+/* 2026-09-12: facts, not sentences. Label left, figure right, one line each. */
+.panel-fact {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-3);
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--rule-hair);
+}
+.panel-fact-k {
+  font-family: var(--font-body);
+  font-size: var(--fs-note);
+  color: var(--ink-2);
+}
+.panel-fact-v {
+  text-align: right;
+  font-size: 0.9375rem;
+}
+.panel-fact-v .thin {
+  font-family: var(--font-body);
+  color: var(--ink-3);
+  font-size: var(--fs-fine);
+}

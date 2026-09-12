@@ -2315,3 +2315,28 @@ footer {
 .token-foot {
   margin-top: var(--s-6);
 }
+.token-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.token-row + .token-row {
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--rule-hair);
+}
+.token-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.token-row-what {
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+.token-row-detail {
+  margin-top: 0.2rem;
+}

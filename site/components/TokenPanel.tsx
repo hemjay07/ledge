@@ -20,7 +20,17 @@
    the cohort with its n, then the link out. */
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
-import { fetchToken, normaliseLookupInput, splitLookupText, type LookupResult } from "../lib/api";
+import { fetchToken, normaliseLookupInput, type LookupResult } from "../lib/api";
+import {
+  fillPercent,
+  formatAge,
+  formatCount,
+  formatDuration,
+  pairLabel,
+  pairQuantity,
+  rateText,
+  taxPercent,
+} from "../lib/format";
 import "../app/panel.css";
 
 /** Holds every token this panel has already fetched, for the life of the
@@ -76,47 +86,104 @@ function useTokenLookup(token: string): LoadState {
   return state;
 }
 
-/* Distinct buyers in the launch's own block, buys/sells/quote, and first
-   buy/last activity -- worker/src/text.ts `activitySentences` writes these
-   three lines in that order whenever the response carries an activity block,
-   and none at all otherwise (a different silence than a zero -- see
-   lib/api.ts `splitLookupText`). Named by index here only to place them in
-   the order this panel opens to; the sentences themselves are untouched. */
+/* The facts, from the structured body -- not the bot's sentences.
+
+   Until 2026-09-12 this panel printed the sentences text.ts writes for the
+   bot, which read like a report ("Launches configured this way, all time:
+   687 of 31,177 graduated, 2.20%. Excluding..."). A row was clicked to see
+   whether anything is real here; that is four figures, in the order the
+   token page gives them: buyers in the launch block, fill, activity, and
+   what launches like it did. The sentences are untouched and still live on
+   the full page, folded. */
 function PanelFacts({ result }: { result: LookupResult }): ReactElement {
   if (result.kind === "error") {
     return <p className="lookup-line-plain">{result.message}</p>;
   }
 
   const body = result.body;
-  const lines = splitLookupText(body);
   const address = normaliseLookupInput(body.address) ?? body.address;
-  const [activityBuysSells, activityFirstLast, activityBuyers] = lines.activity;
+  const { config, state, activity, cohort } = body;
+  const pair = pairLabelOf(config.pairSymbol, config.pairClass);
+  const tax = taxPercent(config.creatorTaxBps);
+
+  const firstBlock = activity?.firstBlock ?? null;
+  const fillPct =
+    state.curveFilledWei !== null && state.graduationThresholdWei !== null
+      ? fillPercent(state.curveFilledWei, state.graduationThresholdWei)
+      : null;
+  const filled =
+    state.curveFilledWei !== null
+      ? pairQuantity(state.curveFilledWei, config.pairDecimals, null).text
+      : null;
+  const threshold =
+    state.graduationThresholdWei !== null
+      ? pairQuantity(state.graduationThresholdWei, config.pairDecimals, config.pairSymbol).text
+      : null;
 
   return (
     <div className="panel-facts">
       {result.kind === "partial" ? <p className="lookup-line-plain">{result.message}</p> : null}
-      {lines.notice ? <p className="lookup-line-plain">{lines.notice}</p> : null}
+      {body.notice ? <p className="lookup-line-plain">{body.notice}</p> : null}
 
-      {activityBuyers ? <p className="panel-lede mono">{activityBuyers}</p> : null}
+      <p className="note note--fine mono">
+        {pair} · {tax} ·{" "}
+        {state.elapsedSeconds === null ? "launch not read" : `launched ${formatAge(state.elapsedSeconds)} ago`} ·{" "}
+        {state.graduated
+          ? `graduated${state.timeToGraduationSeconds === null ? "" : ` in ${formatDuration(state.timeToGraduationSeconds)}`}`
+          : "on the curve"}
+      </p>
 
-      {lines.fill ? <p className="note">{lines.fill}</p> : null}
+      <div className="panel-fact">
+        <span className="panel-fact-k">Buyers in the launch block</span>
+        <span className="panel-fact-v mono">
+          {firstBlock === null ? "not read" : formatCount(firstBlock.distinctBuyers)}
+        </span>
+      </div>
 
-      {activityBuysSells ? <p className="note note--fine">{activityBuysSells}</p> : null}
-      {activityFirstLast ? <p className="note note--fine">{activityFirstLast}</p> : null}
+      <div className="panel-fact">
+        <span className="panel-fact-k">Fill</span>
+        <span className="panel-fact-v mono">
+          {state.graduated
+            ? "graduated"
+            : filled !== null && threshold !== null
+              ? `${filled} of ${threshold}${fillPct === null ? "" : ` · ${fillPct.toFixed(1)}%`}`
+              : "not read"}
+        </span>
+      </div>
 
-      {lines.cohort.map((sentence) => (
-        <p className="note" key={sentence}>
-          {sentence}
-        </p>
-      ))}
+      {activity ? (
+        <div className="panel-fact">
+          <span className="panel-fact-k">Since launch</span>
+          <span className="panel-fact-v mono">
+            {formatCount(activity.buys)} buys · {formatCount(activity.sells)} sells
+          </span>
+        </div>
+      ) : null}
 
-      {lines.staleNote ? <p className="note note--fine is-stale">{lines.staleNote}</p> : null}
+      {cohort?.allTime ? (
+        <div className="panel-fact">
+          <span className="panel-fact-k">Launches like it that graduated</span>
+          <span className="panel-fact-v mono">
+            {rateText({
+              rate: cohort.allTime.rate,
+              n: cohort.allTime.launches,
+              insufficient: cohort.allTime.insufficient,
+            })}{" "}
+            <span className="thin">of {formatCount(cohort.allTime.launches)}, all time</span>
+          </span>
+        </div>
+      ) : null}
 
       <p className="panel-foot mono">
-        <a href={`/t/${address}`}>Open the full page for {lines.identity ?? address}</a>
+        <a href={`/t/${address}`}>Open the full page for {shortAddress(address)}</a>
       </p>
     </div>
   );
+}
+
+/** The pair in the reader's word: the symbol when known, else the class. */
+function pairLabelOf(symbol: string | null, pairClass: string): string {
+  return symbol ?? pairLabel(pairClass);
 }
 
 export function TokenPanel({
