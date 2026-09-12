@@ -121,6 +121,36 @@ published with n like everything else.
 Rollback at any step is the reverse: the Worker cron and the GitHub schedule
 are one commit away.
 
+## Reliability: what actually broke, and what fixes each
+
+Measured on 2026-09-12, the day this was written:
+
+| What happened | Why | Fixed by |
+|---|---|---|
+| No crawl between 05:41 and 09:28 UTC — four hours on an hourly cron | GitHub's scheduler does not guarantee a `schedule:` run fires; under load it skips or defers them | The box: a systemd timer fires locally, from a clock we own |
+| A manual run sat queued 8 minutes before starting | Hosted runners are a shared queue | The box: the process is already running |
+| The 05:41 scheduled run failed outright | It raced a manual run; both committed `data/`, and the loser could not rebase `data/state.json` | The box: one service, one checkout, one lock — two runs cannot overlap |
+| The banner said "2 h old" for most of the day | `staleAfterSeconds` is 7,200, so the site tolerates two hours of silence before it says anything | Dropping it to 1,800 once the timer is reliable |
+
+**What the box does not fix, and what covers it.** One box is one point of
+failure: it can be rebooted, run out of disk, or lose its network. Three
+things cover that, and all three are part of this plan, not extras:
+
+1. `Restart=always` on both units, so a crash is a five-second gap.
+2. **The watchdog.** The reconciliation job (section 3) already runs hourly
+   and knows the age of both cursors. If either is older than its bound it
+   posts to the owner's Telegram — the same bot the graveyard uses. A
+   silent indexer is the failure mode that costs credibility, so the
+   alarm is not optional and is built with the indexer, not after it.
+3. **Nothing is lost, only delayed.** The canonical record is a git
+   repository and the crawl is resumable from its own cursor: a box that
+   is down for six hours catches up when it returns, and the only visible
+   consequence is the stale banner, which is the honest thing to show.
+
+**The GitHub workflow is not deleted.** It keeps `workflow_dispatch`, so if
+the box is gone the crawl can be run from a browser on a phone. That is the
+fallback, and it is one click.
+
 ## Cost
 
 ~$5/month for the box. Cloudflare Workers Paid ($5/month) is needed
