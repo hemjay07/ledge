@@ -66,13 +66,18 @@ export const REORG_OVERLAP_BLOCKS = BLOCKS_PER_TICK * 2;
 /** A bounded catch-up: an outage must not produce a tick that blows the
     subrequest budget. What it does not reach, the next minute reaches.
 
-    Sized for the free plan's 50 subrequests per invocation, measured live:
-    5,000 blocks (~1,200 launches) needed 10 log calls plus ~48 header and
-    factory-view batches and died with "Too many subrequests". 1,800 blocks
-    is three ticks of chain: 4 log calls, ~8 header batches, ~8 factory
-    batches, one KV read -- about 21, leaving room for the fallback endpoint
-    to double a failed call. Catching up from an hour behind takes ~20 ticks. */
-export const MAX_CATCHUP_BLOCKS = BLOCKS_PER_TICK * 3;
+    It was three ticks of chain (1,800 blocks), sized for the free plan's 50
+    subrequests. On Workers Paid the ceiling is 10,000 and the binding
+    constraint is no longer the request count but the 30 s of CPU and the
+    work each block costs: every launch in the range needs a block header
+    and a factory view, and every curve trade in it is folded.
+
+    Twenty ticks of chain (12,000 blocks) nets about 11,400 blocks a minute
+    of catch-up against a chain producing 594, so an hour behind closes in
+    about three minutes instead of an hour. The cost model in
+    tickLogSubrequests still fits the window to the budget, so a range this
+    wide is read in the log windows it needs rather than refused. */
+export const MAX_CATCHUP_BLOCKS = BLOCKS_PER_TICK * 20;
 /** The gap past which catching up is not worth attempting, so the cursor jumps
     to the head instead and says it did.
 
@@ -97,8 +102,13 @@ export const MAX_CATCHUP_BLOCKS = BLOCKS_PER_TICK * 3;
     silence, so `/api/health` can say a gap was skipped and how big it was. */
 export const MAX_RECOVERABLE_GAP = 600_000;
 /** How many `eth_getLogs` subrequests one tick may spend. The rest of the
-    Worker's allowance goes to block headers, the factory view and KV. */
-export const LOG_SUBREQUEST_BUDGET = 20;
+    Worker's allowance goes to block headers, the factory view and KV.
+
+    Was 20 under the free plan's 50. On paid the client's own budget is 600
+    (worker/src/rpc.ts), so logs may take 120 -- enough for 12,000 blocks of
+    catch-up at two topics per 1,000-block window, with the larger share
+    still left for headers and views. */
+export const LOG_SUBREQUEST_BUDGET = 120;
 /** Seven days. ~133,000 launch rows, ~25 MB, against a 5 GB free limit. */
 export const RETENTION_SECONDS = 604_800;
 /** How many tokens without a `token_meta` row a single tick may add

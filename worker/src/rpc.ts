@@ -80,9 +80,22 @@ const MAX_RETRIES = 4;
 
    That is the shape this wants: **the cron is the outer retry loop.** A Worker
    running every minute need not fight for a result inside one invocation, and
-   the budget spent fighting is the budget the rest of the tick needs. 40 leaves
-   headroom under the 50 for everything else an invocation does. */
-const SUBREQUEST_BUDGET = 40;
+   the budget spent fighting is the budget the rest of the tick needs.
+
+   The number was 40, sized for the FREE plan's 50 subrequests per invocation.
+   The account moved to Workers Paid on 2026-09-12, where the limit is 10,000
+   (developers.cloudflare.com/workers/platform/limits). 40 was therefore
+   costing coverage for a ceiling that no longer exists: measured the same
+   day, the live layer held 6,298 of the canonical record's 16,164 launches
+   over 24 hours, because a tick that falls behind advances less than the
+   chain produces and eventually jumps the gap.
+
+   600 is a twentieth of the new ceiling. It is deliberately not near it:
+   the invocation also has 30 s of CPU and 15 min of wall clock, and a tick
+   that spends hundreds of requests fighting a slow endpoint is a tick the
+   next minute has to redo. The rest of the headroom is the fallback
+   endpoint's to spend. */
+const SUBREQUEST_BUDGET = 600;
 /* Backoff, sized for a job that runs every sixty seconds.
 
    It was 1000/8000, which spends 7 seconds sleeping across four attempts. That
