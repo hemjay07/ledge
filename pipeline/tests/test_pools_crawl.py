@@ -340,3 +340,30 @@ def test_a_failure_mid_run_leaves_pools_data_unchanged(run_dir, monkeypatch):
 
     assert not (run_dir / "pools").exists()
     assert list(run_dir.rglob("*.tmp")) == []
+
+
+# 2026-09-12: three files share data/pools/ with the dated bars, and none of
+# them is a bar. Folding a probe point or an index row in as an hour bar would
+# be a silent wrong number, which is the one failure the recompute gate cannot
+# catch on its own (both sides would agree).
+def test_pool_bars_loader_takes_only_dated_partitions(tmp_path):
+    from pipeline.recompute import load_pool_bars, load_pool_index, load_pool_backfill
+
+    pools = tmp_path / "pools"
+    pools.mkdir()
+    (pools / "2026-09-12.jsonl").write_text('{"pool":"0xa","hour":"2026-09-12T10","swaps":1}\n')
+    (pools / "index.jsonl").write_text('{"pool":"0xa","txHash":"0x1","logIndex":0}\n')
+    (pools / "index-backfill.jsonl").write_text(
+        '{"pool":"0xa","txHash":"0x1","logIndex":0}\n{"pool":"0xb","txHash":"0x2","logIndex":0}\n'
+    )
+    (pools / "backfill.jsonl").write_text('{"pool":"0xa","mark":"1h","price":"1"}\n')
+
+    bars = load_pool_bars(tmp_path)
+    assert [b["pool"] for b in bars] == ["0xa"]
+    assert all("hour" in b for b in bars)
+
+    index = load_pool_index(tmp_path)
+    assert sorted(r["pool"] for r in index) == ["0xa", "0xb"]  # the shared row once
+
+    points = load_pool_backfill(tmp_path)
+    assert points == [{"pool": "0xa", "mark": "1h", "price": "1"}]

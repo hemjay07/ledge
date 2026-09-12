@@ -66,7 +66,7 @@ from typing import Optional
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pipeline.crawl import AVG_BLOCK_SECONDS, LOG_PACING_SECONDS, _atomic_write_bytes, plan_pool_index_write, plan_windows
+from pipeline.crawl import AVG_BLOCK_SECONDS, LOG_PACING_SECONDS, _atomic_write_bytes, plan_pool_index_write, plan_windows, _load_pool_index
 from pipeline.pool import POOL_MANAGER, TOPIC_V4_INITIALIZE, TOPIC_V4_SWAP, decode_initialize, decode_swap, is_pons_pool, quote_per_token
 from pipeline.recompute import load_partitions
 from pipeline.rpc import BACKOFF_BASE_SECONDS, BACKOFF_CAP_SECONDS, MAX_RETRIES
@@ -176,7 +176,7 @@ def find_pools(data_dir, rpc_client, state: dict) -> list:
     Returns new pool-index rows (not yet written); the caller appends them
     under plan_pool_index_write's own dedupe."""
     data_dir = Path(data_dir)
-    existing_index = _load_jsonl(data_dir / POOLS_DIR / "index.jsonl")
+    existing_index = _load_pool_index(data_dir)  # both index files, deduped
     existing_keys = {(r["txHash"], r["logIndex"]) for r in existing_index}
     resume_block = max((r["block"] for r in existing_index), default=state["firstIndexedBlock"] - 1) + 1
     to_block = state["lastIndexedBlock"]
@@ -215,7 +215,7 @@ def build_probe_plan(data_dir, state: dict) -> list:
     AVG_BLOCK_SECONDS -- an operational definition, recorded on the point
     so the reading stays reproducible."""
     data_dir = Path(data_dir)
-    pool_index = _load_jsonl(data_dir / POOLS_DIR / "index.jsonl")
+    pool_index = _load_pool_index(data_dir)  # both index files, deduped
     graduated_tokens = {g["token"] for g in load_partitions(data_dir / "graduations")}
     already_probed = {(p["pool"], p["mark"]) for p in _load_jsonl(data_dir / POOLS_DIR / "backfill.jsonl")}
     until_ts = _parse_iso(state["lastIndexedAt"])
@@ -396,7 +396,9 @@ def run(data_dir, rpc_client, limit_pools: Optional[int] = None) -> dict:
 
     new_index_records = find_pools(data_dir, rpc_client, state)
     if new_index_records:
-        write = plan_pool_index_write(data_dir, new_index_records)
+        # The probe's discoveries go to their own file so a push from this
+        # clone can never conflict with the crawl's index.jsonl line for line.
+        write = plan_pool_index_write(data_dir, new_index_records, filename="index-backfill.jsonl")
         if write:
             path, payload = write
             _atomic_write_bytes(path, payload)

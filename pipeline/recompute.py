@@ -55,13 +55,23 @@ def load_partitions(dir_path: Path) -> list[dict]:
 
 
 def load_pool_index(data_dir: Path) -> list[dict]:
-    """data/pools/index.jsonl -- a single ever-growing file, one line per
-    pons pool, not a dated partition -- read separately from the hour bars
-    so it is never folded in as though it were one."""
-    path = Path(data_dir) / "pools" / "index.jsonl"
-    if not path.exists():
-        return []
-    return _read_jsonl(path)
+    """data/pools/index.jsonl (the forward crawl) and index-backfill.jsonl
+    (the one-time probe), read as one and deduped -- one line per pons pool,
+    not a dated partition -- read separately from the hour bars so it is
+    never folded in as though it were one."""
+    records: list[dict] = []
+    seen: set = set()
+    for name in ("index.jsonl", "index-backfill.jsonl"):
+        path = Path(data_dir) / "pools" / name
+        if not path.exists():
+            continue
+        for record in _read_jsonl(path):
+            key = (record.get("txHash"), record.get("logIndex"))
+            if key in seen:
+                continue
+            seen.add(key)
+            records.append(record)
+    return records
 
 
 def load_pool_bars(data_dir: Path) -> list[dict]:
@@ -73,14 +83,27 @@ def load_pool_bars(data_dir: Path) -> list[dict]:
         return []
     records = []
     for path in sorted(pools_dir.iterdir()):
-        if path.name == "index.jsonl":
+        # Only dated partitions are bars. index.jsonl, index-backfill.jsonl
+        # and backfill.jsonl live in the same directory and are not: folding
+        # a probe point in as an hour bar would be a silent, wrong number.
+        if not POOL_BAR_NAME.match(path.name):
             continue
-        if path.name.endswith(".jsonl") or path.name.endswith(".jsonl.gz"):
-            records.extend(_read_jsonl(path))
+        records.extend(_read_jsonl(path))
     return records
 
 
+def load_pool_backfill(data_dir: Path) -> list[dict]:
+    """data/pools/backfill.jsonl -- one line per (pool, mark) the probe
+    answered (pipeline/backfill_pools.py). Read separately and handed to
+    the outcomes block as probe points, never as bars."""
+    path = Path(data_dir) / "pools" / "backfill.jsonl"
+    if not path.exists():
+        return []
+    return _read_jsonl(path)
+
+
 DATE_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
+POOL_BAR_NAME = re.compile(r"^\d{4}-\d{2}-\d{2}\.jsonl(\.gz)?$")
 
 
 def sample_key(filename: str) -> str:
@@ -169,6 +192,7 @@ def recompute(data_dir) -> dict:
     graduations = load_partitions(data_dir / "graduations")
     pool_index = load_pool_index(data_dir)
     pool_bars = load_pool_bars(data_dir)
+    backfill_points = load_pool_backfill(data_dir)
 
     for launch in launches:
         launch["pairClass"] = resolve_pair_class(launch, pair_tokens)
@@ -183,6 +207,7 @@ def recompute(data_dir) -> dict:
         samples=samples,
         pool_index=pool_index,
         pool_bars=pool_bars,
+        backfill_points=backfill_points,
         pair_tokens=pair_tokens,
     )
 

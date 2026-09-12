@@ -548,22 +548,43 @@ def plan_pool_bar_writes(data_dir, today: date, new_bars_by_day: dict) -> tuple:
     return writes, deletes
 
 
+POOL_INDEX_FILES = ("index.jsonl", "index-backfill.jsonl")
+
+
 def _load_pool_index(data_dir) -> list:
-    path = Path(data_dir) / POOLS_DIR / "index.jsonl"
-    if not path.exists():
-        return []
-    return _parse_jsonl(path.read_text())
+    """The pool index is two files read as one. `index.jsonl` is what the
+    forward crawl discovers as it goes; `index-backfill.jsonl` is what the
+    one-time probe (pipeline/backfill_pools.py) found scanning history. They
+    are separate files so the probe, which runs on its own clone and pushes
+    on its own schedule, can never produce a text conflict with the crawl
+    on the same line of the same file. Deduped on (txHash, logIndex) so a
+    pool both found is one pool."""
+    records = []
+    seen = set()
+    for name in POOL_INDEX_FILES:
+        path = Path(data_dir) / POOLS_DIR / name
+        if not path.exists():
+            continue
+        for record in _parse_jsonl(path.read_text()):
+            key = _record_key(record)
+            if key in seen:
+                continue
+            seen.add(key)
+            records.append(record)
+    return records
 
 
-def plan_pool_index_write(data_dir, new_index_records: list) -> Optional[tuple]:
+def plan_pool_index_write(data_dir, new_index_records: list, filename: str = "index.jsonl") -> Optional[tuple]:
     """data/pools/index.jsonl is a single ever-growing file, one line per
     pons pool (dozens, not thousands) -- appended to and deduped on
-    (txHash, logIndex) like every other partition, never rotated to .gz."""
+    (txHash, logIndex) like every other partition, never rotated to .gz.
+    The dedupe consults BOTH index files, so a pool the other writer already
+    holds is not written twice; the append goes to `filename` only."""
     if not new_index_records:
         return None
-    path = Path(data_dir) / POOLS_DIR / "index.jsonl"
+    path = Path(data_dir) / POOLS_DIR / filename
     existing_text = path.read_text() if path.exists() else ""
-    existing_keys = {_record_key(r) for r in _parse_jsonl(existing_text)}
+    existing_keys = {_record_key(r) for r in _load_pool_index(data_dir)}
     added = [r for r in new_index_records if _record_key(r) not in existing_keys]
     if not added:
         return None
