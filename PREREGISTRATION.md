@@ -7,6 +7,11 @@ When the owner signs off it is committed, the commit hash goes in the
 homepage slot and on `/method`, and nothing above the "Outcome" heading is
 edited again.
 
+**Owner decisions, 2026-09-12.** Creator tax **3%**. Both commitments below
+confirmed **as written**. The launch is intended **within the next few
+days**; the exact day and hour UTC is the one blank left, and this file is
+frozen the moment it is filled in.
+
 ## What this is and is not
 
 This is a statement, before the launch, of what we expect and what we will
@@ -103,9 +108,10 @@ document does not claim the data supports that choice.
 
 ---
 
-**Needs from the owner before sign-off:**
-- Confirm creator tax 3% (the 2–3% cohort has the highest graduation share
-  in the record, 2.52%; 4–5% halves it to 0.77%).
-- Confirm commitments 1 and 2 as written — they are checkable on-chain and
-  will be checked by others.
-- The launch window (day, hour UTC), so the "when" is on record too.
+**Settled 2026-09-12:** creator tax 3% (the 2–3% cohort has the highest
+graduation share in the record, 2.52%; 4–5% halves it to 0.77%), and
+commitments 1 and 2 confirmed as written.
+
+**Still blank:** the launch window — day and hour UTC. It is the last thing
+this file needs, and it is deliberately the last thing decided, because the
+data layer has to be solid before the launch post points at it.
