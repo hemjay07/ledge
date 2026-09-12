@@ -54,6 +54,32 @@ def load_partitions(dir_path: Path) -> list[dict]:
     return records
 
 
+def load_pool_index(data_dir: Path) -> list[dict]:
+    """data/pools/index.jsonl -- a single ever-growing file, one line per
+    pons pool, not a dated partition -- read separately from the hour bars
+    so it is never folded in as though it were one."""
+    path = Path(data_dir) / "pools" / "index.jsonl"
+    if not path.exists():
+        return []
+    return _read_jsonl(path)
+
+
+def load_pool_bars(data_dir: Path) -> list[dict]:
+    """Every dated data/pools/YYYY-MM-DD.jsonl(.gz) hour bar, oldest first
+    -- like load_partitions, but skipping index.jsonl, which lives in the
+    same directory and is not a bar partition."""
+    pools_dir = Path(data_dir) / "pools"
+    if not pools_dir.exists():
+        return []
+    records = []
+    for path in sorted(pools_dir.iterdir()):
+        if path.name == "index.jsonl":
+            continue
+        if path.name.endswith(".jsonl") or path.name.endswith(".jsonl.gz"):
+            records.extend(_read_jsonl(path))
+    return records
+
+
 DATE_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 
 
@@ -141,6 +167,8 @@ def recompute(data_dir) -> dict:
 
     launches = load_partitions(data_dir / "launches")
     graduations = load_partitions(data_dir / "graduations")
+    pool_index = load_pool_index(data_dir)
+    pool_bars = load_pool_bars(data_dir)
 
     for launch in launches:
         launch["pairClass"] = resolve_pair_class(launch, pair_tokens)
@@ -148,7 +176,14 @@ def recompute(data_dir) -> dict:
     samples = load_samples(data_dir / "samples")
 
     return build_number(
-        launches, graduations, state, crawled_at_for(state, launches), samples=samples
+        launches,
+        graduations,
+        state,
+        crawled_at_for(state, launches),
+        samples=samples,
+        pool_index=pool_index,
+        pool_bars=pool_bars,
+        pair_tokens=pair_tokens,
     )
 
 

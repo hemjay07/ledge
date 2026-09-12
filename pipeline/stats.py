@@ -4,11 +4,14 @@ section 6. This is the only place a METHOD.md definition lives in code.
 """
 from __future__ import annotations
 
-from bisect import bisect_left
+import math
+from bisect import bisect_left, bisect_right
 from collections import Counter
 from datetime import datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional, TypedDict
+
+from pipeline.pool import quote_per_token
 
 Launch = TypedDict(
     "Launch",
@@ -64,6 +67,20 @@ LADDER_EDGES = (30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600)
 # same block have a difference of zero, and a bucket that cannot separate zero
 # from one second would hide the very thing this histogram exists to show.
 HISTOGRAM_EDGES = (0, 2, 5, 10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240)
+
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+# OUTCOMES.md step 3: the three marks after a graduation, in seconds. Named
+# rather than a bare list so the published block is self-describing; moving
+# one is a change to a published figure and needs a dated METHOD.md entry,
+# exactly like LADDER_EDGES and HISTOGRAM_EDGES above.
+OUTCOME_MARKS = {"1h": 3600, "24h": 86400, "7d": 604800}
+
+# Reuses the descriptive time-to-graduation marks already on /graduated
+# (site/components/Graduated.tsx's GRADUATED_IN_OPTIONS: under 10 s,
+# 10 s - 5 min, over 5 min) rather than inventing new edges, per
+# OUTCOMES-STATS-BRIEF.md.
+OUTCOME_TTG_BUCKETS = ["u10", "mid", "over"]
 
 
 def window(launches: list, graduations: list, since: Optional[int], until: int) -> dict:
@@ -456,6 +473,254 @@ def deployers(w: dict) -> dict:
     }
 
 
+def _pair_decimals(address: Optional[str], pair_tokens: dict) -> Optional[int]:
+    """Decimals for a pool's pair (quote) side. ETH (the zero address) is
+    always 18; anything else must carry an explicit "decimals" field in
+    pair-tokens.json or the price is unknown -- never guessed. Mirrors
+    pipeline/crawl.py's `_pool_pair_decimals` exactly: this module cannot
+    import crawl.py (it would pull in pipeline.rpc and the network it
+    opens, which stats.py's module docstring forbids), so the same small
+    pure rule is kept here instead, and the two must never diverge or an
+    hour bar's close and this module's openingPrice would price the same
+    pool two different ways."""
+    if address is None:
+        return None
+    if address == ZERO_ADDRESS:
+        return 18
+    entry = pair_tokens.get(address)
+    return entry.get("decimals") if entry else None
+
+
+def _launched_token_decimals(address: str, pair_tokens: dict) -> int:
+    """Decimals for the launched-token side: 18 (pons's standard supply)
+    unless pair-tokens.json records something else for this address.
+    Mirrors pipeline/crawl.py's `_pool_token_decimals`."""
+    entry = pair_tokens.get(address)
+    if entry and "decimals" in entry:
+        return entry["decimals"]
+    return 18
+
+
+def _opening_price(pool_record: dict, pair_tokens: dict) -> Optional[Decimal]:
+    """quote-per-token at this pool's Initialize sqrtPriceX96, or None if
+    the pool's orientation is unknown or either side's decimals is
+    unknown. currency0/currency1 order is recovered from the two
+    addresses (Uniswap v4 requires currency0 < currency1), the same way
+    pipeline/crawl.py's `_pool_price` recovers it for a bar -- so an
+    unpriceable pool here is unpriceable there too, never inconsistent."""
+    token, pair = pool_record["token"], pool_record["pair"]
+    if token is None or pair is None:
+        return None
+    if int(token, 16) < int(pair, 16):
+        currency0, currency1 = token, pair
+        decimals0 = _launched_token_decimals(token, pair_tokens)
+        decimals1 = _pair_decimals(pair, pair_tokens)
+    else:
+        currency0, currency1 = pair, token
+        decimals0 = _pair_decimals(pair, pair_tokens)
+        decimals1 = _launched_token_decimals(token, pair_tokens)
+    return quote_per_token(pool_record["sqrtPriceX96"], currency0, currency1, token, decimals0, decimals1)
+
+
+def _bars_by_pool(pool_bars: list) -> dict:
+    """Hour bars grouped by pool id, sorted by hour, keeping only bars
+    that actually carry a close (a bar with swaps but unknown decimals
+    carries `close: null` and cannot answer "what was the price")."""
+    by_pool: dict[str, list] = {}
+    for bar in pool_bars:
+        if bar.get("close") is None:
+            continue
+        by_pool.setdefault(bar["pool"], []).append((bar["hour"], Decimal(bar["close"])))
+    for rows in by_pool.values():
+        rows.sort(key=lambda r: r[0])
+    return by_pool
+
+
+def _hour_key(ts: int) -> str:
+    return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H")
+
+
+def _bar_close_at_or_before(bar_rows: list, target_hour: str) -> Optional[Decimal]:
+    """The close of the last hour bar at or before target_hour -- never
+    the nearest bar. `bar_rows` is sorted ascending by hour string, which
+    sorts correctly against target_hour's own "%Y-%m-%dT%H" format."""
+    hours = [r[0] for r in bar_rows]
+    idx = bisect_right(hours, target_hour) - 1
+    return bar_rows[idx][1] if idx >= 0 else None
+
+
+def _graduation_marks(anchor_ts: int, opening_price: Decimal, bar_rows: list, until_ts: int) -> dict:
+    """One entry per OUTCOME_MARKS label whose mark has elapsed as of
+    until_ts. A mark absent from the returned dict has not elapsed and is
+    not counted toward that mark's n at all. A present value of None is
+    `noTrade`: the mark elapsed but no bar exists at or before it -- never
+    a price of 0, never dropped. A present Decimal is changeAt."""
+    result: dict = {}
+    for label, seconds in OUTCOME_MARKS.items():
+        mark_ts = anchor_ts + seconds
+        if until_ts < mark_ts:
+            continue
+        close = _bar_close_at_or_before(bar_rows, _hour_key(mark_ts))
+        result[label] = None if close is None else (close / opening_price) - 1
+    return result
+
+
+def _quantile(sorted_values: list, p: int) -> Optional[float]:
+    """Nearest-rank quantile over a sorted list of Decimal changeAt
+    values, the same method ttg_percentiles uses over seconds. Rounded
+    once, here, via Decimal.quantize -- never a float division -- before
+    it ever becomes a float for JSON."""
+    n = len(sorted_values)
+    if n == 0:
+        return None
+    idx = max(0, min(n - 1, math.ceil(p / 100 * n) - 1))
+    value = sorted_values[idx]
+    return float(value.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP))
+
+
+def _outcome_mark_row(mark_observations: list) -> dict:
+    """mark_observations: one entry per graduation for which this mark has
+    elapsed and whose pool has a known opening price -- None for noTrade,
+    a Decimal changeAt otherwise. n gates insufficiency for the whole row,
+    exactly as every other rate in this module: below MIN_N every
+    quantile and the noTrade share are null, never a computed value."""
+    n = len(mark_observations)
+    no_trade = sum(1 for v in mark_observations if v is None)
+    changes = sorted(v for v in mark_observations if v is not None)
+    insufficient = n < MIN_N
+    return {
+        "n": n,
+        "noTrade": no_trade,
+        "noTradeShare": None if insufficient else round(no_trade / n, 6),
+        "median": None if insufficient else _quantile(changes, 50),
+        "p25": None if insufficient else _quantile(changes, 25),
+        "p75": None if insufficient else _quantile(changes, 75),
+        "insufficient": insufficient,
+    }
+
+
+def _outcomes_population(
+    launches: list, graduations: list, pool_index: list, pool_bars: list, pair_tokens: dict, until_ts: int
+) -> list:
+    """One row per graduation that has a matching pons pool (OUTCOMES.md
+    "What is computed"), each carrying the launch it belongs to (None for
+    an orphan graduation, which no cohort below can place), whether its
+    pool's price is known at all, and its per-mark observations."""
+    pool_by_token = {p["token"]: p for p in pool_index if p.get("token")}
+    bars_by_pool = _bars_by_pool(pool_bars)
+    launch_by_token = {l["token"]: l for l in launches}
+
+    rows = []
+    for g in graduations:
+        pool = pool_by_token.get(g["token"])
+        if pool is None:
+            continue
+        opening_price = _opening_price(pool, pair_tokens)
+        marks: dict = {}
+        if opening_price is not None:
+            bar_rows = bars_by_pool.get(pool["pool"], [])
+            marks = _graduation_marks(g["ts"], opening_price, bar_rows, until_ts)
+        rows.append(
+            {
+                "launch": launch_by_token.get(g["token"]),
+                "ts": g["ts"],
+                "withoutPrice": opening_price is None,
+                "marks": marks,
+            }
+        )
+    return rows
+
+
+def _outcome_bucket_key(row: dict, key: str) -> Optional[str]:
+    launch = row["launch"]
+    if launch is None:
+        return None
+    if key == "ttg":
+        delta = row["ts"] - launch["ts"]
+        if delta < 10:
+            return "u10"
+        if delta < FAST_CUTOFF:
+            return "mid"
+        return "over"
+    if key == "pair":
+        return launch["pairClass"]
+    if key == "tax":
+        return _tax_bucket(launch["creatorTaxBps"])
+    raise ValueError(f"unknown outcome cohort key: {key}")
+
+
+def _outcome_bucket_list(key: str) -> list:
+    return {"ttg": OUTCOME_TTG_BUCKETS, "pair": PAIR_BUCKETS, "tax": TAX_BUCKETS}[key]
+
+
+def outcomes_cohort(rows: list, key: str) -> list[dict]:
+    """One row per bucket: the count of matched graduations in it, how
+    many of those have no price at all (excluded from every mark's n, per
+    OUTCOMES.md), and each mark's own row. A bucket with zero members
+    still emits a full row of zeros/nulls, exactly like every other cohort
+    in this module, so the byte diff is stable."""
+    buckets = _outcome_bucket_list(key)
+    members: dict = {b: [] for b in buckets}
+    for row in rows:
+        bucket = _outcome_bucket_key(row, key)
+        if bucket is not None:
+            members[bucket].append(row)
+
+    result = []
+    for bucket in buckets:
+        bucket_rows = members[bucket]
+        without_price = sum(1 for r in bucket_rows if r["withoutPrice"])
+        priced_rows = [r for r in bucket_rows if not r["withoutPrice"]]
+        result.append(
+            {
+                "bucket": bucket,
+                "graduations": len(bucket_rows),
+                "withoutPrice": without_price,
+                "marks": {
+                    label: _outcome_mark_row([r["marks"][label] for r in priced_rows if label in r["marks"]])
+                    for label in OUTCOME_MARKS
+                },
+            }
+        )
+    return result
+
+
+def outcomes_excluded(rows: list, key: str) -> int:
+    """Matched graduations with no launch on record, so no cohort of any
+    dimension can place them -- the same treatment cohort_excluded gives a
+    launch with no readable bucket key."""
+    return sum(1 for r in rows if _outcome_bucket_key(r, key) is None)
+
+
+def outcomes(
+    launches: list,
+    graduations: list,
+    pool_index: list,
+    pool_bars: list,
+    pair_tokens: dict,
+    until_ts: int,
+) -> dict:
+    """The published `outcomes` block: OUTCOMES.md step 3. Not windowed by
+    h24/all-time like the rest of build_number -- it is its own
+    population, every graduation that has a pons pool, matched by token,
+    with `until_ts` (the same instant crawledAt keys on) deciding which
+    marks have elapsed."""
+    rows = _outcomes_population(launches, graduations, pool_index, pool_bars, pair_tokens, until_ts)
+    return {
+        "matched": len(rows),
+        "cohorts": {
+            "ttg": outcomes_cohort(rows, "ttg"),
+            "pair": outcomes_cohort(rows, "pair"),
+            "tax": outcomes_cohort(rows, "tax"),
+        },
+        "cohortsExcluded": {
+            "ttg": outcomes_excluded(rows, "ttg"),
+            "pair": outcomes_excluded(rows, "pair"),
+            "tax": outcomes_excluded(rows, "tax"),
+        },
+    }
+
+
 def format_iso(ts: int) -> str:
     """A unix timestamp as the ISO-8601 Z string every published instant
     uses. Public because `crawledAt` is now a block timestamp and both the
@@ -529,6 +794,9 @@ def build_number(
     state: dict,
     crawled_at: str,
     samples: dict | None = None,
+    pool_index: list | None = None,
+    pool_bars: list | None = None,
+    pair_tokens: dict | None = None,
 ) -> dict:
     # `crawled_at` is chain time: the block timestamp of the last indexed
     # block, passed in by the caller (METHOD.md "Freshness"). Every window
@@ -568,4 +836,8 @@ def build_number(
         "samples": dict(samples or {}),
         "h24": _window_block(launches, graduations, since_24h, until, lower_bound=True),
         "allTime": _window_block(launches, graduations, None, until, lower_bound=False),
+        # OUTCOMES.md step 3: not a window like h24/allTime above -- every
+        # graduation that has a pons pool, joined by token, with `until`
+        # (the same crawledAt instant) deciding which marks have elapsed.
+        "outcomes": outcomes(launches, graduations, pool_index or [], pool_bars or [], pair_tokens or {}, until),
     }

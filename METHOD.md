@@ -57,6 +57,30 @@ A graduation slower than the last mark belongs to no rung, so the last count can
 
 The marks are a definition. They exist so that anything asking "where does this elapsed time sit" reads a row out of the table rather than computing a percentage of its own; every published share comes from `pipeline/stats.py` and nowhere else. Moving a mark is a dated entry below.
 
+## Outcomes after a graduation
+
+**An outcome is a fact about a graduated token's price at a fixed point after graduation, never a verdict about it.** For every graduation that has a pons pool, three marks are read: **+1 hour, +24 hours, +7 days** after the graduation. `openingPrice` is the pool's own price at the moment it was created — read from the `Initialize` log's `sqrtPriceX96`, never from a later block. At each mark, `priceAt` is the **close of the last hour bar at or before that mark**, and `changeAt = priceAt / openingPrice − 1`.
+
+Where the price comes from: a pons graduation opens one pool on the single Uniswap v4 `PoolManager` pons uses. `Initialize` fires once, at creation, and carries the opening `sqrtPriceX96`; `Swap` fires per trade and carries the price after it. Every trade is folded into an hourly (pool, hour) bar — open, close, high, low, swap count, quote volume — and it is these bars, never a re-read of chain state at a past block, that every later price comes from. The price itself is the quote-per-token ratio derived from `sqrtPriceX96`, oriented by which side of the pool the launched token sits on.
+
+**No bar at or before a mark is its own outcome, `noTrade`** — recorded as a fact (nobody traded the token in that window), never as a price of zero and never dropped from the count.
+
+**A mark that has not yet elapsed for a graduation is not counted toward that mark's n at all.** It is not `noTrade` — `noTrade` means the mark happened and nothing traded; an unelapsed mark simply hasn't happened yet, and pretending otherwise would either invent a price or fabricate a zero.
+
+**A pool with unknown decimals never gets a guessed price.** Its graduation is counted in `withoutPrice`, published beside every cohort it belongs to, and excluded from that cohort's `n` and medians entirely — never silently dropped, per CONSTRAINTS.md #5.
+
+Every mark is reported by three independent cohorts, each reusing a definition already published elsewhere rather than inventing a new one:
+
+- **Time-to-graduation bucket** — the same descriptive marks already on `/graduated`: under 10 s, 10 s to 5 min, over 5 min.
+- **Pair token** — the same four buckets as every other pair-token cohort.
+- **Creator tax band** — the same five buckets as every other tax cohort.
+
+Per cohort and per mark, the published figures are: `n`, the count and share that were `noTrade`, the count `withoutPrice`, and the **median**, **p25** and **p75** of `changeAt`. Medians and quartiles are published, never means — a single token up 50x would otherwise carry an entire cohort's average on its own. Below **n = 30**, the row is `insufficient`: every quantile and the `noTrade` share print null, exactly as `ttg_percentiles` and every cohort in this file already do. The raw counts (`n`, `noTrade`, `withoutPrice`) are always published regardless of `n`, because a denominator is never the thing withheld.
+
+**These figures describe populations, never a token.** "Tokens that graduated in under 10 seconds: median change at +24 h −78% (n=412)" is a fact about that cohort on the day it was measured. It says nothing about what any individual token that graduated in under 10 seconds will do, has done beyond that fact, or should be treated as. Nothing here predicts anything, and no reading of these numbers as a forecast is supported by how they are computed. CONSTRAINTS.md #1 binds here exactly as it binds every other figure on this site.
+
+Only about a day of pool data exists as of 2026-09-12, so almost every cohort currently prints "not enough data (n=0)" or close to it at every mark. That is the correct and honest state of a measurement that started a day ago — it is not worked around, and the backfill that fills it in is separate, later work.
+
 ## Freshness
 
 - The crawler runs hourly. Each run records `crawledAt` and `headBlock`.
@@ -75,6 +99,8 @@ The marks are a definition. They exist so that anything asking "where does this 
 - Anyone can run the same script against the same files and get the same numbers.
 
 ## Changelog of definitions
+
+- 2026-09-12 — new definitions, no existing figure changed: **outcomes after a graduation**, the "Outcomes after a graduation" section above. `openingPrice`, `priceAt` and `changeAt` at +1 h / +24 h / +7 d after a graduation, computed from the pons pool's own `Initialize` and `Swap` logs on the single Uniswap v4 `PoolManager` pons graduates into; `noTrade` as its own outcome rather than a gap; an unelapsed mark excluded from that mark's `n` entirely rather than counted as anything; a pool with unknown decimals counted in `withoutPrice` and excluded from medians, never guessed. Published per time-to-graduation bucket, pair token and creator tax band — the same bucket definitions already used elsewhere in this file — as median, p25 and p75 of `changeAt`, never a mean, gated at n = 30 like every other quantile here. As of this date almost no cohort clears n = 30: only about a day of `data/pools/` history exists, and every mark reads "not enough data (n=…)" or close to it. This is the expected state of a day-old measurement, not a defect, and it is not worked around. Nothing here predicts anything or scores a token — CONSTRAINTS.md #1 applies to `outcomes` exactly as it does to every other figure.
 
 - 2026-09-10 — **what a graduation completing in under a second can and cannot tell you.** No figure changed; this entry constrains how the published ones may be read, including by us.
 

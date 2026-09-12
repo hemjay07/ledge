@@ -96,6 +96,49 @@ const histogramRow = z.object({
   deployers: z.number().int().nonnegative(),
 });
 
+/* OUTCOMES.md step 3 / OUTCOMES-STATS-BRIEF.md. One row per mark after a
+   graduation: n gates insufficiency the same way every other rate in this
+   file does, and below it every quantile and the noTrade share are null,
+   never a computed value. n, noTrade and the raw counts stay in the file
+   regardless -- only the derived figures disappear. */
+const outcomeMarkRow = z.object({
+  n: z.number().int().nonnegative(),
+  noTrade: z.number().int().nonnegative(),
+  noTradeShare: z.number().nullable(),
+  median: z.number().nullable(),
+  p25: z.number().nullable(),
+  p75: z.number().nullable(),
+  insufficient: z.boolean(),
+});
+
+const outcomeCohortRow = z.object({
+  bucket: z.string(),
+  graduations: z.number().int().nonnegative(),
+  withoutPrice: z.number().int().nonnegative(),
+  marks: z.object({
+    "1h": outcomeMarkRow,
+    "24h": outcomeMarkRow,
+    "7d": outcomeMarkRow,
+  }),
+});
+
+/* Optional: a number.json written before this step still validates. Not a
+   window like h24/allTime -- every graduation that has a pons pool, joined
+   by token, regardless of when its launch fell. */
+const outcomesSchema = z.object({
+  matched: z.number().int().nonnegative(),
+  cohorts: z.object({
+    ttg: z.array(outcomeCohortRow),
+    pair: z.array(outcomeCohortRow),
+    tax: z.array(outcomeCohortRow),
+  }),
+  cohortsExcluded: z.object({
+    ttg: z.number().int().nonnegative(),
+    pair: z.number().int().nonnegative(),
+    tax: z.number().int().nonnegative(),
+  }),
+});
+
 const windowShape = z.object({
   since: z.number().int().nullable(),
   until: z.number().int(),
@@ -291,6 +334,9 @@ export const numberSchema = z.object({
   samples: z.record(z.string(), sampleSchema).optional(),
   h24: windowSchema,
   allTime: windowSchema,
+  /* Optional for the same reason `samples` is: a number.json written before
+     OUTCOMES.md step 3 landed still parses. Not rendered anywhere yet. */
+  outcomes: outcomesSchema.optional(),
 });
 
 export type NumberFile = z.infer<typeof numberSchema>;
@@ -301,3 +347,6 @@ export type LadderRung = z.infer<typeof ladderRung>;
 export type HistogramRow = z.infer<typeof histogramRow>;
 export type TtgHistogramBucket = z.infer<typeof ttgHistogramBucket>;
 export type Sample = z.infer<typeof sampleShape>;
+export type OutcomeMarkRow = z.infer<typeof outcomeMarkRow>;
+export type OutcomeCohortRow = z.infer<typeof outcomeCohortRow>;
+export type Outcomes = z.infer<typeof outcomesSchema>;
