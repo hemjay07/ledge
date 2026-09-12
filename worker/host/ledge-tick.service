@@ -1,0 +1,20 @@
+[Unit]
+Description=ledge live indexer (worker/src/tick.ts run under Node)
+Documentation=https://github.com/ledge/ledge/blob/main/INDEXER.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ledge
+WorkingDirectory=/opt/ledge/worker
+EnvironmentFile=/etc/ledge/env
+ExecStart=/usr/bin/node /opt/ledge/worker/dist/host.mjs
+Restart=always
+RestartSec=5
+# The loop itself already runs forever; a crash restarts clean rather than
+# being treated as an outage that needs manual attention.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

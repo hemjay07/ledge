@@ -15,7 +15,8 @@
     "dev": "wrangler dev --local",
     "db:local": "wrangler d1 execute LEDGE_DB --local --file=schema.sql",
     "test:node": "vitest run --config vitest.node.config.ts",
-    "test:workers": "vitest run --config vitest.workers.config.ts"
+    "test:workers": "vitest run --config vitest.workers.config.ts",
+    "build:host": "esbuild host/main.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/host.mjs --external:@resvg/resvg-wasm"
   },
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",
