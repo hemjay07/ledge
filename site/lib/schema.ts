@@ -109,6 +109,11 @@ const outcomeMarkRow = z.object({
   p25: z.number().nullable(),
   p75: z.number().nullable(),
   insufficient: z.boolean(),
+  /* OUTCOMES-BACKFILL-BRIEF.md step 4: how many of this mark's readings
+     came from a backfill probe (data/pools/backfill.jsonl) rather than a
+     real hour bar. Optional so a number.json written before this field
+     landed still parses. */
+  fromProbe: z.number().int().nonnegative().optional(),
 });
 
 const outcomeCohortRow = z.object({
