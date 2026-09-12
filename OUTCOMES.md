@@ -1,6 +1,7 @@
 # What happens after a graduation
 
-Written 2026-09-12. Status: **design**. Nothing here is built.
+Written 2026-09-12. Status: **steps 1 and 2 built and proven against the
+chain; steps 3 to 5 not started.**
 
 ## The question it answers
 
@@ -108,6 +109,49 @@ Reading 100,000 logs an hour is a steady background job, not a GitHub
 Actions job: it is the second reason the crawl moves to the box
 (`INDEXER.md`). Same RPC, same 1,000-block windows, one process. Storage
 is a few MB a day in the repo's data partitions, rotated to `.gz`.
+
+## What has been proven, and how
+
+**Step 1 (decoders and pricing), 2026-09-12.** `pipeline/pool.py`. The
+layouts were verified against real logs from the deployed PoolManager, not
+derived from the signature: `Initialize` carries `id`, `currency0` and
+`currency1` as INDEXED topics, and a first pass that read all seven fields
+out of `data` crashed on every real log. Two real logs are pasted into
+`pipeline/tests/test_pool.py` as fixtures for that reason.
+
+**Step 2 (collection), 2026-09-12.** `pipeline/crawl.py` reads both topics
+off the PoolManager in its existing window loop and writes
+`data/pools/index.jsonl` and `data/pools/YYYY-MM-DD.jsonl` inside the same
+all-or-nothing commit as every other partition.
+
+Measured while building it:
+
+- **Swap reads are filtered server-side by pool id.** The endpoint accepts
+  an array of pool ids in the second topic position as an OR match: one
+  request returned the same 239 logs as five single-id requests over the
+  same window, key for key. So the cost is **two extra requests per
+  1,000-block window** whatever the number of pools, not one per pool, and
+  the ~100,000 swaps an hour across the whole PoolManager never have to be
+  read.
+- **`Initialize` cannot be filtered by hook** — `hooks` is not an indexed
+  topic — so every pool creation is read and filtered in memory. Measured
+  over blocks 61,010,000 to 61,046,000 (about an hour): 736 pools created,
+  of which **6 carry pons's hook**. Reading 736 to keep 6 is the price, and
+  it is small.
+- **A real run wrote real bars.** Crawling blocks 61,034,001 to 61,047,488
+  against the chain produced two pons pools and their hour bars; the
+  ETH-paired one opened at 2.06e-8 ETH per token and closed the same hour at
+  1.22e-8, a 41% fall inside sixty minutes. The other pool's pair token has
+  no decimals on record, so its prices are `null` and its swap count and
+  quote volume are kept — never a guessed price.
+
+**Known gap, written down rather than hidden.** Launches, graduations and
+the pool index are reorg-safe by key dedupe. Hour bars are aggregates with
+no per-swap key on disk, so a swap is folded only when its block is above
+the run's starting cursor; the ~3,000-block reorg window is therefore not
+re-folded, and a reorg inside it would leave a bar slightly wrong rather
+than double-counted. About five minutes of chain, and the alternative
+(keeping every swap key) costs more than the error.
 
 ## Order of work
 

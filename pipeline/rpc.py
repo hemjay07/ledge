@@ -208,7 +208,24 @@ class RpcClient:
         response = self._send_with_retry(payload)
         return int(response[0]["result"], 16)
 
-    def get_logs(self, from_block: int, to_block: int, topic0: str) -> list:
+    def get_logs(
+        self,
+        from_block: int,
+        to_block: int,
+        topic0: str,
+        address: str = FACTORY_ADDRESS,
+        topic1=None,
+    ) -> list:
+        """`address` defaults to the factory -- every existing caller is
+        unchanged -- and is overridable so the same client can read the
+        Uniswap v4 PoolManager too (OUTCOMES.md). `topic1` is the optional
+        second topic filter: a single topic string, a list of topics (an OR
+        match), or None for no filter in that position. Measured against
+        the production endpoint 2026-09-12: a list of pool ids in the
+        second position returns exactly the union of what one request per
+        id would return, so a batch of pool ids costs one request rather
+        than one per id (see OUTCOMES-CRAWL-BRIEF.md report)."""
+        topics = [topic0] if topic1 is None else [topic0, topic1]
         payload = [
             {
                 "jsonrpc": "2.0",
@@ -218,8 +235,8 @@ class RpcClient:
                     {
                         "fromBlock": hex(from_block),
                         "toBlock": hex(to_block),
-                        "address": FACTORY_ADDRESS,
-                        "topics": [topic0],
+                        "address": address,
+                        "topics": topics,
                     }
                 ],
             }

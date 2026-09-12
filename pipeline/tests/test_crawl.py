@@ -244,8 +244,20 @@ class _StubRpc:
             return self.head_timestamp
         return max(self.timestamps.values(), default=_iso_day_ts("2026-09-06")) + 1
 
-    def get_logs(self, from_block, to_block, topic0):
-        source = self.launch_logs if topic0 == _TOKEN_LAUNCHED_TOPIC0 else self.grad_logs
+    def get_logs(self, from_block, to_block, topic0, address=None, topic1=None):
+        # address/topic1 accepted and ignored: this fixture models only the
+        # factory-side topics (TOKEN_LAUNCHED/POOL_GRADUATED) this test file
+        # exercises. The pool (Uniswap v4) reads added by
+        # OUTCOMES-CRAWL-BRIEF.md pass through the same window loop and so
+        # reach every stub here too; any other topic0 (the two pool topics)
+        # gets no logs -- pipeline/tests/test_pools_crawl.py is where those
+        # reads are actually exercised and asserted on.
+        if topic0 == _TOKEN_LAUNCHED_TOPIC0:
+            source = self.launch_logs
+        elif topic0 == _POOL_GRADUATED_TOPIC0:
+            source = self.grad_logs
+        else:
+            source = []
         return [log for log in source if from_block <= int(log["blockNumber"], 16) <= to_block]
 
     def call_batch(self, requests):
@@ -432,7 +444,9 @@ def test_backfill_with_existing_history_crawls_backwards_from_first_indexed_bloc
     seen = []
 
     class _RecordingRpcClient:
-        def get_logs(self, frm, to, topic0):
+        def get_logs(self, frm, to, topic0, address=None, topic1=None):
+            # address/topic1 accepted and ignored -- see the note on
+            # _StubRpc.get_logs above.
             seen.append((frm, to))
             return []
 
@@ -529,7 +543,9 @@ def test_a_forward_run_scans_at_most_one_capped_range(committed_data_dir, monkey
         """Answers header requests, because a forward run stamps its cursor
         with the timestamp of the block it reached."""
 
-        def get_logs(self, frm, to, topic0):
+        def get_logs(self, frm, to, topic0, address=None, topic1=None):
+            # address/topic1 accepted and ignored -- see the note on
+            # _StubRpc.get_logs above.
             seen.append((frm, to))
             return []
 
@@ -557,7 +573,9 @@ def test_a_run_within_the_cap_still_reaches_the_head(committed_data_dir, monkeyp
     seen = []
 
     class _RecordingRpcClient:
-        def get_logs(self, frm, to, topic0):
+        def get_logs(self, frm, to, topic0, address=None, topic1=None):
+            # address/topic1 accepted and ignored -- see the note on
+            # _StubRpc.get_logs above.
             seen.append((frm, to))
             return []
 

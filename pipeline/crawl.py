@@ -44,6 +44,7 @@ import json
 import sys
 import time
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -54,6 +55,15 @@ if __package__ in (None, ""):
 
 from pipeline import enrich as enrich_mod
 from pipeline.canonical import canonical_dumps
+from pipeline.pool import (
+    POOL_MANAGER,
+    TOPIC_V4_INITIALIZE,
+    TOPIC_V4_SWAP,
+    decode_initialize,
+    decode_swap,
+    is_pons_pool,
+    quote_per_token,
+)
 from pipeline.recompute import crawled_at_for, load_partitions, load_samples, resolve_pair_class
 from pipeline.rpc import TOPIC_POOL_GRADUATED, TOPIC_TOKEN_LAUNCHED, decode_pool_graduated, decode_token_launched
 from pipeline.stats import build_number, format_iso
@@ -301,6 +311,265 @@ def _group_by_day(records: list) -> dict:
     return by_day
 
 
+# --- pool (Uniswap v4) primitives ---------------------------------------
+# OUTCOMES.md: prices for what happens after a graduation come only from
+# Initialize and Swap logs on the single PoolManager pons graduates into,
+# never from reading pool state at a past block. pipeline/pool.py (step 1,
+# already merged) owns the log decoding and the sqrtPriceX96 math; this
+# section folds those logs into the two data/pools/ partitions under the
+# same all-or-nothing commit as launches and graduations.
+POOLS_DIR = "pools"
+
+
+def _pool_orientation(currency0: str, currency1: str, known_launch_tokens: set) -> tuple:
+    """Which currency is the pons launch token and which is the pair,
+    decided against every launch token LEDGE has ever recorded -- not just
+    this run's. Neither side matching (or, degenerately, both) is not
+    guessed: both come back None and the index line says so."""
+    c0_is_launch = currency0 in known_launch_tokens
+    c1_is_launch = currency1 in known_launch_tokens
+    if c0_is_launch and not c1_is_launch:
+        return currency0, currency1
+    if c1_is_launch and not c0_is_launch:
+        return currency1, currency0
+    return None, None
+
+
+def _shape_pool_index(decoded: dict, known_launch_tokens: set) -> dict:
+    token, pair = _pool_orientation(decoded["currency0"], decoded["currency1"], known_launch_tokens)
+    return {
+        "pool": decoded["id"],
+        "token": token,
+        "pair": pair,
+        "block": decoded["block"],
+        "ts": decoded.get("ts"),
+        "sqrtPriceX96": decoded["sqrtPriceX96"],
+        "tickSpacing": decoded["tickSpacing"],
+        "txHash": decoded["txHash"],
+        "logIndex": decoded["logIndex"],
+    }
+
+
+def _pool_token_is_currency0(token: str, pair: str) -> bool:
+    """Uniswap v4 requires a pool's currency0 < currency1 by address value
+    (the PoolManager rejects any PoolKey that isn't sorted that way), so
+    which side the launched token sits on is recoverable from the two
+    addresses alone -- nothing extra needs to be stored in the index line
+    to price a later swap correctly."""
+    return int(token, 16) < int(pair, 16)
+
+
+def _pool_pair_decimals(address: str, pair_tokens: dict) -> Optional[int]:
+    """Decimals for the pair (quote) side of a pool. ETH (the zero
+    address) is always 18; anything else must carry an explicit
+    "decimals" field in pair-tokens.json or the price is unknown -- never
+    guessed."""
+    if address == ZERO_ADDRESS:
+        return 18
+    entry = pair_tokens.get(address)
+    return entry.get("decimals") if entry else None
+
+
+def _pool_token_decimals(address: str, pair_tokens: dict) -> int:
+    """Decimals for the launched-token side: 18 (pons's standard supply),
+    unless pair-tokens.json records something different for this address
+    (it can also appear there if the same token is later approved as a
+    pair token elsewhere)."""
+    entry = pair_tokens.get(address)
+    if entry and "decimals" in entry:
+        return entry["decimals"]
+    return 18
+
+
+def _pool_price(sqrt_price_x96: int, token: Optional[str], pair: Optional[str], pair_tokens: dict):
+    """quote-per-token at this swap's sqrtPriceX96, or None if the
+    orientation or either side's decimals is unknown. Reuses
+    pool.quote_per_token, which needs the pool's real currency0/currency1
+    identities -- recovered via _pool_token_is_currency0 rather than
+    stored, since sqrtPriceX96 is meaningless without that ordering."""
+    if token is None or pair is None:
+        return None
+    if _pool_token_is_currency0(token, pair):
+        currency0, currency1 = token, pair
+        decimals0 = _pool_token_decimals(token, pair_tokens)
+        decimals1 = _pool_pair_decimals(pair, pair_tokens)
+    else:
+        currency0, currency1 = pair, token
+        decimals0 = _pool_pair_decimals(pair, pair_tokens)
+        decimals1 = _pool_token_decimals(token, pair_tokens)
+    return quote_per_token(sqrt_price_x96, currency0, currency1, token, decimals0, decimals1)
+
+
+def _pool_quote_amount(decoded_swap: dict, token: Optional[str], pair: Optional[str]) -> Optional[int]:
+    """The absolute raw (base-unit) amount on the pair side of a swap --
+    needs only the orientation, never decimals, since volumeQuote is a raw
+    count like pairTokenAmount elsewhere in this file."""
+    if token is None or pair is None:
+        return None
+    quote_is_currency1 = _pool_token_is_currency0(token, pair)
+    raw = decoded_swap["amount1"] if quote_is_currency1 else decoded_swap["amount0"]
+    return abs(raw)
+
+
+def _pool_hour_key(ts: int) -> str:
+    return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H")
+
+
+def _new_pool_bar(pool_id: str, token: Optional[str], hour: str) -> dict:
+    return {
+        "pool": pool_id, "token": token, "hour": hour,
+        "open": None, "close": None, "high": None, "low": None,
+        "swaps": 0, "volumeQuote": "0",
+    }
+
+
+def _fold_swap_into_bar(bar: dict, price, quote_amount: Optional[int]) -> None:
+    bar["swaps"] += 1
+    if quote_amount is not None:
+        bar["volumeQuote"] = str(Decimal(bar["volumeQuote"]) + Decimal(quote_amount))
+    if price is None:
+        return
+    price_str = format(price, "f")
+    if bar["open"] is None:
+        bar["open"] = price_str
+    bar["close"] = price_str
+    if bar["high"] is None or price > Decimal(bar["high"]):
+        bar["high"] = price_str
+    if bar["low"] is None or price < Decimal(bar["low"]):
+        bar["low"] = price_str
+
+
+def build_pool_bars(new_swaps: list, pool_index_by_id: dict, pair_tokens: dict) -> dict:
+    """Fold this run's new Swap records into hour bars, one per
+    (pool, hour). A swap for a pool whose orientation is unknown (index
+    line carries token: null) is not folded -- there is no way to tell
+    which side is the quote amount without guessing."""
+    bars: dict = {}
+    for swap in new_swaps:
+        pool_record = pool_index_by_id.get(swap["id"])
+        if pool_record is None:
+            continue
+        token, pair = pool_record["token"], pool_record["pair"]
+        if token is None or pair is None:
+            continue
+        hour = _pool_hour_key(swap["ts"])
+        key = (swap["id"], hour)
+        bar = bars.get(key) or _new_pool_bar(swap["id"], token, hour)
+        price = _pool_price(swap["sqrtPriceX96"], token, pair, pair_tokens)
+        quote_amount = _pool_quote_amount(swap, token, pair)
+        _fold_swap_into_bar(bar, price, quote_amount)
+        bars[key] = bar
+    return bars
+
+
+def _merge_pool_bar(existing: Optional[dict], new: Optional[dict]) -> dict:
+    """An hour bar already on disk is merged with this run's, not
+    replaced: open is the earliest, close is the latest, high/low the
+    extremes, swaps and volumeQuote add up. Runs proceed forward through
+    the chain, so an on-disk bar predates this run's batch; the one
+    exception is a backward backfill, which OUTCOMES.md's own order of
+    work runs once, before anything is published, into hours that have no
+    forward bar yet -- so it does not hit this ambiguity in practice."""
+    if existing is None:
+        return new
+    if new is None:
+        return existing
+    merged = {
+        "pool": existing["pool"],
+        "token": existing["token"] if existing["token"] is not None else new["token"],
+        "hour": existing["hour"],
+        "swaps": existing["swaps"] + new["swaps"],
+        "volumeQuote": str(Decimal(existing["volumeQuote"]) + Decimal(new["volumeQuote"])),
+    }
+    merged["open"] = existing["open"] if existing["open"] is not None else new["open"]
+    merged["close"] = new["close"] if new["close"] is not None else existing["close"]
+    highs = [Decimal(v) for v in (existing["high"], new["high"]) if v is not None]
+    lows = [Decimal(v) for v in (existing["low"], new["low"]) if v is not None]
+    merged["high"] = format(max(highs), "f") if highs else None
+    merged["low"] = format(min(lows), "f") if lows else None
+    return merged
+
+
+def _pool_bar_day(bar: dict) -> date:
+    return date.fromisoformat(bar["hour"][:10])
+
+
+def _group_pool_bars_by_day(bars: dict) -> dict:
+    by_day: dict = {}
+    for bar in bars.values():
+        by_day.setdefault(_pool_bar_day(bar), {})[(bar["pool"], bar["hour"])] = bar
+    return by_day
+
+
+def plan_pool_bar_writes(data_dir, today: date, new_bars_by_day: dict) -> tuple:
+    """Like plan_partition_writes, but for data/pools/YYYY-MM-DD.jsonl:
+    each line is a (pool, hour) aggregate, so a day already on disk is
+    read back, merged bar-by-bar with this run's bars via _merge_pool_bar,
+    and rewritten whole -- never a byte-for-byte append, because a new
+    swap in an hour that already has a bar changes an existing line
+    rather than adding one. Days before `today` are merged the same way,
+    then gzipped, following the same rule as launches/graduations."""
+    data_dir = Path(data_dir)
+    pools_dir = data_dir / POOLS_DIR
+    writes: list = []
+    deletes: list = []
+
+    for day in sorted(_partition_days(pools_dir) | set(new_bars_by_day)):
+        plain = pools_dir / f"{day.isoformat()}.jsonl"
+        archive = pools_dir / f"{day.isoformat()}.jsonl.gz"
+        new_bars = new_bars_by_day.get(day, {})
+
+        if day >= today:
+            if not new_bars:
+                continue
+            existing = {(b["pool"], b["hour"]): b for b in (_read_partition_file(plain) if plain.exists() else [])}
+            merged = dict(existing)
+            for key, bar in new_bars.items():
+                merged[key] = _merge_pool_bar(existing.get(key), bar)
+            records = [merged[k] for k in sorted(merged)]
+            writes.append((plain, _jsonl_text(records).encode()))
+            continue
+
+        if not new_bars and not plain.exists():
+            continue  # already archived and untouched: leave the .gz alone
+        existing = {
+            (b["pool"], b["hour"]): b
+            for path in (archive, plain) if path.exists()
+            for b in _read_partition_file(path)
+        }
+        merged = dict(existing)
+        for key, bar in new_bars.items():
+            merged[key] = _merge_pool_bar(existing.get(key), bar)
+        records = [merged[k] for k in sorted(merged)]
+        writes.append((archive, _gzip_bytes(_jsonl_text(records).encode())))
+        if plain.exists():
+            deletes.append(plain)
+
+    return writes, deletes
+
+
+def _load_pool_index(data_dir) -> list:
+    path = Path(data_dir) / POOLS_DIR / "index.jsonl"
+    if not path.exists():
+        return []
+    return _parse_jsonl(path.read_text())
+
+
+def plan_pool_index_write(data_dir, new_index_records: list) -> Optional[tuple]:
+    """data/pools/index.jsonl is a single ever-growing file, one line per
+    pons pool (dozens, not thousands) -- appended to and deduped on
+    (txHash, logIndex) like every other partition, never rotated to .gz."""
+    if not new_index_records:
+        return None
+    path = Path(data_dir) / POOLS_DIR / "index.jsonl"
+    existing_text = path.read_text() if path.exists() else ""
+    existing_keys = {_record_key(r) for r in _parse_jsonl(existing_text)}
+    added = [r for r in new_index_records if _record_key(r) not in existing_keys]
+    if not added:
+        return None
+    return path, (existing_text + _jsonl_text(added)).encode()
+
+
 def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[datetime] = None,
         backfill_hours: Optional[int] = None) -> dict:
     data_dir = Path(data_dir)
@@ -336,6 +605,12 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
 
     raw_launches = []
     raw_grads = []
+    raw_pool_inits = []
+    raw_swaps = []
+    # Seeded from data/pools/index.jsonl so a pool discovered in an earlier
+    # run has its swaps read from the very first window of this one, not
+    # only once this run happens to re-see its Initialize.
+    known_pool_ids = {r["pool"] for r in _load_pool_index(data_dir)}
     _log(f"crawl: {len(windows)} windows, blocks {start_block}-{to_block}")
     for i, (frm, to) in enumerate(windows, 1):
         if i % 10 == 0 or i == len(windows):
@@ -345,6 +620,26 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
         time.sleep(LOG_PACING_SECONDS)
         for log in rpc_client.get_logs(frm, to, TOPIC_POOL_GRADUATED):
             raw_grads.append(decode_pool_graduated(log))
+        time.sleep(LOG_PACING_SECONDS)
+
+        # Initialize is read for the whole window (there is no way to filter
+        # it to pons pools server-side: `hooks` lives in the log body, not
+        # in an indexed topic) and kept only where is_pons_pool says so.
+        # Swap volume across the whole PoolManager is ~100,000/hour
+        # (OUTCOMES.md) -- far too much to read raw -- so it is filtered to
+        # the pons pool ids known so far, including any this same window's
+        # Initialize batch just added, via the second topic position, which
+        # the endpoint accepts as an array (OR match; measured 2026-09-12,
+        # see rpc.get_logs and the report).
+        for log in rpc_client.get_logs(frm, to, TOPIC_V4_INITIALIZE, address=POOL_MANAGER):
+            decoded = decode_initialize(log)
+            if is_pons_pool(decoded):
+                raw_pool_inits.append(decoded)
+                known_pool_ids.add(decoded["id"])
+        time.sleep(LOG_PACING_SECONDS)
+        if known_pool_ids:
+            for log in rpc_client.get_logs(frm, to, TOPIC_V4_SWAP, address=POOL_MANAGER, topic1=sorted(known_pool_ids)):
+                raw_swaps.append(decode_swap(log))
         time.sleep(LOG_PACING_SECONDS)
 
     if now is None:
@@ -357,19 +652,38 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     scanned = [_shape_launch(l) for l in raw_launches]
     _log(f"crawl: logs done, timestamping {len(scanned) + len(raw_grads)} records")
     timestamps = _fetch_block_timestamps(
-        rpc_client, [r["block"] for r in scanned] + [g["block"] for g in raw_grads]
+        rpc_client,
+        [r["block"] for r in scanned] + [g["block"] for g in raw_grads]
+        + [p["block"] for p in raw_pool_inits] + [s["block"] for s in raw_swaps],
     )
     for record in scanned:
         record["ts"] = timestamps[record["block"]]
     for record in raw_grads:
+        record["ts"] = timestamps[record["block"]]
+    for record in raw_pool_inits:
+        record["ts"] = timestamps[record["block"]]
+    for record in raw_swaps:
         record["ts"] = timestamps[record["block"]]
 
     days_to_check = dedupe_day_set(timestamps.values())
     new_launches = dedupe_records(scanned, _load_existing_keys(data_dir, "launches", days_to_check))
     new_grads = dedupe_records(raw_grads, _load_existing_keys(data_dir, "graduations", days_to_check))
 
-    if not new_launches and not new_grads and to_block == state["lastIndexedBlock"]:
+    if not new_launches and not new_grads and not raw_pool_inits and not raw_swaps and to_block == state["lastIndexedBlock"]:
         return {"committed": False}
+
+    # The reorg-window overlap (REORG_WINDOW blocks re-scanned every run) is
+    # safe for launches/graduations and the pool index because all three are
+    # raw per-record partitions deduped on (txHash, logIndex). Swap volume is
+    # folded straight into hour-bar aggregates with no such per-record key
+    # kept on disk, so re-scanning that overlap would double-count a swap
+    # already folded into a committed bar. Only swaps strictly past the
+    # cursor this run started from are folded; a genuine reorg landing only
+    # on a Swap inside that narrow (~5-minute) window is the one case this
+    # does not correct, and it is not a real cost here because launches,
+    # graduations and the pool index are all still fully reorg-safe.
+    swap_min_block = None if backfilling_history or state.get("lastIndexedBlock") is None else state["lastIndexedBlock"]
+    new_swaps = [s for s in raw_swaps if swap_min_block is None or s["block"] > swap_min_block]
 
     # The measurement instant: the chain time of the block the cursor lands
     # on, read from that block's header (METHOD.md "Freshness"). One extra
@@ -402,12 +716,30 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     for launch in all_launches:
         launch["pairClass"] = resolve_pair_class(launch, pair_tokens)
 
+    # Pool index: raw per-pool records, deduped on (txHash, logIndex) like
+    # launches/graduations. Orientation is decided against every launch
+    # token LEDGE has ever recorded, same as orphan status above.
+    existing_pool_index = _load_pool_index(data_dir)
+    existing_pool_index_keys = {_record_key(r) for r in existing_pool_index}
+    new_pool_index = [
+        _shape_pool_index(d, known_launch_tokens)
+        for d in raw_pool_inits
+        if _record_key(d) not in existing_pool_index_keys
+    ]
+    pool_index_by_id = {r["pool"]: r for r in existing_pool_index}
+    pool_index_by_id.update({r["pool"]: r for r in new_pool_index})
+    new_pool_bars = build_pool_bars(new_swaps, pool_index_by_id, pair_tokens)
+
     # --- stage every output in memory ------------------------------------
     partition_writes, partition_deletes = plan_partition_writes(
         data_dir,
         today,
         {"launches": _group_by_day(enriched_launches), "graduations": _group_by_day(shaped_grads)},
     )
+    pool_bar_writes, pool_bar_deletes = plan_pool_bar_writes(data_dir, today, _group_pool_bars_by_day(new_pool_bars))
+    pool_index_write = plan_pool_index_write(data_dir, new_pool_index)
+    partition_writes = partition_writes + pool_bar_writes + ([pool_index_write] if pool_index_write else [])
+    partition_deletes = partition_deletes + pool_bar_deletes
     pair_tokens_payload = (json.dumps(pair_tokens, sort_keys=True, indent=2) + "\n").encode()
 
     new_state = dict(state)
