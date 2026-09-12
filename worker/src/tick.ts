@@ -664,8 +664,9 @@ export async function tick(
     try {
       const populationResult = await db
         .prepare(RESERVE_POPULATION_QUERY)
-        .all<{ token: string; curve: string; pair_token: string }>();
+        .all<{ token: string; curve: string; pair_token: string; reserve_wei: string | null }>();
       const population = populationResult.results ?? [];
+      const heldReserve = new Map(population.map((row) => [row.token, row.reserve_wei]));
       const targets: CurveTarget[] = population.map((row) => ({
         token: row.token,
         curve: row.curve,
@@ -700,6 +701,14 @@ export async function tick(
         );
         for (const reading of reserves) {
           if (reading.reserveWei === null) continue; // never write a failed sub-call as a fresh reading
+          /* Write only what changed. Most tracked curves do not move from one
+             minute to the next, and writing all 500 every minute was 720,000
+             rows a day against D1's free-plan 100,000: on 2026-09-12 that
+             blocked every write for the rest of the day and stopped the
+             index. An unchanged reading keeps its older reserve_block, which
+             is still the block it was last SEEN to hold that value -- the
+             label stays true. */
+          if (heldReserve.get(reading.token) === reading.reserveWei) continue;
           statements.push(
             db
               .prepare(`UPDATE token_activity SET reserve_wei = ?, reserve_block = ? WHERE token = ?`)

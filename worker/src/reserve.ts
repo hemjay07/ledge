@@ -48,7 +48,7 @@ export const MAX_RESERVE_CURVES = 500;
     reconciled), most recently active first. Only `curve` is new here; the
     rest of a board row comes from D1 alone and is untouched by this file. */
 export const RESERVE_POPULATION_QUERY = `
-  SELECT a.token, l.curve, l.pair_token
+  SELECT a.token, l.curve, l.pair_token, a.reserve_wei
     FROM token_activity a
     JOIN launch l
       ON l.token = a.token

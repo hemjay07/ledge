@@ -231,8 +231,16 @@ export function PulseBody({ result }: { result: LiveResult | null }): ReactEleme
   const { takingBuys, lastHour } = pulseCounts(body);
   const ageSeconds = pulseAgeSeconds(body);
 
+  /* Stale: the figures lose the live colour, because a number in the
+     liveness accent beside "has not run" says two things at once. They are
+     still printed -- they are the last true reading -- in ink, with when. */
+  const lastRan =
+    body.live.lastSuccessAt === null
+      ? null
+      : Math.max(0, Math.round((Date.now() - Date.parse(body.live.lastSuccessAt)) / 1000));
+
   return (
-    <div className="live-pulse">
+    <div className={body.live.stale ? "live-pulse is-stale-pulse" : "live-pulse"}>
       <div className="pulse-reading">
         <span className="pulse-figure mono">{formatCount(takingBuys)}</span>
         <p className="pulse-caption">
@@ -246,7 +254,11 @@ export function PulseBody({ result }: { result: LiveResult | null }): ReactEleme
       </div>
       <p className="note note--fine pulse-age">
         {body.live.stale ? (
-          <span className="mono is-stale">the live index has not run recently</span>
+          <span className="mono is-stale">
+            {lastRan === null
+              ? "the live index has not completed a run yet; these are the last counts it held"
+              : `the live index last ran ${formatAge(lastRan)} ago; these counts are from then`}
+          </span>
         ) : (
           <>
             {/* The one piece of motion on this block, and it carries

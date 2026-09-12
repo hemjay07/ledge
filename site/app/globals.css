@@ -2103,6 +2103,10 @@ footer {
 .is-stale-card .card-header {
   border-bottom-color: var(--stale);
 }
+/* A stale reading is printed in ink, never in the liveness accent. */
+.is-stale-pulse .pulse-figure {
+  color: var(--ink-2);
+}
 
 /* ---- the hook: not a card -- prose set the way the fold sets it -------- */
 .home-hook .kicker {
