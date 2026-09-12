@@ -233,9 +233,9 @@ export default function Home(): ReactElement {
         </div>
 
         <p className="note home-rest">
-          Where the rest is: <Link href="/number">the Pons Number in full</Link> ·{" "}
-          <Link href="/method">how it is measured</Link> · <Link href="/cohorts">more cohorts</Link>{" "}
-          · <Link href="/cockpit">pair &times; tax configurations</Link>.
+          More: <Link href="/number">the Pons Number</Link> ·{" "}
+          <Link href="/cohorts">cohorts by pair, tax, hour and day</Link> ·{" "}
+          <Link href="/cockpit">pair &times; tax</Link> · <Link href="/method">how it is counted</Link>.
         </p>
 
         <Footer />

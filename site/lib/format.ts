@@ -19,6 +19,14 @@ export function pairLabel(bucket: string): string {
   return PAIR_LABELS[bucket] ?? bucket;
 }
 
+/** A creator tax in the reader's own unit: 300 bps is "3%". Null when the
+    factory read failed, and that says so rather than printing 0. */
+export function taxPercent(bps: number | null): string {
+  if (bps === null) return "not read";
+  const percent = bps / 100;
+  return Number.isInteger(percent * 100) ? `${percent}%` : `${percent.toFixed(2)}%`;
+}
+
 /** Tax buckets arrive as "2-3%" and are printed with an en dash. */
 export function taxLabel(bucket: string): string {
   return bucket.replace("-", "–");

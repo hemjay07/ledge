@@ -37,7 +37,7 @@ import { useTokenPanel } from "../lib/use-token-panel";
 import { PAIR_BUCKETS, TAX_BUCKETS, taxBucketOf } from "../lib/board-buckets";
 import { clampPage, paginate, totalPagesFor } from "../lib/paginate";
 import { mergeQuery, readQuery, readQueryInt } from "../lib/query-state";
-import { formatAge, formatCount, pairLabel, taxLabel } from "../lib/format";
+import { formatAge, formatCount, pairLabel, taxLabel, taxPercent } from "../lib/format";
 
 const REFRESH_MS = 15_000;
 
@@ -130,14 +130,14 @@ function useGraveyard(sort: GraveyardSortKey) {
    was never indexed, versus it was indexed and nobody bought in it. */
 function firstBlockBuyersCell(value: number | null): ReactElement {
   return value === null ? (
-    <td className="thin">not indexed</td>
+    <td className="thin">not read</td>
   ) : (
     <td className="fig n">{formatCount(value)}</td>
   );
 }
 
 function firstBlockBuyersText(value: number | null): string {
-  return value === null ? "not indexed" : `${formatCount(value)} first-block buyers`;
+  return value === null ? "first block not read" : `${formatCount(value)} first-block buyers`;
 }
 
 /** A UTC calendar date, no time -- "6 Sep 2026" -- for the scope sentence's
@@ -191,7 +191,7 @@ function GraveyardCard({
       </a>
       {row.window.partial ? (
         <span className="mono state-tag is-partial" title={row.window.label}>
-          partial
+          partial count
         </span>
       ) : null}
       <p className="note note--fine live-card-analyst">
@@ -200,7 +200,7 @@ function GraveyardCard({
       </p>
       <p className="note note--fine live-card-analyst">
         {pairLabel(row.pairClass)} ·{" "}
-        {row.creatorTaxBps === null ? "creator tax not read" : `${row.creatorTaxBps} bps`}
+        {taxPercent(row.creatorTaxBps)}
       </p>
     </li>
   );
@@ -305,9 +305,8 @@ export function GraveyardBoard(): ReactElement {
         <div className="graveyard-lead">
           <span className="graveyard-figure mono">{formatCount(body.count)}</span>
           <p className="note graveyard-lead-caption">
-            launches at zero buys, 72 h or older, of the {formatCount(body.scope.indexedLaunches)} the
-            activity index holds (oldest launched {dateOnly(body.scope.earliestIndexedLaunchAt)}). A
-            launch outside that record is not counted.
+            launches with no buy after 72 hours, of the {formatCount(body.scope.indexedLaunches)}{" "}
+            the index has watched since {dateOnly(body.scope.earliestIndexedLaunchAt)}.
           </p>
         </div>
       ) : null}
@@ -392,11 +391,8 @@ export function GraveyardBoard(): ReactElement {
           >
             <table>
               <caption>
-                One row per token, ranked only by a column printed on the row itself, every one at
-                zero buys since its own launch block, at least {formatAge(body.scope.ageCutoffSeconds)}{" "}
-                ago; a row marked <span className="mono is-partial">partial</span> launched before
-                this index began recording, so trades before its own start block are not counted and
-                its true totals can only be higher.
+                Every row: no buy since launch, at least {formatAge(body.scope.ageCutoffSeconds)} ago. A
+                row marked &ldquo;partial count&rdquo; launched before the index began.
               </caption>
               <thead>
                 <tr>
@@ -438,7 +434,7 @@ export function GraveyardBoard(): ReactElement {
                     </th>
                     <td className="fig n">{pairLabel(row.pairClass)}</td>
                     <td className="fig n">
-                      {row.creatorTaxBps === null ? "not read" : `${row.creatorTaxBps} bps`}
+                      {taxPercent(row.creatorTaxBps)}
                     </td>
                     <td className="fig n">{formatAge(row.ageSeconds)}</td>
                     <td className="fig n">{formatCount(row.sells)}</td>
@@ -478,23 +474,20 @@ export function GraveyardBoard(): ReactElement {
 
           <details className="board-what-counts">
             <summary>What this can and cannot see</summary>
-            <p className="lede">
-              A launch appears here only after at least 72 hours with no buy since its own launch
-              block. The activity index that feeds this page only began recording curve trades
-              recently: a launch that finished its whole life before that start has no row here at
-              all, and its absence means it was never measured -- it does not mean the launch took a
-              buy. The exact count of launches the index currently holds, and the oldest one among
-              them, is printed above the table on every load.
-            </p>
-            <p className="lede">
-              Buys and sells are counted from indexed curve trades. A row's buy count is always
-              zero -- that is the gate a launch has to meet to appear here at all -- and its sell
-              count is whatever LEDGE indexed regardless. A launch older than the indexed record has
-              a partial count, and its own row says so.
+            <p className="note">
+              A launch is listed after 72 hours with no buy since its launch block. The index only
+              began watching curves recently: a launch that lived and died before then has no row,
+              and its absence means &ldquo;not measured&rdquo;, not &ldquo;took a buy&rdquo;. The
+              count of launches watched, and the oldest, is printed above the table.
             </p>
             <p className="note">
-              Distinct first-block buyers is absent, never zero, when that launch's own block was
-              never indexed. Zero means the block was read and nobody bought in it.
+              Buys and sells are counted from the curve&rsquo;s own trade events. A launch older
+              than the index has a partial count, and its row says so.
+            </p>
+            <p className="note">
+              First-block buyers is the number of distinct wallets that bought in the block the
+              token launched in. &ldquo;Not read&rdquo; means that block was never indexed; 0 means
+              it was, and nobody bought.
             </p>
           </details>
         </>

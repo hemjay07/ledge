@@ -51,6 +51,7 @@ import {
   pairLabel,
   pairQuantity,
   taxLabel,
+  taxPercent,
 } from "../lib/format";
 
 const REFRESH_MS = 15_000;
@@ -287,12 +288,12 @@ export function LivePulse(): ReactElement {
    same reading would erase that difference. Shared by the table cell and the
    card stat, so both faces of the board read it the same way. */
 function firstBlockBuyersText(value: number | null): ReactElement {
-  return value === null ? <>not indexed</> : <>{formatCount(value)}</>;
+  return value === null ? <>not read</> : <>{formatCount(value)}</>;
 }
 
 function firstBlockBuyersCell(value: number | null): ReactElement {
   return value === null ? (
-    <td className="thin">not indexed</td>
+    <td className="thin">not read</td>
   ) : (
     <td className="fig n">{formatCount(value)}</td>
   );
@@ -490,7 +491,7 @@ function LiveCard({
       </div>
       <p className="note note--fine live-card-analyst">
         {stripAddresses(pairLabel(row.pairClass))} · creator tax{" "}
-        {row.creatorTaxBps === null ? "not read" : `${row.creatorTaxBps} bps`} ·{" "}
+        {taxPercent(row.creatorTaxBps)} ·{" "}
         {formatAge(row.ageSeconds)} old · last activity {lastActivityAgo(row, observedAt)} ago
       </p>
     </li>
@@ -707,13 +708,13 @@ export function LiveBoardFull(): ReactElement {
             aria-label="Every curve with activity, sortable"
           >
             <table>
+              {/* One plain sentence. The window in block numbers and the fill
+                  label live under "How these are counted" below -- stated once,
+                  in the open, where a reader who wants them looks (CONSTRAINTS
+                  3 and 5), not on the line every reader scans. */}
               <caption>
-                One row per token, ranked only by a column printed on the row itself. Every cell
-                is a plain count or a fact about that token's own launch. Counted over{" "}
-                {windowCaption(pageRows)}.{" "}
-                {fillLabels(pageRows).map((label) => (
-                  <span key={label}>{label} </span>
-                ))}
+                Counts since each launch; a row marked &ldquo;partial count&rdquo; launched before the
+                index began. Fill is read from the curve.
               </caption>
               <thead>
                 <tr>
@@ -752,7 +753,7 @@ export function LiveBoardFull(): ReactElement {
                     </th>
                     <td className="fig n">{stripAddresses(pairLabel(row.pairClass))}</td>
                     <td className="fig n">
-                      {row.creatorTaxBps === null ? "not read" : `${row.creatorTaxBps} bps`}
+                      {taxPercent(row.creatorTaxBps)}
                     </td>
                     <td className="fig n">{formatAge(row.ageSeconds)}</td>
                     <td className="fig n">{formatCount(row.buys)}</td>
@@ -767,8 +768,7 @@ export function LiveBoardFull(): ReactElement {
 
           {cardsUnscaled ? (
             <p className="note note--fine live-cards-note">
-              Raw base units. This pair token&rsquo;s decimals are not known, so the figures are not
-              scaled.
+              Some figures are in raw units: that pair token&rsquo;s decimals are not known yet.
             </p>
           ) : null}
           <ul className="live-cards" aria-label="Every curve with activity, sortable">
@@ -796,16 +796,21 @@ export function LiveBoardFull(): ReactElement {
 
           <details className="board-what-counts">
             <summary>How these are counted</summary>
-            <p className="lede">
-              Buys, sells, and quote in and out are counted from indexed curve trades, not read
-              from the curve itself: the curve skims a fee and the creator tax off quote in before
-              its own reserve sees it, so the net-quote fill here is an upper bound on the curve's
-              real reserve, not a live read of it. A launch older than the indexed record has a
-              partial count, and its own row says so.
+            <p className="note">
+              Buys and sells are counted from the curve&rsquo;s own trade events, {windowCaption(pageRows)}.
+              A launch older than the index has a partial count, and its row says so.
             </p>
             <p className="note">
-              Distinct first-block buyers is absent, never zero, when that launch's own block was
-              never indexed. Zero means the block was read and nobody bought in it.
+              Fill is the curve&rsquo;s own reserve against its own graduation threshold
+              {fillLabels(pageRows).map((label) => (
+                <span key={label}>, {label}</span>
+              ))}
+              . Every launch has its own threshold; nothing here assumes one.
+            </p>
+            <p className="note">
+              First-block buyers is the number of distinct wallets that bought in the block the
+              token launched in. &ldquo;Not read&rdquo; means that block was never indexed; 0 means
+              it was, and nobody bought.
             </p>
           </details>
         </>
@@ -898,9 +903,8 @@ export function HomeNowCard(): ReactElement {
             {/* The note sits outside the scroller so it wraps to the card's width
                 instead of scrolling sideways with the table and clipping. */}
             <p className="note note--fine home-now-note">
-              Fill is the indexed net quote against each launch&rsquo;s own graduation
-              threshold, an upper bound on the curve&rsquo;s reserve; the full reading is on
-              each token&rsquo;s own page.
+              Fill is each curve&rsquo;s own reserve against its own threshold, read from the
+              curve.
             </p>
             <div className="scroller">
               <table className="home-now-table">

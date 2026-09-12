@@ -60,7 +60,7 @@ export function TopBar(): ReactElement {
        anywhere in the string so a ponsfamily.com launch link works unchanged. */
     const found = value.match(ADDRESS_PATTERN);
     if (!found) {
-      setProblem("That is not a 20-byte address.");
+      setProblem("That is not a token address. Paste the 0x… address or the pons link.");
       return;
     }
     setProblem(null);

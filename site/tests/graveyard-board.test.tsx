@@ -58,7 +58,7 @@ describe("the graveyard's own row model", () => {
     // row 0: firstBlockBuyers 0 -- indexed, nobody bought
     expect(rows[0]?.textContent).toContain("0");
     // row 1: firstBlockBuyers null -- never indexed
-    expect(rows[1]?.textContent).toContain("not indexed");
+    expect(rows[1]?.textContent).toContain("not read"); // 2026-09-12: a state says what it means
   });
 
   it("marks a partial row's address with a `partial` tag carrying its own window label, and leaves a non-partial row untagged", async () => {
@@ -84,9 +84,10 @@ describe("the graveyard's own row model", () => {
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(2));
 
     const caption = container.querySelector("caption")?.textContent ?? "";
-    expect(caption).toMatch(/partial/i);
-    expect(caption).toMatch(/before this index began recording/i);
-    expect(caption).toMatch(/can only be higher/i);
+    // 2026-09-12 copy pass: one plain sentence; the consequence ("its true
+    // totals can only be higher") lives under "What this can and cannot see"
+    expect(caption).toMatch(/partial count/i);
+    expect(caption).toMatch(/before the index began/i);
   });
 
   it("states no score, no grade, no verdict word anywhere on the page", async () => {
@@ -115,8 +116,9 @@ describe("the lead figure and the scope caveat", () => {
     answerWith(graveyard);
     const { container } = render(<GraveyardBoard />);
     await waitFor(() => expect(container.textContent ?? "").toContain(String(graveyard.scope.indexedLaunches)));
-    expect(container.textContent).toMatch(/72 h or older/);
-    expect(container.textContent).toMatch(/not counted/i);
+    // 2026-09-12 copy pass: "no buy after 72 hours, of the N the index has watched since <date>"
+    expect(container.textContent).toMatch(/after 72 hours/);
+    expect(container.textContent).toMatch(/watched since/i);
   });
 
   /* THE HONESTY TEST, at the page's own boundary: a graveyard with an empty

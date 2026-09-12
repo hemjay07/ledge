@@ -60,6 +60,7 @@ import {
   pairLabel,
   rateText,
   taxLabel,
+  taxPercent,
 } from "../lib/format";
 
 const MIN_N = 30;
@@ -202,9 +203,7 @@ function compareRows(a: GraduatedRow, b: GraduatedRow, sort: GraduatedSortKey): 
    and "2-3%", and a column that says "100 bps" beside them is the same fact
    in a second dialect. */
 function taxCell(bps: number | null): string {
-  if (bps === null) return "not read";
-  const percent = bps / 100;
-  return Number.isInteger(percent * 10) ? `${percent}%` : `${bps} bps`;
+  return taxPercent(bps);
 }
 
 /* The address, shortened the way worker/src/text.ts and Live.tsx shorten it,
@@ -291,10 +290,7 @@ function LadderContext(): ReactElement {
         aria-label="Cumulative share of all-time graduations by time to graduate"
       >
         <table>
-          <caption>
-            Cumulative share of {formatCount(ttg.n)} all-time graduations completing within each
-            mark. Read from the last computed measurement, not recomputed here.
-          </caption>
+          <caption>Of {formatCount(ttg.n)} graduations, how many had finished by each mark.</caption>
           <thead>
             <tr>
               <th scope="col">Within</th>
@@ -638,13 +634,12 @@ export function GraduatedBoard({
           >
             <table>
               <caption>
-                One row per token, ranked only by a column printed on the row itself. Time to
-                graduate is that token&rsquo;s own graduation minus its own launch.{" "}
+                Time to graduate is launch to graduation, from the chain.{" "}
                 {formatCount(totalGraduationRows - excludedNoLaunch - excludedUnmatched)} graduations
-                below carry a matched launch; {formatCount(excludedNoLaunch)} more are excluded
-                because no launch is on record
+                are timed; {formatCount(excludedNoLaunch)} are not, because their launch is not on
+                record
                 {excludedUnmatched > 0
-                  ? `, and a further ${formatCount(excludedUnmatched)} could not be joined to a launch`
+                  ? `, and ${formatCount(excludedUnmatched)} more could not be matched to a launch`
                   : ""}
                 .
               </caption>

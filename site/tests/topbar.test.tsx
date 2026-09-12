@@ -102,7 +102,7 @@ describe("the shell's address field", () => {
     });
     fireEvent.submit(container.querySelector("form") as HTMLFormElement);
     expect(assigned).toEqual([]);
-    expect(container.querySelector(".topbar-problem")?.textContent).toMatch(/not a 20-byte address/i);
+    expect(container.querySelector(".topbar-problem")?.textContent).toMatch(/not a token address/i);
   });
 
   /* CONSTRAINTS 3 applies to the shell as much as to a page: a figure here

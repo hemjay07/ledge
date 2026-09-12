@@ -57,9 +57,8 @@ export default function Token(): ReactElement {
             token or not.
           </h1>
           <p className="dek">
-            Every figure here is public and unkeyed, and stays that way. The token does not buy
-            access to any number. What it buys is set out below, each with whether it is running
-            yet.
+            The token does not buy access to any number. What it buys is below, each with whether
+            it is running yet.
           </p>
         </div>
       </section>

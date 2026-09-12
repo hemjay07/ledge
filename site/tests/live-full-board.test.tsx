@@ -48,7 +48,9 @@ describe("the live board's own row model", () => {
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
     const text = container.textContent ?? "";
-    expect(text).toContain("300 bps");
+    // 2026-09-12 copy pass: the reader's own unit, "3%", never "300 bps"
+    expect(text).toContain("3%");
+    expect(text).not.toContain("bps");
     expect(text).toContain("not read"); // row d, creatorTaxBps: null
     expect(text).toContain("graduated");
   });
@@ -78,14 +80,18 @@ describe("the live board's own row model", () => {
     expect(rows[ungraduatedIndex]!.querySelector(".state-tag")).toBeNull();
   });
 
-  it("states the fill's own label exactly once on the board, in the table's caption", async () => {
+  /* 2026-09-12 copy pass: the label is stated once, under "How these are
+     counted", not in the caption every reader scans. Still in the document,
+     still once (CONSTRAINTS 3 and 5). */
+  it("states the fill's own label exactly once on the board, under how-counted", async () => {
     answerWith(live);
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
     const label = live.rows.find((r) => r.fill !== null)!.fill!.label;
     const occurrences = (container.textContent ?? "").split(label).length - 1;
     expect(occurrences).toBe(1);
-    expect(container.querySelector("caption")?.textContent).toContain(label);
+    expect(container.querySelector(".board-what-counts")?.textContent).toContain(label);
+    expect(container.querySelector("caption")?.textContent).not.toMatch(/block \d/);
   });
 
   it("tells apart a first block never indexed from one indexed with no buyers", async () => {
@@ -101,7 +107,7 @@ describe("the live board's own row model", () => {
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(2));
     const rows = [...container.querySelectorAll("tbody tr")];
     expect(rows[0]?.textContent).toContain("0");
-    expect(rows[1]?.textContent).toContain("not indexed");
+    expect(rows[1]?.textContent).toContain("not read"); // 2026-09-12: a state says what it means
   });
 
   it("renders the fill rule against each launch's OWN threshold, both figures beside it, never a lone percentage", async () => {
@@ -325,7 +331,7 @@ describe("the live board's card layout (below the table's breakpoint)", () => {
     await waitFor(() => expect(container.querySelectorAll(".live-card").length).toBe(2));
     const cards = [...container.querySelectorAll(".live-card")];
     expect(cards[0]?.textContent).toContain("0");
-    expect(cards[1]?.textContent).toContain("not indexed");
+    expect(cards[1]?.textContent).toContain("not read");
   });
 
   /* The window and launch block moved off the card and onto the token's own
