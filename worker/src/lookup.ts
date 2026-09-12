@@ -138,6 +138,14 @@ export async function readLaunchedToken(
   return decodeLaunchedToken(returned);
 }
 
+/** One `token_meta` row (2026-09-12, worker/schema.sql), as readIndex reads
+    it back: name/symbol are independently nullable -- a row existing means
+    the read was attempted, not that it succeeded. */
+export interface TokenMetaRow {
+  name: string | null;
+  symbol: string | null;
+}
+
 export async function readIndex(
   db: D1Database,
   address: string,
@@ -146,8 +154,9 @@ export async function readIndex(
   graduation: GraduationRow | null;
   cursor: CursorRow | null;
   activity: ActivityRow | null;
+  tokenMeta: TokenMetaRow | null;
 }> {
-  const [launch, graduation, cursor, activity] = await db.batch([
+  const [launch, graduation, cursor, activity, tokenMeta] = await db.batch([
     /* `token` is indexed but not unique -- the durable key is the log's own
        identity -- so both reads name the row they want: the earliest, which
        is the one that actually happened. */
@@ -161,12 +170,14 @@ export async function readIndex(
       .bind(address),
     db.prepare("SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1"),
     db.prepare("SELECT * FROM token_activity WHERE token = ?").bind(address),
+    db.prepare("SELECT name, symbol FROM token_meta WHERE address = ?").bind(address),
   ]);
   return {
     launch: (launch?.results[0] as LaunchRow | undefined) ?? null,
     graduation: (graduation?.results[0] as GraduationRow | undefined) ?? null,
     cursor: (cursor?.results[0] as CursorRow | undefined) ?? null,
     activity: (activity?.results[0] as ActivityRow | undefined) ?? null,
+    tokenMeta: (tokenMeta?.results[0] as TokenMetaRow | undefined) ?? null,
   };
 }
 
@@ -219,6 +230,10 @@ export interface BuildInput {
   pairDecimals: number | null;
   /** The folded curve activity, when the index holds a row for this token. */
   activity?: ActivityRow | null;
+  /** The launched token's own name()/symbol() (2026-09-12, worker/schema.sql's
+      `token_meta` cache) -- never the pair token. Undefined/null means no
+      reading is available; buildTokenBody reports both as null in that case. */
+  tokenMeta?: TokenMetaRow | null;
   siteOrigin: string;
 }
 
@@ -286,6 +301,8 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
       pairClass,
       pairSymbol: pairSymbolOf(pairToken, input.pairTokens),
       pairDecimals: input.pairDecimals,
+      name: input.tokenMeta?.name ?? null,
+      symbol: input.tokenMeta?.symbol ?? null,
       creatorTaxBps,
       taxBucket,
     },

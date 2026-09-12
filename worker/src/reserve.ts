@@ -25,6 +25,7 @@
 import type { RpcClient } from "./rpc";
 import { SELECTOR_GRADUATED, SELECTOR_REAL_QUOTE_RESERVE } from "./curve";
 import { SELECTOR_DECIMALS, ZERO_ADDRESS } from "./decimals";
+import { decodeTokenMetaResults, encodeTokenMetaCalls, type TokenMetaReading } from "./tokenMeta";
 
 /** Deployed at the same address on every EVM chain that has it, Robinhood
     Chain included -- confirmed live before this file was written. */
@@ -342,21 +343,29 @@ export async function readReserves(
 export interface ReservesAndPairTokens {
   reserves: ReserveReading[];
   pairTokens: PairTokenReading[];
+  /** name()/symbol() of the launched TOKEN itself (2026-09-12,
+      worker/schema.sql's `token_meta` table), folded into the same aggregate3
+      array as the reserve and pair-token calls above -- never the pair token
+      the curve trades against, which pairTokens is about. */
+  tokenMeta: TokenMetaReading[];
 }
 
-/** One eth_call, one subrequest, covering BOTH the curve reserve reads
-    readReserves makes on its own and the pair-token decimals()/symbol()
-    reads worker/schema.sql's `pair_token` table caches (2026-09-12). The two
-    kinds of call are folded into ONE aggregate3 array rather than sent as two
+/** One eth_call, one subrequest, covering the curve reserve reads
+    readReserves makes on its own, the pair-token decimals()/symbol() reads
+    worker/schema.sql's `pair_token` table caches, and the launched token's
+    own name()/symbol() reads `token_meta` caches (2026-09-12). All three
+    kinds of call are folded into ONE aggregate3 array rather than sent as
     separate eth_calls, so the whole thing costs exactly the one subrequest
-    readReserves alone used to cost -- `pairTokenAddresses` is expected to
-    already be filtered down to addresses genuinely worth a call (not the
-    zero address, not already a row in `pair_token`; see worker/src/tick.ts).
+    readReserves alone used to cost -- `pairTokenAddresses` and
+    `tokenMetaAddresses` are expected to already be filtered down to
+    addresses genuinely worth a call (not the zero address for the former,
+    not already a row in the respective cache table for either; see
+    worker/src/tick.ts).
 
     Duplicates readReserves' own encode/call/decode plumbing rather than
-    calling it, because splitting one combined response into two typed
-    results is simpler than threading a second decode pass through a function
-    whose contract (and tests) is the single-purpose reserve read alone.
+    calling it, because splitting one combined response into typed results is
+    simpler than threading a second decode pass through a function whose
+    contract (and tests) is the single-purpose reserve read alone.
 
     Returns empty arrays -- logged, not thrown -- under the same conditions
     readReserves does: a caller reading them back writes nothing, leaving
@@ -365,12 +374,14 @@ export async function readReservesAndPairTokens(
   rpc: RpcClient,
   targets: CurveTarget[],
   pairTokenAddresses: string[],
+  tokenMetaAddresses: string[],
   blockNumber: number,
 ): Promise<ReservesAndPairTokens> {
   const curves = targets.slice(0, MAX_RESERVE_CURVES);
   const addresses = pairTokenAddresses.filter((a) => a.toLowerCase() !== ZERO_ADDRESS);
-  const empty: ReservesAndPairTokens = { reserves: [], pairTokens: [] };
-  if (curves.length === 0 && addresses.length === 0) return empty;
+  const tokenAddresses = [...new Set(tokenMetaAddresses.map((a) => a.toLowerCase()))];
+  const empty: ReservesAndPairTokens = { reserves: [], pairTokens: [], tokenMeta: [] };
+  if (curves.length === 0 && addresses.length === 0 && tokenAddresses.length === 0) return empty;
 
   const reserveCalls: Call3[] = [];
   for (const { curve } of curves) {
@@ -378,7 +389,8 @@ export async function readReservesAndPairTokens(
     reserveCalls.push({ target: curve, callData: SELECTOR_REAL_QUOTE_RESERVE.replace(/^0x/, "") });
   }
   const pairTokenCalls = encodePairTokenCalls(addresses);
-  const calls = [...reserveCalls, ...pairTokenCalls];
+  const tokenMetaCalls = encodeTokenMetaCalls(tokenAddresses);
+  const calls = [...reserveCalls, ...pairTokenCalls, ...tokenMetaCalls];
   const calldata = encodeAggregate3(calls);
   const blockTag = "0x" + blockNumber.toString(16);
 
@@ -412,7 +424,8 @@ export async function readReservesAndPairTokens(
   }
 
   const reserveDecoded = decoded.slice(0, reserveCalls.length);
-  const pairTokenDecoded = decoded.slice(reserveCalls.length);
+  const pairTokenDecoded = decoded.slice(reserveCalls.length, reserveCalls.length + pairTokenCalls.length);
+  const tokenMetaDecoded = decoded.slice(reserveCalls.length + pairTokenCalls.length);
 
   const reserves = curves.map(({ token }, i) => {
     const graduatedResult = reserveDecoded[i * 2];
@@ -424,5 +437,9 @@ export async function readReservesAndPairTokens(
     };
   });
 
-  return { reserves, pairTokens: decodePairTokenResults(addresses, pairTokenDecoded) };
+  return {
+    reserves,
+    pairTokens: decodePairTokenResults(addresses, pairTokenDecoded),
+    tokenMeta: decodeTokenMetaResults(tokenAddresses, tokenMetaDecoded),
+  };
 }

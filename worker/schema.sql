@@ -222,3 +222,42 @@ CREATE TABLE IF NOT EXISTS pair_token (
 --     symbol      TEXT,
 --     read_block  INTEGER
 --   );
+
+-- Token name()/symbol() cache, read once per token (2026-09-12). Distinct
+-- from `pair_token` above: that table caches the PAIR a curve trades against
+-- (ETH, USDG, ...); this one caches name()/symbol() for the TOKEN itself --
+-- the launched token a board or graveyard row is about, which until now
+-- showed only its raw address. Filled by worker/src/reserve.ts/tick.ts, in
+-- the SAME aggregate3() call the reserve read already makes (the board
+-- population and, up to its own LIMIT, the graveyard candidate population --
+-- worker/src/graveyard.ts's GRAVEYARD_QUERY), and by worker/src/curve.ts's
+-- own per-token batched read on a /api/token lookup miss.
+--
+-- A row existing means the read was ATTEMPTED, not that it succeeded: name
+-- and symbol are independently nullable, and a token whose answer decodes as
+-- a raw bytes32 rather than the ABI dynamic `string` most ERC-20s return is
+-- stored as NULL rather than guessed at -- the same "no guess" posture
+-- `pair_token` carries. Once a row exists, success or NULL, it is never
+-- re-read: a NULL is a saved result, not a miss to retry every tick.
+-- read_block records the tick's head block (or, on a live single-token read,
+-- is left NULL when the exact block is not cheaply knowable -- see
+-- worker/src/service.ts) the read was taken at, for parity with
+-- reserve_block/pair_token.read_block.
+CREATE TABLE IF NOT EXISTS token_meta (
+  address     TEXT PRIMARY KEY,     -- lowercase 0x address
+  name        TEXT,                 -- NULL when name() failed or did not decode as a string
+  symbol      TEXT,                 -- NULL when symbol() failed or did not decode as a string
+  read_block  INTEGER
+);
+
+-- MIGRATION (2026-09-12). Additive and nullable, same posture as the
+-- `pair_token` migration above: run this by hand against the deployed
+-- database (no `wrangler d1 execute` from an agent -- a human runs this).
+-- No existing table is touched.
+--
+--   CREATE TABLE IF NOT EXISTS token_meta (
+--     address     TEXT PRIMARY KEY,
+--     name        TEXT,
+--     symbol      TEXT,
+--     read_block  INTEGER
+--   );

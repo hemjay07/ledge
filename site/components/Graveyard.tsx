@@ -38,6 +38,7 @@ import { PAIR_BUCKETS, TAX_BUCKETS, taxBucketOf } from "../lib/board-buckets";
 import { clampPage, paginate, totalPagesFor } from "../lib/paginate";
 import { mergeQuery, readQuery, readQueryInt } from "../lib/query-state";
 import { formatAge, formatCount, pairLabel, taxLabel, taxPercent } from "../lib/format";
+import { TokenName } from "./Live";
 
 const REFRESH_MS = 15_000;
 
@@ -187,6 +188,7 @@ function GraveyardCard({
       }}
     >
       <a className="live-card-token mono" href={`/t/${row.token}`} title={row.token}>
+        <TokenName symbol={row.symbol} name={row.name} />
         {`${row.token.slice(0, 10)}…${row.token.slice(-6)}`}
       </a>
       {row.window.partial ? (
@@ -423,6 +425,7 @@ export function GraveyardBoard(): ReactElement {
                   >
                     <th scope="row" className="mono">
                       <a href={`/t/${row.token}`} title={row.token}>
+                        <TokenName symbol={row.symbol} name={row.name} />
                         {`${row.token.slice(0, 10)}…${row.token.slice(-6)}`}
                       </a>
                       {row.window.partial ? (

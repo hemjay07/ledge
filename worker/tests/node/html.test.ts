@@ -140,3 +140,60 @@ describe("phone-width layout", () => {
     expect(html).not.toMatch(/width:\s*\d{3,}px/);
   });
 });
+
+/* The token's own name/symbol (2026-09-12, worker/schema.sql's `token_meta`
+   cache) is untrusted, on-chain, attacker-controlled text -- read straight
+   off the token's own contract, never written by LEDGE. It must be
+   HTML-escaped like everything else this file prints, and it must never be
+   confused with the address as the page's identity. */
+describe("the token's own name/symbol: untrusted on-chain text", () => {
+  it("HTML-escapes a name containing <script>, so it never executes", () => {
+    const html = render({ tokenMeta: { name: "<script>alert(1)</script>", symbol: "EVIL" } });
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+
+  it("HTML-escapes the symbol the same way", () => {
+    const html = render({ tokenMeta: { name: "Fine Name", symbol: '"><img src=x onerror=alert(1)>' } });
+    expect(html).not.toContain('"><img src=x onerror=alert(1)>');
+    expect(html).toContain("&quot;&gt;&lt;img src=x onerror=alert(1)&gt;");
+  });
+
+  /* An emoji in a token name is on-chain data a real ERC-20 deployer can and
+     does put in symbol()/name() -- this project's "no emoji in code" lint
+     rule (scripts/lint-worker.sh and CLAUDE.md's own conventions) governs
+     code LEDGE's own authors write, not third-party on-chain content being
+     displayed back. It is rendered as plain, escaped text like any other
+     name -- never stripped, never treated as a formatting instruction. */
+  it("renders an emoji in a token name as plain text, not stripped or specially treated", () => {
+    const html = render({ tokenMeta: { name: "Pons \u{1F680} Coin", symbol: "PONS" } });
+    expect(html).toContain("Pons \u{1F680} Coin");
+  });
+
+  it("shows SYMBOL · Name above the address when both are present", () => {
+    const html = render({ tokenMeta: { name: "Pons Coin", symbol: "PONS" } });
+    expect(html).toMatch(/<p class="token-identity-line">PONS · Pons Coin<\/p>/);
+  });
+
+  it("shows only the symbol when the name is absent", () => {
+    const html = render({ tokenMeta: { name: null, symbol: "PONS" } });
+    expect(html).toMatch(/<p class="token-identity-line">PONS<\/p>/);
+  });
+
+  it("shows nothing extra when neither is present -- the address alone still appears", () => {
+    const html = render({ tokenMeta: null });
+    expect(html).not.toMatch(/<p class="token-identity-line">/);
+    expect(html).toContain(ADDRESS);
+  });
+
+  it("the address is always printed, never replaced by the name/symbol", () => {
+    const html = render({ tokenMeta: { name: "Pons Coin", symbol: "PONS" } });
+    expect(html).toContain(ADDRESS);
+  });
+
+  it("prepends the symbol to the <title> when present", () => {
+    const html = render({ tokenMeta: { name: "Pons Coin", symbol: "PONS" } });
+    const titleMatch = html.match(/<title>([^<]*)<\/title>/);
+    expect(titleMatch?.[1]?.startsWith("PONS · ")).toBe(true);
+  });
+});

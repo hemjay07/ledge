@@ -38,6 +38,7 @@
    from. */
 
 import type { RpcClient } from "./rpc";
+import { decodeTokenName, decodeTokenSymbol, SELECTOR_NAME, SELECTOR_SYMBOL_TOKEN } from "./tokenMeta";
 
 /** No-arg view selectors on PonsV2BondingCurve (RESEARCH-PHASE2-3.md A2,
     computed with pipeline/keccak.py and cross-checked against the deployed
@@ -214,5 +215,118 @@ export async function curveFill(
     thresholdWei: threshold.toString(),
     share: shareOf(filled, threshold),
     note: filled > threshold ? FILL_OVER_THRESHOLD : null,
+  };
+}
+
+/* TOKEN NAME()/SYMBOL(), IN THE SAME BATCH AS THE FILL (2026-09-12). A lookup
+   miss on worker/schema.sql's `token_meta` cache (worker/src/service.ts)
+   costs the same one eth_call this page already spends on curveFill's own
+   three reads, never a second one -- two more sub-calls, on the launched
+   TOKEN's own address rather than the curve's, folded into the SAME
+   `rpc.callBatch` invocation. Duplicates curveFill's own orchestration rather
+   than calling it and making a second batch, the same trade-off
+   readReservesAndPairTokens documents in worker/src/reserve.ts for the
+   tick's own combined read. */
+export interface CurveFillAndTokenMeta {
+  fill: CurveFill | null;
+  name: string | null;
+  symbol: string | null;
+}
+
+/**
+ * @param rpc            chain access
+ * @param curve          the launch's OWN curve, from getLaunchedToken word 1
+ * @param eventThresholdWei  graduationThreshold from TokenLaunched word 2,
+ *                           used only if the curve declines to answer
+ * @param tokenAddress   the launched token itself -- name()/symbol() are read
+ *                        from here, never from the curve
+ */
+export async function curveFillAndTokenMeta(
+  rpc: RpcClient,
+  curve: string,
+  eventThresholdWei: string,
+  tokenAddress: string,
+): Promise<CurveFillAndTokenMeta> {
+  const selectors = [
+    SELECTOR_GRADUATED,
+    SELECTOR_REAL_QUOTE_RESERVE,
+    SELECTOR_GRADUATION_THRESHOLD,
+  ];
+  const results = await rpc.callBatch([
+    ...selectors.map((data) => ({ method: "eth_call", params: [{ to: curve, data }, "latest"] })),
+    { method: "eth_call", params: [{ to: tokenAddress, data: SELECTOR_NAME }, "latest"] },
+    { method: "eth_call", params: [{ to: tokenAddress, data: SELECTOR_SYMBOL_TOKEN }, "latest"] },
+  ]);
+
+  const missing = selectors.filter((_, i) => results[i] === undefined);
+
+  const graduatedWord = decodeUint(results[0]);
+  const filled = decodeUint(results[1]);
+  const fromCurve = decodeUint(results[2]);
+
+  const nameRaw = results[3];
+  const symbolRaw = results[4];
+  const name = typeof nameRaw === "string" ? decodeTokenName(nameRaw.replace(/^0x/, "")) : null;
+  const symbol = typeof symbolRaw === "string" ? decodeTokenSymbol(symbolRaw.replace(/^0x/, "")) : null;
+
+  if (graduatedWord === null && filled === null && fromCurve === null) {
+    return { fill: null, name, symbol };
+  }
+
+  let threshold = fromCurve;
+  if (threshold === null || threshold === 0n) {
+    try {
+      const fallback = BigInt(eventThresholdWei);
+      threshold = fallback > 0n ? fallback : null;
+    } catch {
+      threshold = null;
+    }
+  }
+
+  if (missing.length > 0) {
+    return {
+      fill: {
+        filledWei: filled === null ? null : filled.toString(),
+        thresholdWei: threshold === null ? null : threshold.toString(),
+        share: null,
+        note: fillReadFailed(missing),
+      },
+      name,
+      symbol,
+    };
+  }
+
+  if (threshold === null) return { fill: null, name, symbol };
+
+  if (graduatedWord === 1n) {
+    return {
+      fill: { filledWei: threshold.toString(), thresholdWei: threshold.toString(), share: 1, note: FILL_GRADUATED },
+      name,
+      symbol,
+    };
+  }
+
+  if (filled === null) {
+    return {
+      fill: {
+        filledWei: null,
+        thresholdWei: threshold.toString(),
+        share: null,
+        note: fillReadFailed([SELECTOR_REAL_QUOTE_RESERVE]),
+      },
+      name,
+      symbol,
+    };
+  }
+
+  return {
+    fill: {
+      filledWei: filled.toString(),
+      thresholdWei: threshold.toString(),
+      share: shareOf(filled, threshold),
+      note: filled > threshold ? FILL_OVER_THRESHOLD : null,
+    },
+    name,
+    symbol,
   };
 }

@@ -279,6 +279,25 @@ function activityCard(body: Body): string {
     </section>`;
 }
 
+/* ---- the token's own name/symbol, above the address (2026-09-12) ---------
+
+   worker/schema.sql's `token_meta` cache (worker/src/reserve.ts,
+   worker/src/curve.ts) reads name()/symbol() straight off the token's own
+   contract -- untrusted, on-chain, attacker-controlled text, never LEDGE's
+   own copy. It is HTML-escaped like everything else this file prints, and
+   CSS forces it to one line with ellipsis overflow (.token-identity-line
+   below) so a name a malicious deployer made absurdly long can never break
+   the page's layout. It is a label, never the identity: the address is
+   still printed in full immediately below it and again in the footer, and
+   this line is never used in its place. */
+function identityLine(body: Body): string {
+  const symbol = body.config.symbol;
+  const name = body.config.name;
+  if (symbol === null && name === null) return "";
+  const parts = [symbol, name].filter((v): v is string => v !== null).map(e);
+  return `<p class="token-identity-line">${parts.join(" · ")}</p>`;
+}
+
 /* ---- the header: not a card ------------------------------------------
 
    The token's own address, in full, mono, wrapping rather than truncating --
@@ -299,6 +318,7 @@ function headerBlock(body: Body, observedMaxSeconds: number | null): string {
 
   return `
     <div class="token-header">
+      ${identityLine(body)}
       <div class="addr-row">
         <code class="addr-full mono" id="token-addr">${e(body.address)}</code>
         <button type="button" class="copy-btn" aria-label="Copy the token address" onclick="try{var t=document.getElementById('token-addr').textContent;navigator.clipboard.writeText(t);var b=this,o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1200);}catch(err){}">Copy</button>
@@ -376,17 +396,22 @@ export function tokenShell(
   const ogImage = `${siteOrigin}/og/t/${address}.png`;
   const canonical = `${siteOrigin}/t/${address}`;
   const facts = text.split("\n").map((line) => `<p>${escapeHtml(line)}</p>`).join("\n        ");
+  /* SYMBOL prepended to the title text.ts's headline() builds, never inside
+     it -- text.ts is not touched by this change. The address stays in the
+     meta line below regardless; a symbol is a label on the title, not a
+     replacement for the identity the page is about. */
+  const displayTitle = body.config.symbol === null ? title : `${body.config.symbol} · ${title}`;
 
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(title)} — LEDGE</title>
+<title>${escapeHtml(displayTitle)} — LEDGE</title>
 <link rel="canonical" href="${canonical}">
-<meta name="description" content="${escapeHtml(title)}">
+<meta name="description" content="${escapeHtml(displayTitle)}">
 <meta property="og:type" content="article">
-<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:title" content="${escapeHtml(displayTitle)}">
 <meta property="og:description" content="${escapeHtml(text.split("\n")[3] ?? title)}">
 <meta property="og:image" content="${ogImage}">
 <meta property="og:url" content="${canonical}">
@@ -533,6 +558,21 @@ export function tokenShell(
 
   /* ---- the header: the address and the token's own facts, not a card --- */
   .token-header { margin: 0 0 1.25rem; }
+  /* Untrusted, on-chain text (worker/schema.sql's token_meta cache): a
+     malicious deployer's name()/symbol() must never be able to widen or
+     break the page, so it is forced to exactly one line with ellipsis
+     overflow, however long the underlying string is. */
+  .token-identity-line {
+    margin: 0 0 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
   .addr-row {
     display: flex;
     align-items: flex-start;

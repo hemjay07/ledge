@@ -26,7 +26,7 @@
 
 import type { CursorRow } from "./lookup";
 import type { PairTokenEntry } from "./buckets";
-import { pairUnits, type DbPairToken } from "./board";
+import { pairUnits, tokenMetaOf, type DbPairToken, type DbTokenMeta } from "./board";
 import { toIso } from "./format";
 
 /** 72 hours. A launch younger than this has not had the window the finding
@@ -114,6 +114,10 @@ export interface GraveyardRow {
   window: GraveyardWindow;
   pairDecimals: number | null;
   pairSymbol: string | null;
+  /** The token's own name()/symbol() (2026-09-12, worker/schema.sql's
+      `token_meta` cache) -- see board.ts's BoardRow for the same field. */
+  name: string | null;
+  symbol: string | null;
 }
 
 export interface GraveyardScope {
@@ -147,6 +151,7 @@ function rowOf(
   nowSeconds: number,
   pairTokens: Record<string, PairTokenEntry> | null,
   dbPairTokens: Map<string, DbPairToken> | null,
+  dbTokenMeta: Map<string, DbTokenMeta> | null,
 ): GraveyardRow {
   return {
     token: row.token,
@@ -161,6 +166,7 @@ function rowOf(
     lastActivityAt: toIso(row.last_activity_ts),
     window: windowOf(row, toBlock),
     ...pairUnits(row.pair_token, dbPairTokens, pairTokens),
+    ...tokenMetaOf(row.token, dbTokenMeta),
   };
 }
 
@@ -188,12 +194,13 @@ export function buildGraveyardRows(
   limit = 200,
   pairTokens: Record<string, PairTokenEntry> | null = null,
   dbPairTokens: Map<string, DbPairToken> | null = null,
+  dbTokenMeta: Map<string, DbTokenMeta> | null = null,
 ): GraveyardRow[] {
   const toBlock = cursor ? cursor.last_indexed_block : 0;
   const eligible = dbRows.filter((row) => nowSeconds - row.ts >= GRAVEYARD_AGE_SECONDS);
   return sortDbRows(eligible, sort)
     .slice(0, limit)
-    .map((row) => rowOf(row, toBlock, nowSeconds, pairTokens, dbPairTokens));
+    .map((row) => rowOf(row, toBlock, nowSeconds, pairTokens, dbPairTokens, dbTokenMeta));
 }
 
 export function buildGraveyardScope(scopeRow: GraveyardScopeDbRow | null): GraveyardScope {

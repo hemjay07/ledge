@@ -419,3 +419,38 @@ describe("a failed poll", () => {
     expect(container.textContent).not.toMatch(/not reachable|did not answer/i);
   });
 });
+
+/* 2026-09-12: rows carry the token's own name, read from its contract. It is
+   data a deployer wrote, so it is rendered as text beside the address and
+   never in place of it. */
+describe("the token's own name on a row", () => {
+  it("prints the symbol beside the address, and nothing when none was read", async () => {
+    const named = {
+      ...live,
+      rows: live.rows.map((r, i) =>
+        i === 0 ? { ...r, symbol: "GLEEB", name: "gleebonchain" } : { ...r, symbol: null, name: null },
+      ),
+    };
+    answerWith(named);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
+    const first = container.querySelectorAll("tbody tr")[0]!;
+    expect(first.querySelector(".token-name")?.textContent).toBe("GLEEB");
+    expect(first.textContent).toContain(live.rows[0]!.token.slice(0, 10));
+    expect(container.querySelectorAll("tbody tr")[1]!.querySelector(".token-name")).toBeNull();
+  });
+
+  it("renders a name as text, never as markup", async () => {
+    const nasty = {
+      ...live,
+      rows: live.rows.map((r, i) =>
+        i === 0 ? { ...r, symbol: "<script>x</script>", name: null } : r,
+      ),
+    };
+    answerWith(nasty);
+    const { container } = render(<LiveBoardFull />);
+    await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(4));
+    expect(container.querySelector(".token-name")?.textContent).toBe("<script>x</script>");
+    expect(container.querySelector("script")).toBeNull();
+  });
+});

@@ -155,6 +155,12 @@ export interface BoardRow {
       could never afford a decimals() call each. */
   pairDecimals: number | null;
   pairSymbol: string | null;
+  /** The token's own name()/symbol() (2026-09-12, worker/schema.sql's
+      `token_meta` cache) -- never the pair token, which pairSymbol is about.
+      Null means the read was never attempted or did not decode as a string,
+      never that the token has no name. */
+  name: string | null;
+  symbol: string | null;
 }
 
 /** One `pair_token` row, as read straight off worker/schema.sql's read-once
@@ -163,6 +169,16 @@ export interface BoardRow {
     the read was attempted, not that it succeeded. */
 export interface DbPairToken {
   decimals: number | null;
+  symbol: string | null;
+}
+
+/** One `token_meta` row, as read straight off worker/schema.sql's read-once
+    name()/symbol() cache for the launched token itself (worker/src/reserve.ts,
+    worker/src/tick.ts, 2026-09-12). Both fields are independently nullable,
+    same posture as DbPairToken above: a row existing means the read was
+    attempted, not that it succeeded. */
+export interface DbTokenMeta {
+  name: string | null;
   symbol: string | null;
 }
 
@@ -175,6 +191,18 @@ export function pairTokenMapFromRows(
   const map = new Map<string, DbPairToken>();
   for (const row of rows) {
     map.set(row.address.toLowerCase(), { decimals: row.decimals, symbol: row.symbol });
+  }
+  return map;
+}
+
+/** Same job as pairTokenMapFromRows, for `token_meta` -- loaded ONCE per
+    request (worker/src/index.ts), never once per row. */
+export function tokenMetaMapFromRows(
+  rows: Array<{ address: string; name: string | null; symbol: string | null }>,
+): Map<string, DbTokenMeta> {
+  const map = new Map<string, DbTokenMeta>();
+  for (const row of rows) {
+    map.set(row.address.toLowerCase(), { name: row.name, symbol: row.symbol });
   }
   return map;
 }
@@ -247,12 +275,26 @@ function windowOf(row: BoardDbRow, toBlock: number): BoardWindow {
   };
 }
 
+/** The token's own name/symbol, straight from `token_meta` -- no fallback map
+    exists for these the way pairUnits has the static registry for pair
+    tokens, so a table miss (the read was never attempted, or this tick has
+    not reached it yet) is simply null, and the row shows the address alone,
+    same as before this table existed. */
+export function tokenMetaOf(
+  token: string,
+  dbTokenMeta: Map<string, DbTokenMeta> | null,
+): { name: string | null; symbol: string | null } {
+  const entry = dbTokenMeta?.get(token.toLowerCase());
+  return { name: entry?.name ?? null, symbol: entry?.symbol ?? null };
+}
+
 function rowOf(
   row: BoardDbRow,
   toBlock: number,
   nowSeconds: number,
   pairTokens: Record<string, PairTokenEntry> | null,
   dbPairTokens: Map<string, DbPairToken> | null,
+  dbTokenMeta: Map<string, DbTokenMeta> | null,
 ): BoardRow {
   return {
     token: row.token,
@@ -272,6 +314,7 @@ function rowOf(
     window: windowOf(row, toBlock),
     fill: fillOf(row),
     ...pairUnits(row.pair_token, dbPairTokens, pairTokens),
+    ...tokenMetaOf(row.token, dbTokenMeta),
   };
 }
 
@@ -312,9 +355,10 @@ export function buildBoardRows(
   limit = 200,
   pairTokens: Record<string, PairTokenEntry> | null = null,
   dbPairTokens: Map<string, DbPairToken> | null = null,
+  dbTokenMeta: Map<string, DbTokenMeta> | null = null,
 ): BoardRow[] {
   const toBlock = cursor ? cursor.last_indexed_block : 0;
   return sortDbRows(dbRows, sort)
     .slice(0, limit)
-    .map((row) => rowOf(row, toBlock, nowSeconds, pairTokens, dbPairTokens));
+    .map((row) => rowOf(row, toBlock, nowSeconds, pairTokens, dbPairTokens, dbTokenMeta));
 }

@@ -33,6 +33,9 @@ export async function reset(): Promise<void> {
     // worker/src/tick.ts fills, cleared between tests the same way every
     // other tick-owned table is.
     env.LEDGE_DB.prepare("DELETE FROM pair_token"),
+    // token_meta (2026-09-12): the read-once name()/symbol() cache for the
+    // launched token itself, same reasoning as pair_token above.
+    env.LEDGE_DB.prepare("DELETE FROM token_meta"),
   ]);
   await env.LEDGE_KV.put(KV_NUMBER, JSON.stringify(numberFixture));
   await env.LEDGE_KV.put(KV_PAIR_TOKENS, JSON.stringify(pairTokens));

@@ -2340,3 +2340,17 @@ footer {
 .token-row-detail {
   margin-top: 0.2rem;
 }
+
+/* The token's own name in front of its address. Whatever a deployer wrote,
+   on one line: never wraps, never pushes the address off the row. */
+.token-name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  margin-right: 0.4rem;
+  max-width: 9rem;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}

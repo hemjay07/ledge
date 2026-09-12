@@ -101,6 +101,15 @@ export const MAX_RECOVERABLE_GAP = 600_000;
 export const LOG_SUBREQUEST_BUDGET = 20;
 /** Seven days. ~133,000 launch rows, ~25 MB, against a 5 GB free limit. */
 export const RETENTION_SECONDS = 604_800;
+/** How many tokens without a `token_meta` row a single tick may add
+    name()/symbol() calls for (2026-09-12). The candidate population -- the
+    board's reserve targets plus the graveyard's candidates -- can run to
+    hundreds of tokens on a cold cache, and every one of them is two more
+    words of calldata in the same aggregate3 call the reserve read already
+    makes. Capping keeps that call bounded; whatever this tick does not
+    reach is still a candidate next tick, because the population is queried
+    fresh and the cache miss has not gone anywhere. */
+export const MAX_NEW_TOKEN_META_READS = 300;
 
 /** What a range costs: one window per LOG_WINDOW_BLOCKS, two topics each. */
 export function logSubrequests(from: number, to: number): number {
@@ -650,11 +659,14 @@ export async function tick(
 
     /* The curve reserve read (2026-09-12), extended the same day to also
        cache pair-token decimals()/symbol() the board cannot otherwise show
-       units for (worker/schema.sql's `pair_token` table). Both are one
-       Multicall3 call, spent from the same subrequest budget as everything
-       else this tick does -- readReservesAndPairTokens folds the reserve
-       calls and the pair-token calls into one aggregate3 array rather than
-       making two eth_calls, so this costs exactly what the reserve read
+       units for (worker/schema.sql's `pair_token` table), and again to also
+       cache the launched token's OWN name()/symbol() (worker/schema.sql's
+       `token_meta` table) so a board or graveyard row need not show a bare
+       address. All three are one Multicall3 call, spent from the same
+       subrequest budget as everything else this tick does --
+       readReservesAndPairTokens folds the reserve calls, the pair-token
+       calls and the token-meta calls into one aggregate3 array rather than
+       making separate eth_calls, so this costs exactly what the reserve read
        alone used to. Downstream of the tick's own job -- the activity fold
        above and the cursor write below -- so nothing here may block or delay
        either: a budget already spent, a malformed response, or any other
@@ -692,11 +704,36 @@ export async function tick(
       const known = new Set(knownPairTokens.map((row) => row.address.toLowerCase()));
       const unknownPairTokens = candidatePairTokens.filter((address) => !known.has(address));
 
-      if (targets.length > 0 || unknownPairTokens.length > 0) {
-        const { reserves, pairTokens } = await readReservesAndPairTokens(
+      /* The token-meta population: the board's own reserve targets, union
+         the graveyard's candidates (worker/src/graveyard.ts's GRAVEYARD_QUERY,
+         up to its own LIMIT) -- a launch with zero buys is exactly the kind
+         of row that shows nothing but a raw address today, and it never
+         appears in the reserve population above because a token with no
+         curve activity worth reading is not necessarily one with no trades
+         at all. Order is deterministic (reserve tokens first, in the same
+         order the reserve population was built, then graveyard tokens the
+         same way) so which 300 a cold cache reads first is reproducible. */
+      const graveyardPopulationResult = await db.prepare(GRAVEYARD_QUERY).all<{ token: string }>();
+      const graveyardTokens = (graveyardPopulationResult.results ?? []).map((row) => row.token);
+      const candidateTokenMeta = [
+        ...new Set([...population.map((row) => row.token), ...graveyardTokens].map((a) => a.toLowerCase())),
+      ];
+      const knownTokenMeta = await selectChunked<{ address: string }>(
+        db,
+        (placeholders) => `SELECT address FROM token_meta WHERE address IN (${placeholders})`,
+        candidateTokenMeta,
+      );
+      const knownTokens = new Set(knownTokenMeta.map((row) => row.address.toLowerCase()));
+      const unknownTokenMeta = candidateTokenMeta
+        .filter((address) => !knownTokens.has(address))
+        .slice(0, MAX_NEW_TOKEN_META_READS);
+
+      if (targets.length > 0 || unknownPairTokens.length > 0 || unknownTokenMeta.length > 0) {
+        const { reserves, pairTokens, tokenMeta } = await readReservesAndPairTokens(
           rpc,
           targets,
           unknownPairTokens,
+          unknownTokenMeta,
           head,
         );
         for (const reading of reserves) {
@@ -723,6 +760,19 @@ export async function tick(
                  ON CONFLICT (address) DO UPDATE SET decimals = excluded.decimals, symbol = excluded.symbol, read_block = excluded.read_block`,
               )
               .bind(reading.address.toLowerCase(), reading.decimals, reading.symbol, head),
+          );
+        }
+        /* INSERT OR IGNORE, never an upsert: `unknownTokenMeta` is already
+           filtered to addresses with no existing row, so a row landing here
+           twice in one batch cannot happen, and IGNORE is only the guard
+           against the read-once cache ever being overwritten by a stray
+           re-read -- see worker/schema.sql's table comment, "never re-read a
+           token once it has a row". */
+        for (const reading of tokenMeta) {
+          statements.push(
+            db
+              .prepare(`INSERT OR IGNORE INTO token_meta (address, name, symbol, read_block) VALUES (?, ?, ?, ?)`)
+              .bind(reading.address, reading.name, reading.symbol, head),
           );
         }
       }

@@ -144,6 +144,12 @@ const config = z.object({
      so -- never scaled by an assumed exponent. */
   pairSymbol: z.string().nullable(),
   pairDecimals: z.number().int().min(0).max(36).nullable(),
+  /* The launched TOKEN's own name()/symbol() (2026-09-12,
+     worker/schema.sql's `token_meta` cache) -- never the pair token, which
+     pairSymbol/pairToken are about. Null means the read was never attempted
+     or did not decode, not that the token has no name. */
+  name: z.string().nullable(),
+  symbol: z.string().nullable(),
   creatorTaxBps: z.number().int().nullable(),
   taxBucket: z.string().nullable(),
 });
@@ -342,6 +348,11 @@ export const liveRowSchema = z.object({
      would move the figure by orders of magnitude. */
   pairDecimals: z.number().int().min(0).max(36).nullable(),
   pairSymbol: z.string().nullable(),
+  /* The token's own name()/symbol() (2026-09-12, worker/schema.sql's
+     `token_meta` cache), so a row need not show a bare address. Null means
+     the read was never attempted or did not decode. */
+  name: z.string().nullable(),
+  symbol: z.string().nullable(),
 });
 
 export const liveResponseSchema = z.object({
@@ -410,6 +421,11 @@ export const graveyardRowSchema = z.object({
   window: graveyardWindow,
   pairDecimals: z.number().int().min(0).max(36).nullable(),
   pairSymbol: z.string().nullable(),
+  /* The token's own name()/symbol() (2026-09-12, worker/schema.sql's
+     `token_meta` cache). Null means the read was never attempted or did not
+     decode. */
+  name: z.string().nullable(),
+  symbol: z.string().nullable(),
 });
 
 /* The caveat CONSTRAINTS 3 requires: the activity index only began recording

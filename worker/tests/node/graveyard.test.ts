@@ -157,3 +157,31 @@ describe("the bot post", () => {
     });
   });
 });
+
+/* The token's own name()/symbol() (2026-09-12, worker/schema.sql's
+   `token_meta` cache) -- never the pair token, which pairSymbol is about. */
+describe("graveyard rows carry the token's own name/symbol", () => {
+  it("reads name/symbol from the token_meta map when a row exists", () => {
+    const dbTokenMeta = new Map([
+      ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", { name: "Pons Coin", symbol: "PONS" }],
+    ]);
+    const rows = buildGraveyardRows([row()], CURSOR, NOW, "age", 200, null, null, dbTokenMeta);
+    expect(rows[0]!.name).toBe("Pons Coin");
+    expect(rows[0]!.symbol).toBe("PONS");
+  });
+
+  it("is null for both when there is no token_meta row -- never a guess", () => {
+    const rows = buildGraveyardRows([row()], CURSOR, NOW, "age");
+    expect(rows[0]!.name).toBeNull();
+    expect(rows[0]!.symbol).toBeNull();
+  });
+
+  it("stays null when the token_meta row itself holds NULL -- a saved result, not a miss", () => {
+    const dbTokenMeta = new Map([
+      ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", { name: null, symbol: null }],
+    ]);
+    const rows = buildGraveyardRows([row()], CURSOR, NOW, "age", 200, null, null, dbTokenMeta);
+    expect(rows[0]!.name).toBeNull();
+    expect(rows[0]!.symbol).toBeNull();
+  });
+});

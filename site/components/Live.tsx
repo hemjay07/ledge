@@ -418,6 +418,20 @@ function stateTags(row: Row): ReactElement | null {
 /* The address, shortened the way Graduated.tsx and worker/src/text.ts shorten
    it, so the same token reads identically on every board. The full address
    is the link target and the title, so nothing is lost. */
+/** The token's own name, read from its contract (worker/src/reserve.ts), in
+    front of the address. A name is whatever the deployer wrote: it is
+    rendered as text, never as identity -- the address stays printed, and it
+    is the link's title and target. A missing name prints nothing rather than
+    a placeholder: the row is not lying about having read one. */
+export function TokenName({ symbol, name }: { symbol: string | null; name: string | null }) {
+  if (symbol === null && name === null) return null;
+  return (
+    <span className="token-name" title={name ?? undefined}>
+      {symbol ?? name}
+    </span>
+  );
+}
+
 export function shortAddress(address: string): string {
   return `${address.slice(0, 10)}…${address.slice(-6)}`;
 }
@@ -465,6 +479,7 @@ function LiveCard({
       }}
     >
       <a className="live-card-token mono" href={`/t/${row.token}`} title={row.token}>
+        <TokenName symbol={row.symbol} name={row.name} />
         {shortAddress(row.token)}
       </a>
       {stateTags(row)}
@@ -747,6 +762,7 @@ export function LiveBoardFull(): ReactElement {
                   >
                     <th scope="row" className="mono">
                       <a href={`/t/${row.token}`} title={row.token}>
+                        <TokenName symbol={row.symbol} name={row.name} />
                         {shortAddress(row.token)}
                       </a>
                       {stateTags(row)}
@@ -925,7 +941,8 @@ export function HomeNowCard(): ReactElement {
                     <tr key={row.token}>
                       <th scope="row" className="mono">
                         <a href={`/t/${row.token}`} title={row.token}>
-                          {shortAddress(row.token)}
+                          <TokenName symbol={row.symbol} name={row.name} />
+                        {shortAddress(row.token)}
                         </a>
                       </th>
                       <td className="fig n" data-unit="buys">

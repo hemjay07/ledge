@@ -206,7 +206,7 @@ describe("readReservesAndPairTokens — pair-token decimals/symbol", () => {
       { success: true, data: encodeAbiString("USDG") },
     ]);
     const { client } = fakeMulticall(resultHex);
-    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], 1);
+    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], [], 1);
     expect(pairTokens).toEqual([{ address: PAIR_A, decimals: 6, symbol: "USDG" }]);
   });
 
@@ -222,7 +222,7 @@ describe("readReservesAndPairTokens — pair-token decimals/symbol", () => {
       { success: true, data: bytes32Symbol },
     ]);
     const { client } = fakeMulticall(resultHex);
-    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], 1);
+    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], [], 1);
     expect(pairTokens).toEqual([{ address: PAIR_A, decimals: 18, symbol: null }]);
   });
 
@@ -237,7 +237,7 @@ describe("readReservesAndPairTokens — pair-token decimals/symbol", () => {
       { success: true, data: garbage },
     ]);
     const { client } = fakeMulticall(resultHex);
-    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], 1);
+    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], [], 1);
     expect(pairTokens).toEqual([{ address: PAIR_A, decimals: 18, symbol: null }]);
   });
 
@@ -250,7 +250,7 @@ describe("readReservesAndPairTokens — pair-token decimals/symbol", () => {
         { success: false, data: "" }, // symbol() reverts
       ]);
       const { client } = fakeMulticall(resultHex);
-      const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], 1);
+      const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], [], 1);
       expect(pairTokens).toEqual([{ address: PAIR_A, decimals: 6, symbol: null }]);
     })();
   });
@@ -263,7 +263,7 @@ describe("readReservesAndPairTokens — pair-token decimals/symbol", () => {
       { success: true, data: encodeAbiString("XYZ") },
     ]);
     const { client } = fakeMulticall(resultHex);
-    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], 1);
+    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], [], 1);
     expect(pairTokens).toEqual([{ address: PAIR_A, decimals: null, symbol: "XYZ" }]);
   });
 
@@ -275,7 +275,7 @@ describe("readReservesAndPairTokens — pair-token decimals/symbol", () => {
       { success: true, data: encodeAbiString("XYZ") },
     ]);
     const { client } = fakeMulticall(resultHex);
-    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], 1);
+    const { pairTokens } = await readReservesAndPairTokens(client, targets, [PAIR_A], [], 1);
     expect(pairTokens).toEqual([{ address: PAIR_A, decimals: null, symbol: "XYZ" }]);
   });
 
@@ -294,6 +294,7 @@ describe("readReservesAndPairTokens — pair-token decimals/symbol", () => {
       client,
       targets,
       [PAIR_A, PAIR_B],
+      [],
       56_172_580,
     );
     expect(reserves).toEqual([{ token: "0xtoken-a", graduated: false, reserveWei: "2245000000000000000" }]);
@@ -312,21 +313,90 @@ describe("readReservesAndPairTokens — pair-token decimals/symbol", () => {
       { success: true, data: word(0n) },
     ]);
     const { client } = fakeMulticall(resultHex, seen);
-    const { pairTokens } = await readReservesAndPairTokens(client, targets, [ZERO_ADDRESS], 1);
+    const { pairTokens } = await readReservesAndPairTokens(client, targets, [ZERO_ADDRESS], [], 1);
     expect(pairTokens).toEqual([]);
   });
 
   it("returns empty arrays rather than a guess when the multicall response is malformed", async () => {
     const { client } = fakeMulticall("0xnotarealresponse");
-    const result = await readReservesAndPairTokens(client, targets, [PAIR_A], 1);
-    expect(result).toEqual({ reserves: [], pairTokens: [] });
+    const result = await readReservesAndPairTokens(client, targets, [PAIR_A], [], 1);
+    expect(result).toEqual({ reserves: [], pairTokens: [], tokenMeta: [] });
   });
 
   it("makes no call at all when there is nothing to read", async () => {
     const seen = { targets: [] as string[], datas: [] as string[] };
     const { client } = fakeMulticall(null, seen);
-    const result = await readReservesAndPairTokens(client, [], [], 1);
-    expect(result).toEqual({ reserves: [], pairTokens: [] });
+    const result = await readReservesAndPairTokens(client, [], [], [], 1);
+    expect(result).toEqual({ reserves: [], pairTokens: [], tokenMeta: [] });
     expect(client.subrequests).toBe(0);
+  });
+
+  /* Token-meta (name()/symbol() of the launched TOKEN, not the pair) reads
+     (2026-09-12), folded into the same aggregate3 array as the reserve and
+     pair-token calls above -- worker/schema.sql's `token_meta` cache. */
+  describe("token name()/symbol() reads", () => {
+    const TOKEN_META_A = "0xdddddddddddddddddddddddddddddddddddddddd";
+
+    it("decodes name() and symbol() for a token with no cached row yet", async () => {
+      const resultHex = encodeResults([
+        { success: true, data: word(0n) },
+        { success: true, data: word(0n) },
+        { success: true, data: encodeAbiString("Pons Coin") },
+        { success: true, data: encodeAbiString("PONS") },
+      ]);
+      const { client } = fakeMulticall(resultHex);
+      const { tokenMeta } = await readReservesAndPairTokens(client, targets, [], [TOKEN_META_A], 1);
+      expect(tokenMeta).toEqual([{ address: TOKEN_META_A, name: "Pons Coin", symbol: "PONS" }]);
+    });
+
+    it("stores name/symbol as NULL when the return is a raw bytes32, not a dynamic string", async () => {
+      const bytes32Name = Buffer.from("MKR").toString("hex").padEnd(WORD, "0");
+      const resultHex = encodeResults([
+        { success: true, data: word(0n) },
+        { success: true, data: word(0n) },
+        { success: true, data: bytes32Name },
+        { success: true, data: bytes32Name },
+      ]);
+      const { client } = fakeMulticall(resultHex);
+      const { tokenMeta } = await readReservesAndPairTokens(client, targets, [], [TOKEN_META_A], 1);
+      expect(tokenMeta).toEqual([{ address: TOKEN_META_A, name: null, symbol: null }]);
+    });
+
+    it("decodes an empty string as '', not NULL -- a real answer, not a failure", async () => {
+      const resultHex = encodeResults([
+        { success: true, data: word(0n) },
+        { success: true, data: word(0n) },
+        { success: true, data: encodeAbiString("") },
+        { success: true, data: encodeAbiString("") },
+      ]);
+      const { client } = fakeMulticall(resultHex);
+      const { tokenMeta } = await readReservesAndPairTokens(client, targets, [], [TOKEN_META_A], 1);
+      expect(tokenMeta).toEqual([{ address: TOKEN_META_A, name: "", symbol: "" }]);
+    });
+
+    it("makes exactly one eth_call covering reserves, pair tokens and token meta together", async () => {
+      const seen = { targets: [] as string[], datas: [] as string[] };
+      const resultHex = encodeResults([
+        { success: true, data: word(0n) },
+        { success: true, data: word(2_245_000_000_000_000_000n) },
+        { success: true, data: word(6n) },
+        { success: true, data: encodeAbiString("USDG") },
+        { success: true, data: encodeAbiString("Pons Coin") },
+        { success: true, data: encodeAbiString("PONS") },
+      ]);
+      const { client } = fakeMulticall(resultHex, seen);
+      const { reserves, pairTokens, tokenMeta } = await readReservesAndPairTokens(
+        client,
+        targets,
+        [PAIR_A],
+        [TOKEN_META_A],
+        56_172_580,
+      );
+      expect(reserves).toEqual([{ token: "0xtoken-a", graduated: false, reserveWei: "2245000000000000000" }]);
+      expect(pairTokens).toEqual([{ address: PAIR_A, decimals: 6, symbol: "USDG" }]);
+      expect(tokenMeta).toEqual([{ address: TOKEN_META_A, name: "Pons Coin", symbol: "PONS" }]);
+      expect(client.subrequests).toBe(1);
+      expect(seen.targets).toEqual([MULTICALL3_ADDRESS]);
+    });
   });
 });

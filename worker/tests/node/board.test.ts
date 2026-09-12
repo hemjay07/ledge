@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pairUnits } from "../../src/board";
+import { buildBoardRows, pairUnits, type BoardDbRow } from "../../src/board";
 
 /* A quantity is only legible in its own units: 8090000000 is 8,090 USDG, and
    4200000000000000000 is 4.2 ETH. Neither is legible as the integer, and a
@@ -92,5 +92,58 @@ describe("the board's pair units — pair_token table cache", () => {
       pairDecimals: 18,
       pairSymbol: "ETH",
     });
+  });
+});
+
+/* The token's own name()/symbol() (2026-09-12, worker/schema.sql's
+   `token_meta` cache) -- never the pair token, which pairSymbol is about. */
+describe("board rows carry the token's own name/symbol", () => {
+  const NOW = 1_762_536_735;
+  const CURSOR = { last_indexed_block: 56_172_588, last_success_at: NOW - 20, consecutive_failures: 0 };
+
+  function dbRow(): BoardDbRow {
+    return {
+      token: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      pair_class: "eth",
+      pair_token: "0x0000000000000000000000000000000000000000",
+      creator_tax_bps: 300,
+      graduation_threshold: "4200000000000000000",
+      block: 56_150_000,
+      ts: NOW - 3_600,
+      graduated: 0,
+      from_block: 56_150_000,
+      buys: 3,
+      sells: 1,
+      quote_in: "100",
+      quote_out: "0",
+      first_block_buyers: 1,
+      last_activity_ts: NOW - 100,
+      reserve_wei: null,
+      reserve_block: null,
+    };
+  }
+
+  it("reads name/symbol from the token_meta map when a row exists", () => {
+    const dbTokenMeta = new Map([
+      ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", { name: "Pons Coin", symbol: "PONS" }],
+    ]);
+    const rows = buildBoardRows([dbRow()], CURSOR, NOW, "buys", 200, null, null, dbTokenMeta);
+    expect(rows[0]!.name).toBe("Pons Coin");
+    expect(rows[0]!.symbol).toBe("PONS");
+  });
+
+  it("is null for both when there is no token_meta row -- never a guess", () => {
+    const rows = buildBoardRows([dbRow()], CURSOR, NOW, "buys");
+    expect(rows[0]!.name).toBeNull();
+    expect(rows[0]!.symbol).toBeNull();
+  });
+
+  it("stays null when the token_meta row itself holds NULL -- a saved result, not a miss", () => {
+    const dbTokenMeta = new Map([
+      ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", { name: null, symbol: null }],
+    ]);
+    const rows = buildBoardRows([dbRow()], CURSOR, NOW, "buys", 200, null, null, dbTokenMeta);
+    expect(rows[0]!.name).toBeNull();
+    expect(rows[0]!.symbol).toBeNull();
   });
 });

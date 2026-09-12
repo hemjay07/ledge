@@ -26,6 +26,7 @@ import {
   buildBoardRows,
   isBoardSortKey,
   pairTokenMapFromRows,
+  tokenMetaMapFromRows,
   type BoardDbRow,
 } from "./board";
 
@@ -36,6 +37,15 @@ const PAIR_TOKEN_QUERY = "SELECT address, decimals, symbol FROM pair_token";
 interface PairTokenDbRow {
   address: string;
   decimals: number | null;
+  symbol: string | null;
+}
+/** Every row of the live token-meta cache (2026-09-12), read once per
+    request the same way -- worker/schema.sql's `token_meta` table comment,
+    worker/src/board.ts's tokenMetaOf. */
+const TOKEN_META_QUERY = "SELECT address, name, symbol FROM token_meta";
+interface TokenMetaDbRow {
+  address: string;
+  name: string | null;
   symbol: string | null;
 }
 import {
@@ -169,20 +179,22 @@ async function handleLive(env: Env, nowMs: number, url: URL): Promise<Response> 
      once a minute by the tick, and it lets a row say "4.2 ETH" instead of
      4200000000000000000. No decimals() call per row -- 121 rows could never
      afford one, and decimals.ts forbids guessing the exponent. */
-  const [[rowsResult, cursorResult, pairTokenResult], pairTokens] = await Promise.all([
+  const [[rowsResult, cursorResult, pairTokenResult, tokenMetaResult], pairTokens] = await Promise.all([
     env.LEDGE_DB.batch([
     env.LEDGE_DB.prepare(BOARD_QUERY),
     env.LEDGE_DB.prepare(
       "SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1",
     ),
     env.LEDGE_DB.prepare(PAIR_TOKEN_QUERY),
+    env.LEDGE_DB.prepare(TOKEN_META_QUERY),
     ]),
     loadPairTokens(env, nowMs),
   ]);
   const cursor = (cursorResult?.results[0] as CursorRow | undefined) ?? null;
   const dbRows = (rowsResult?.results ?? []) as unknown as BoardDbRow[];
   const dbPairTokens = pairTokenMapFromRows((pairTokenResult?.results ?? []) as unknown as PairTokenDbRow[]);
-  const rows = buildBoardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens, dbPairTokens);
+  const dbTokenMeta = tokenMetaMapFromRows((tokenMetaResult?.results ?? []) as unknown as TokenMetaDbRow[]);
+  const rows = buildBoardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens, dbPairTokens, dbTokenMeta);
 
   const payload = {
     schemaVersion: SCHEMA_VERSION,
@@ -226,22 +238,25 @@ async function handleGraveyard(env: Env, nowMs: number, url: URL): Promise<Respo
     );
   }
 
-  const [[rowsResult, scopeResult, cursorResult, pairTokenResult], pairTokens] = await Promise.all([
-    env.LEDGE_DB.batch([
-      env.LEDGE_DB.prepare(GRAVEYARD_QUERY),
-      env.LEDGE_DB.prepare(GRAVEYARD_SCOPE_QUERY),
-      env.LEDGE_DB.prepare(
-        "SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1",
-      ),
-      env.LEDGE_DB.prepare(PAIR_TOKEN_QUERY),
-    ]),
-    loadPairTokens(env, nowMs),
-  ]);
+  const [[rowsResult, scopeResult, cursorResult, pairTokenResult, tokenMetaResult], pairTokens] =
+    await Promise.all([
+      env.LEDGE_DB.batch([
+        env.LEDGE_DB.prepare(GRAVEYARD_QUERY),
+        env.LEDGE_DB.prepare(GRAVEYARD_SCOPE_QUERY),
+        env.LEDGE_DB.prepare(
+          "SELECT last_indexed_block, last_success_at, consecutive_failures FROM cursor WHERE id = 1",
+        ),
+        env.LEDGE_DB.prepare(PAIR_TOKEN_QUERY),
+        env.LEDGE_DB.prepare(TOKEN_META_QUERY),
+      ]),
+      loadPairTokens(env, nowMs),
+    ]);
   const cursor = (cursorResult?.results[0] as CursorRow | undefined) ?? null;
   const dbRows = (rowsResult?.results ?? []) as unknown as GraveyardDbRow[];
   const scopeRow = (scopeResult?.results[0] as GraveyardScopeDbRow | undefined) ?? null;
   const dbPairTokens = pairTokenMapFromRows((pairTokenResult?.results ?? []) as unknown as PairTokenDbRow[]);
-  const rows = buildGraveyardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens, dbPairTokens);
+  const dbTokenMeta = tokenMetaMapFromRows((tokenMetaResult?.results ?? []) as unknown as TokenMetaDbRow[]);
+  const rows = buildGraveyardRows(dbRows, cursor, nowSeconds, sortParam, 200, pairTokens, dbPairTokens, dbTokenMeta);
   const scope = buildGraveyardScope(scopeRow);
 
   const payload = {
