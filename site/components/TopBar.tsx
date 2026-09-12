@@ -32,6 +32,9 @@ const BROWSE = [
   { href: "/live", label: "Live" },
   { href: "/graduated", label: "Graduated" },
   { href: "/graveyard", label: "Graveyard" },
+  /* Its own link, not under Reference: a buyer who followed the pons listing
+     here must find the token without a click (REVAMP.md 2026-09-12). */
+  { href: "/token", label: "Token" },
 ] as const;
 
 /** How we know. Behind one disclosure rather than five more links, because

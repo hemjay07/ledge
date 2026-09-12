@@ -2285,3 +2285,33 @@ footer {
 .home-rest {
   margin: var(--s-8) 0 0;
 }
+
+/* ---- /token: the page a buyer reads ------------------------------------ */
+.token-card {
+  margin-top: var(--s-4);
+}
+.token-card .dek {
+  margin-top: 0;
+}
+.token-status {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.token-status--on {
+  color: var(--fill);
+}
+.token-nots {
+  margin: 0;
+  padding-left: 1.2rem;
+  list-style: disc;
+  font-family: var(--font-body);
+  font-size: var(--fs-note);
+}
+.token-nots li + li {
+  margin-top: 0.25rem;
+}
+.token-foot {
+  margin-top: var(--s-6);
+}

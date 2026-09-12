@@ -22,6 +22,7 @@ describe("the shell's reachability guarantee", () => {
     "/live",
     "/graduated",
     "/graveyard",
+    "/token",
     "/number",
     "/cohorts",
     "/cockpit",
