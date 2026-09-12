@@ -809,13 +809,18 @@ a:focus-visible,
 .tabs {
   margin-top: var(--s-4);
 }
+/* Wraps rather than scrolls sideways: a strip that ran off the right edge
+   hid its last tab behind nothing on a phone, with no affordance saying
+   there was more (2026-09-12). Six short labels cost two lines. */
 .tab-strip {
   display: flex;
-  gap: var(--s-4);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+  column-gap: var(--s-4);
+  align-items: baseline;
+  line-height: 1.5;
   border-bottom: 1px solid var(--rule-hair);
-  padding-bottom: 0.4rem;
+  padding-bottom: 0.5rem;
   margin-bottom: var(--s-4);
 }
 .tab {
@@ -830,7 +835,6 @@ a:focus-visible,
   text-transform: uppercase;
   color: var(--ink-3);
   border-bottom: 2px solid transparent;
-  margin-bottom: -0.75rem;
 }
 .tab:hover,
 .tab:focus-visible {
@@ -2385,4 +2389,38 @@ footer {
 /* the address under a name is the quieter of the two */
 .token-name + * {
   font-size: 0.8125rem;
+}
+
+/* ==================================================================
+   The evidence pages, calmed (REVAMP.md 2026-09-12, "1.6 the evidence pages,
+   calmed"). /number, /cohorts, /cockpit and /method dropped their numbered
+   ledger chrome -- RunningHead, ColophonStrip, LedgerEntry's folio gutter --
+   for the same framed-card vocabulary the home page and the boards already
+   use: .card, .card-header, .card-kicker. Rigour is unchanged; only the
+   chrome and the order (figure before method) moved. Cuts and windows still
+   use .tabs / .tab-strip; a table is still a Register. ================== */
+
+.evidence-lead {
+  margin-top: var(--s-6);
+}
+.evidence-lead .kicker {
+  margin-bottom: var(--s-2);
+}
+.evidence-lead .dek {
+  margin-top: 0;
+}
+.sheet > .evidence-lead:first-child,
+.sheet > .card:first-child {
+  margin-top: var(--s-6);
+}
+.sheet > .card + .card,
+.sheet > .evidence-lead + .card {
+  margin-top: var(--s-6);
+}
+
+/* "How this is counted": the methodology fine print a reader did not come
+   for, collapsed by default at the foot of the card rather than opening the
+   page. Reuses the boards' own .board-what-counts <details> unchanged. */
+.card > .board-what-counts {
+  margin-top: var(--s-4);
 }

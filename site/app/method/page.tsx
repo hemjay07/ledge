@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
-import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Footer } from "../../components/Footer";
-import { LedgerEntry } from "../../components/LedgerEntry";
 import { numberFile } from "../../lib/number";
 import { methodHtml } from "../../lib/method";
-import { formatStamp } from "../../lib/format";
 
 export const metadata: Metadata = {
   title: "Method — LEDGE",
@@ -20,24 +17,18 @@ export default function Method(): ReactElement {
 
   return (
     <main className="sheet">
-        <RunningHead mark="LEDGE · METHOD" win={`Definitions ${numberFile.definitionsVersion} · 01`} />
-
-      <div className="fold" style={{ paddingBottom: "1.5rem" }}>
-        <h1 className="kicker">Method</h1>
-        <p className="lede" style={{ marginTop: "0.5rem" }}>
-          These are counts of past launches. They describe the population, not any token. LEDGE
-          does not score, rank, or predict individual tokens.
-        </p>
+      <div className="evidence-lead">
+        <h1 className="kicker">METHOD</h1>
+        <p className="dek">How every number on this site is counted, and how to recompute it.</p>
+        <p className="note">LEDGE does not score, rank, or predict individual tokens.</p>
       </div>
-      <ColophonStrip stamp={formatStamp(numberFile.crawledAt)} />
 
-      <LedgerEntry
-        folio="02"
-        id="h-recompute"
-        heading="Recompute"
-        headingNote={`· definitions ${numberFile.definitionsVersion}`}
-      >
-        <p className="note">
+      <div className="card">
+        <div className="card-header">
+          <h2 className="kicker card-kicker">RECOMPUTE</h2>
+          <span className="note note--fine mono">definitions {numberFile.definitionsVersion}</span>
+        </div>
+        <p className="note" id="h-recompute">
           Every figure on this site comes from <code>data/number.json</code>, which is regenerated
           from the raw launch and graduation files with no network access. Clone the repository and
           run:
@@ -50,17 +41,15 @@ export default function Method(): ReactElement {
           {numberFile.schemaVersion} · chain {numberFile.chainId} · first indexed block{" "}
           {numberFile.firstIndexedBlock.toLocaleString("en-US")}.
         </p>
-      </LedgerEntry>
+      </div>
 
-      <LedgerEntry
-        folio="03"
-        id="h-definitions"
-        heading="Definitions"
-        headingNote="· binding on the crawler, the site and the tests"
-      >
-        <div className="method" dangerouslySetInnerHTML={{ __html: html }} />
-      </LedgerEntry>
-
+      <div className="card">
+        <div className="card-header">
+          <h2 className="kicker card-kicker">DEFINITIONS</h2>
+          <span className="note note--fine">binding on the crawler, the site and the tests</span>
+        </div>
+        <div className="method" id="h-definitions" dangerouslySetInnerHTML={{ __html: html }} />
+      </div>
 
       <Footer />
     </main>

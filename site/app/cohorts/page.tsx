@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { Age } from "../../components/Age";
-import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { Footer } from "../../components/Footer";
 import { Tabs } from "../../components/Tabs";
-import { LedgerEntry } from "../../components/LedgerEntry";
 import { Register } from "../../components/Register";
 import { Stat } from "../../components/Stat";
 import { allTime, h24, numberFile, type WindowData } from "../../lib/number";
@@ -12,7 +10,6 @@ import {
   formatCount,
   formatDurationLong,
   formatOneIn,
-  formatStamp,
   histogramLabel,
   hourLabel,
   pairLabel,
@@ -36,19 +33,9 @@ export const metadata: Metadata = {
    data, so the second window returns on its own once history is indexed. */
 const allTimeIsSameMeasurement = sameMeasurement(h24, allTime);
 
-const ALL_WINDOWS: { key: string; window: WindowData; label: string; note: string }[] = [
-  {
-    key: "h24",
-    window: h24,
-    label: "24 h",
-    note: "Trailing 24 hours from the last measurement.",
-  },
-  {
-    key: "all",
-    window: allTime,
-    label: "all-time",
-    note: "Every launch since the first block indexed.",
-  },
+const ALL_WINDOWS: { key: string; window: WindowData; label: string }[] = [
+  { key: "h24", window: h24, label: "24 h" },
+  { key: "all", window: allTime, label: "all-time" },
 ];
 
 const WINDOWS = allTimeIsSameMeasurement
@@ -58,20 +45,25 @@ const WINDOWS = allTimeIsSameMeasurement
 /* The cut keys cohortTables() returns, named for a reader rather than for the
    code. The keys themselves are the register's own `key`, so a cut that is
    added or renamed there shows up here as its raw key rather than silently
-   vanishing from the strip. */
+   vanishing from the strip. Labels reworded 2026-09-12 (REVAMP.md 1.6): no
+   "trailing"/"register"/"bucket"/"configuration"/"cohort" as a heading word. */
 const TAB_LABELS: Record<string, string> = {
   fast: "Fast graduations",
-  pair: "Pair token",
-  tax: "Creator tax",
-  hour: "Hour",
-  day: "Day",
+  pair: "By pair token",
+  tax: "By creator tax",
+  hour: "By hour",
+  day: "By day",
   dep: "Per deployer",
 };
 
-function cohortTables(w: WindowData, label: string, folioBase: number): ReactElement[] {
-  const n = `· ${label} · n = ${formatCount(w.launches)} launches`;
-  const folio = (i: number) => String(folioBase + i).padStart(2, "0");
+/* One register per cut, each just a caption-and-table now — no folio, no
+   numbered heading, since the tab strip above already names the cut a reader
+   picked. Every register is still rendered and still in the document; only
+   the LedgerEntry chrome is gone (REVAMP.md 2026-09-12, "the evidence pages,
+   calmed"). */
+function cohortTables(w: WindowData, label: string): ReactElement[] {
   const distinct = w.deployers.distinct;
+  const nLaunches = formatCount(w.launches);
 
   /* An hour that recorded nothing has nothing to read: 21 consecutive rows of
      "not enough data (n=0)" bury the three that carry launches. The empty
@@ -97,13 +89,7 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
   const cutoffWords = formatDurationLong(w.excludingFast.cutoffSeconds);
 
   return [
-    <LedgerEntry
-      key="fast"
-      folio={folio(0)}
-      id={`h-fast-${label}`}
-      heading="Fast graduations"
-      headingNote={`· ${label} · n = ${formatCount(fast.n)} graduations`}
-    >
+    <div key="fast" id={`h-fast-${label}`}>
       <p className="lede">
         {fast.insufficient ? (
           <Stat
@@ -139,15 +125,11 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
           </>
         )}
       </p>
-    </LedgerEntry>,
+    </div>,
     <Register
       key="pair"
-      folio={folio(1)}
-      heading="By pair token"
-      headingId={`h-pair-${label}`}
-      headingNote={n}
       ariaLabel={`Graduation rate by pair token, ${label}`}
-      caption="Graduations of launches, by the token the pool is paired against."
+      caption={`Graduation rate by the token a launch is paired against, n = ${nLaunches} launches.`}
       columns={COHORT_COLUMNS("Pair token")}
       rows={w.cohorts.pair.map((r) => cohortRegisterRow(pairLabel(r.bucket), r))}
       foot={cohortFooting(w)}
@@ -155,12 +137,8 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
     />,
     <Register
       key="tax"
-      folio={folio(2)}
-      heading="By creator tax"
-      headingId={`h-tax-${label}`}
-      headingNote={n}
       ariaLabel={`Graduation rate by creator tax, ${label}`}
-      caption="Creator tax read from the factory at launch."
+      caption={`Graduation rate by the creator tax read from the factory at launch, n = ${nLaunches} launches.`}
       columns={COHORT_COLUMNS("Creator tax")}
       rows={w.cohorts.tax.map((r) => cohortRegisterRow(taxLabel(r.bucket), r))}
       foot={cohortFooting(w)}
@@ -168,12 +146,8 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
     />,
     <Register
       key="hour"
-      folio={folio(3)}
-      heading="By hour (UTC)"
-      headingId={`h-hour-${label}`}
-      headingNote={n}
       ariaLabel={`Graduation rate by hour of day, UTC, ${label}`}
-      caption="Hourly buckets that recorded at least one launch."
+      caption={`Graduation rate by hour of day (UTC), hours with at least one launch, n = ${nLaunches} launches.`}
       columns={COHORT_COLUMNS("Hour (UTC)")}
       rows={observedHours.map((r) => cohortRegisterRow(hourLabel(r.bucket), r))}
       foot={cohortFooting(w)}
@@ -181,24 +155,14 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
     />,
     <Register
       key="day"
-      folio={folio(4)}
-      heading="By day of week (UTC)"
-      headingId={`h-day-${label}`}
-      headingNote={n}
       ariaLabel={`Graduation rate by day of week, UTC, ${label}`}
-      caption="Daily buckets that recorded at least one launch. A bucket renders a rate only at n = 30 or more."
+      caption={`Graduation rate by day of week (UTC), days with at least one launch, n = ${nLaunches} launches.`}
       columns={COHORT_COLUMNS("Day (UTC)")}
       rows={observedDays.map((r) => cohortRegisterRow(r.bucket, r))}
       foot={cohortFooting(w)}
       note={`${emptyDaysNote}${excluded(w.cohortsExcluded.day)}`.trim() || null}
     />,
-    <LedgerEntry
-      key="dep"
-      folio={folio(5)}
-      id={`h-dep-${label}`}
-      heading="Deployers"
-      headingNote={`· ${label} · n = ${formatCount(distinct)} distinct`}
-    >
+    <div key="dep" id={`h-dep-${label}`}>
       <p className="lede">
         <span className="mono">{formatCount(distinct)}</span> distinct deployers launched{" "}
         <span className="mono">{formatCount(w.launches)}</span> tokens.{" "}
@@ -225,7 +189,7 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
       </p>
       <Register
         ariaLabel={`Distribution of launches per deployer, ${label}`}
-        caption="Counts of deployers by how many tokens they launched. No addresses."
+        caption={`Deployers by how many tokens they launched, n = ${formatCount(distinct)} deployers. No addresses.`}
         columns={["Launches per deployer", "Deployers (n)", `Share of ${formatCount(distinct)}`]}
         rows={w.deployers.histogram.map((row) => ({
           label: histogramLabel(row.bucket),
@@ -240,99 +204,102 @@ function cohortTables(w: WindowData, label: string, folioBase: number): ReactEle
         }}
         note="Aggregate distribution only. No deployer address appears on this page."
       />
-    </LedgerEntry>,
+    </div>,
   ];
+}
+
+/* The two headline rates for a window: two small stat blocks, not
+   paragraphs, sitting above the cut strip. Reuses .alltime/.at-v/.at-k, the
+   vocabulary this page already had for this pair of numbers. */
+function windowHeadline(w: WindowData, label: string, key: string): ReactElement {
+  return (
+    <div className="alltime">
+      <div>
+        <Stat
+          className="at-v"
+          name={`rate-${key}`}
+          value={w.rate}
+          n={w.launches}
+          window={label}
+          updatedAt={crawledAt}
+          insufficient={w.insufficient}
+        />
+        <span className="at-k">
+          {formatCount(w.graduations)} graduations of {formatCount(w.launches)} launches
+        </span>
+      </div>
+      <div>
+        <Stat
+          className="at-v"
+          name={`excluding-fast-${key}`}
+          value={w.excludingFast.rate}
+          n={w.launches}
+          window={label}
+          updatedAt={crawledAt}
+          insufficient={w.excludingFast.insufficient}
+        />
+        <span className="at-k">
+          excluding launches that graduated inside {formatDurationLong(w.excludingFast.cutoffSeconds)}
+          {w.excludingFast.oneIn === null ? "" : ` · ${formatOneIn(w.excludingFast.oneIn)}`} ·{" "}
+          {formatCount(w.excludingFast.graduations)} of {formatCount(w.launches)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function windowBody(w: WindowData, label: string, key: string): ReactElement {
+  return (
+    <>
+      {windowHeadline(w, label, key)}
+      <Tabs
+        param={`cut-${key}`}
+        ariaLabel={`Cohorts of the ${label} window, by cut`}
+        tabs={cohortTables(w, label).map((el) => ({
+          key: String(el.key ?? "cut"),
+          label: TAB_LABELS[String(el.key ?? "")] ?? String(el.key ?? "cut"),
+          content: el,
+        }))}
+      />
+    </>
+  );
 }
 
 export default function Cohorts(): ReactElement {
   return (
     <main className="sheet">
-        <RunningHead mark="LEDGE · COHORTS" win="All buckets · 01" />
-
-      <div className="fold" style={{ paddingBottom: "1.5rem" }}>
-        <h1 className="kicker">Cohorts</h1>
-        <p className="lede" style={{ marginTop: "0.5rem" }}>
-          Every bucket of the Pons Number that recorded a launch, in both windows, with the launch
-          count standing beside every rate. A bucket under n&nbsp;=&nbsp;30 prints its sample size
-          instead of a percentage.
-        </p>
-        {allTimeIsSameMeasurement ? <p className="note">{SAME_MEASUREMENT_NOTE}</p> : null}
-        <p className="note">
+      <div className="card">
+        <div className="card-header">
+          <h1 className="kicker card-kicker">COHORTS</h1>
           <Age crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
-        </p>
-      </div>
-      <ColophonStrip stamp={formatStamp(crawledAt)} />
+        </div>
 
-      {WINDOWS.map((w, wi) => (
-        <div key={w.key}>
-          <LedgerEntry
-            folio={String(wi * 10 + 2).padStart(2, "0")}
-            id={`h-window-${w.key}`}
-            heading={w.key === "h24" ? "Trailing 24 hours" : "All-time"}
-            headingNote={`· n = ${formatCount(w.window.launches)} launches · ${formatCount(w.window.graduations)} graduations`}
-          >
-            <p className="note">{w.note}</p>
-            <div className="alltime">
-              <div>
-                <Stat
-                  className="at-v"
-                  name={`rate-${w.key}`}
-                  value={w.window.rate}
-                  n={w.window.launches}
-                  window={w.label}
-                  updatedAt={crawledAt}
-                  insufficient={w.window.insufficient}
-                />
-                <span className="at-k">
-                  {formatCount(w.window.graduations)} graduations of{" "}
-                  {formatCount(w.window.launches)} launches
-                </span>
-              </div>
-              <div>
-                <Stat
-                  className="at-v"
-                  name={`excluding-fast-${w.key}`}
-                  value={w.window.excludingFast.rate}
-                  n={w.window.launches}
-                  window={w.label}
-                  updatedAt={crawledAt}
-                  insufficient={w.window.excludingFast.insufficient}
-                />
-                <span className="at-k">
-                  excluding launches that graduated inside{" "}
-                  {formatDurationLong(w.window.excludingFast.cutoffSeconds)}
-                  {w.window.excludingFast.oneIn === null
-                    ? ""
-                    : ` · ${formatOneIn(w.window.excludingFast.oneIn)}`}{" "}
-                  · {formatCount(w.window.excludingFast.graduations)} of{" "}
-                  {formatCount(w.window.launches)}
-                </span>
-              </div>
-            </div>
-            {w.key === "all" ? (
-              <p className="note note--fine">
-                Indexed from block {formatCount(numberFile.firstIndexedBlock)} to block{" "}
-                {formatCount(numberFile.headBlock)}.
-              </p>
-            ) : null}
-          </LedgerEntry>
-          {/* One register at a time rather than five stacked. Every one is
-              still rendered and still in the document — the tab hides them
-              with `hidden`, it does not drop them — so nothing became less
-              reachable, which is what CONSTRAINTS 5 protects. The chosen cut
-              rides in the query string, keyed per window so the two strips do
-              not collide. */}
+        {WINDOWS.length > 1 ? (
           <Tabs
-            param={`cut-${w.key}`}
-            ariaLabel={`Cohorts of the ${w.label} window, by cut`}
-            tabs={cohortTables(w.window, w.label, wi * 10 + 3).map((el) => ({
-              key: String(el.key ?? "cut"),
-              label: TAB_LABELS[String(el.key ?? "")] ?? String(el.key ?? "cut"),
-              content: el,
+            param="window"
+            ariaLabel="Cohorts, by window"
+            tabs={WINDOWS.map((w) => ({
+              key: w.key,
+              label: w.key === "h24" ? "Last 24 hours" : "All time",
+              content: windowBody(w.window, w.label, w.key),
             }))}
           />
-        </div>
-      ))}
+        ) : (
+          windowBody(WINDOWS[0]!.window, WINDOWS[0]!.label, WINDOWS[0]!.key)
+        )}
+
+        <details className="board-what-counts">
+          <summary>How this is counted</summary>
+          {allTimeIsSameMeasurement ? <p className="note">{SAME_MEASUREMENT_NOTE}</p> : null}
+          <p className="note">
+            A row under n&nbsp;=&nbsp;30 prints its sample size instead of a percentage.
+          </p>
+          <p className="note note--fine">
+            All-time is indexed from block {formatCount(numberFile.firstIndexedBlock)} to block{" "}
+            {formatCount(numberFile.headBlock)}.
+          </p>
+        </details>
+      </div>
 
       <Footer />
     </main>

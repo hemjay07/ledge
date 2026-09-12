@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { Age } from "../../components/Age";
-import { ColophonStrip, RunningHead } from "../../components/ColophonStrip";
 import { ConfigGrid, type GridWindow } from "../../components/ConfigGrid";
 import { Footer } from "../../components/Footer";
-import { LedgerEntry } from "../../components/LedgerEntry";
 import { allTime, h24, numberFile, type WindowData } from "../../lib/number";
-import { formatCount, formatDurationLong, formatStamp } from "../../lib/format";
+import { formatCount, formatDurationLong } from "../../lib/format";
 import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
@@ -25,11 +23,6 @@ const allTimeIsSameMeasurement = sameMeasurement(h24, allTime);
 
 const cutoffWords = formatDurationLong(allTime.excludingFast.cutoffSeconds);
 
-/* The grid's size is read off the file rather than typed into the copy: a
-   bucket boundary that moves changes the count, and a page that says 20 while
-   printing 25 is a page whose own denominator is wrong. */
-const cells = allTime.cohorts.pairTax.length;
-
 /* Nothing is said when nothing was excluded: the All footing already
    reconciles the cells against the population. */
 function excludedNote(w: WindowData): string | null {
@@ -47,7 +40,7 @@ function grid(w: WindowData, key: string, label: string, folio: string, heading:
     folio,
     heading,
     headingNote: `· ${label} · n = ${formatCount(w.launches)} launches`,
-    caption: `Launches and graduations by pair token and creator tax, ${label}. Printed pair token first, then creator tax ascending.`,
+    caption: `Share of launches that graduated, by pair token and creator tax, ${label}. Cells under n = 30 show their n.`,
     ariaLabel: `Graduations by pair token and creator tax, ${label}`,
     note: excludedNote(w),
     rows: w.cohorts.pairTax,
@@ -76,42 +69,36 @@ const WINDOWS: GridWindow[] = allTimeIsSameMeasurement
 export default function Cockpit(): ReactElement {
   return (
     <main className="sheet">
-      <RunningHead mark="LEDGE · CONFIGURATIONS" win={`${formatCount(cells)} cells · 01`} />
-
-      <div className="fold" style={{ paddingBottom: "1.5rem" }}>
-        <h1 className="kicker">Configurations</h1>
-        <p className="lede" style={{ marginTop: "0.5rem" }}>
-          Every pair token and creator tax a Pons launch has been made with, crossed —{" "}
-          {formatCount(cells)} cells, each carrying the launches it was counted over. A cell under
-          n&nbsp;=&nbsp;30 prints its sample size instead of a percentage.
-        </p>
-        {allTimeIsSameMeasurement ? <p className="note">{SAME_MEASUREMENT_NOTE}</p> : null}
-        <p className="note">
+      <div className="card">
+        <div className="card-header">
+          <h1 className="kicker card-kicker">PAIR × TAX</h1>
           <Age crawledAt={crawledAt} staleAfterSeconds={staleAfterSeconds} />
-        </p>
+        </div>
+
+        {allTimeIsSameMeasurement ? <p className="note">{SAME_MEASUREMENT_NOTE}</p> : null}
+
+        {/* The grid, exactly as ConfigGrid renders it: every pair token and
+            creator tax combination crossed for both published windows, the
+            whole population printed, one picker that marks a row across
+            every window at once rather than filtering anything away.
+            ConfigGrid is out of this pass's scope (only the four page files
+            and their CSS/tests) — its own window-by-window layout is "the
+            grid as it is". */}
+        <ConfigGrid folio="02" windows={WINDOWS} crawledAt={crawledAt} />
+
+        <details className="board-what-counts">
+          <summary>How this is counted</summary>
+          <div>
+            <p id="h-what" className="lede">
+              A configuration is the pair token a launch is priced against and the creator tax set at
+              launch. Each row counts every indexed launch made with that configuration and how many
+              graduated. The second rate excludes graduations that completed inside {cutoffWords}.
+              These are counts of launches already recorded; they describe that population, not any
+              launch not yet made.
+            </p>
+          </div>
+        </details>
       </div>
-      <ColophonStrip stamp={formatStamp(crawledAt)} />
-
-      {/* The grid first, the explanation after.
-
-          This page opened with three screens of prose defining what a
-          configuration is before a reader reached anything they could touch.
-          That is the same failure the home page had: the argument arriving
-          before the thing it is about. The definition has not been cut and it
-          has not been softened — it sits directly beneath the grid, where
-          someone who wants it is looking for it, rather than in front of
-          someone who does not. */}
-      <ConfigGrid folio="02" windows={WINDOWS} crawledAt={crawledAt} />
-
-      <LedgerEntry folio="03" id="h-what" heading="What these are">
-        <p className="lede">
-          A configuration is the pair token a launch is priced against and the creator tax set at
-          launch. Each row counts every indexed launch made with that configuration and how many
-          graduated. The second rate excludes graduations that completed inside {cutoffWords}.
-          These are counts of launches already recorded; they describe that population, not any
-          launch not yet made.
-        </p>
-      </LedgerEntry>
 
       <Footer />
     </main>
