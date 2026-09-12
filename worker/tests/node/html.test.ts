@@ -26,20 +26,20 @@ describe("distinct first-block buyers: null vs zero render differently", () => {
 
   it("renders a dash and 'not indexed' when the launch block itself was not indexed", () => {
     const html = render({ activity: { ...ACTIVITY, first_block_buyers: null } });
-    expect(html).toContain("That block was not indexed.");
+    expect(html).toContain("That block was never read");
   });
 
   it("renders the figure 0 with a finding, not a gap, when the block was indexed and nobody bought", () => {
     const html = render({ activity: { ...ACTIVITY, first_block_buyers: 0 } });
     expect(html).toMatch(/<div class="fig">0<\/div>/);
-    expect(html).toContain("Block indexed. Nobody bought in it.");
+    expect(html).toContain("The block was read, and nobody bought in it.");
     expect(html).not.toContain("not indexed");
   });
 
   it("renders the true positive count when buyers were seen", () => {
     const html = render({ activity: ACTIVITY });
     expect(html).toMatch(/<div class="fig">7<\/div>/);
-    expect(html).toContain("Bought in the block the token launched in.");
+    expect(html).toContain("Distinct wallets that bought in the block this token launched in.");
   });
 
   it("the three states (absent, null block, zero, positive) are mutually distinguishable strings", () => {
@@ -81,7 +81,7 @@ describe("no verdict vocabulary reaches the fact cards", () => {
 describe("the fill card never prints a lone percentage", () => {
   it("a percentage, when shown, always sits beside both quantities", () => {
     const html = render({ activity: ACTIVITY });
-    const fillCardMatch = html.match(/<div class="k">Curve fill<\/div>([\s\S]*?)<\/section>/);
+    const fillCardMatch = html.match(/<div class="k">Fill<\/div>([\s\S]*?)<\/section>/);
     expect(fillCardMatch).not.toBeNull();
     const card = fillCardMatch![1] as string;
     const pct = card.match(/(\d[\d.]*)%/);

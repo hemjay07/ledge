@@ -637,8 +637,8 @@ describe("the other endpoints", () => {
     expect(html).toMatch(/<details class="fact-details">[\s\S]*<summary>As text/);
     expect(html).toMatch(/<div id="fact">[\s\S]*<\/details>/);
 
-    const buyersAt = html.indexOf("Distinct buyers, launch block");
-    const fillAt = html.indexOf(">Curve fill<");
+    const buyersAt = html.indexOf("Buyers in the launch block"); // 2026-09-12 copy pass
+    const fillAt = html.indexOf(">Fill<");
     expect(buyersAt).toBeGreaterThan(-1);
     expect(fillAt).toBeGreaterThan(-1);
     expect(buyersAt).toBeLessThan(fillAt);

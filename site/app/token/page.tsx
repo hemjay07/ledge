@@ -97,17 +97,20 @@ export default function Token(): ReactElement {
 
       <section className="card token-card">
         <div className="card-header">
-          <span className="kicker card-kicker">What it does not get you</span>
+          <span className="kicker card-kicker">Where the money goes</span>
         </div>
         <div className="card-body">
-          <ul className="token-nots">
-            <li>No yield, revenue share, buyback or airdrop.</li>
-            <li>No early or private access to any number.</li>
-            <li>No vote over any published figure.</li>
-          </ul>
-          <p className="note">
+          <p className="dek">
             Creator fees fund the work. If enough comes in, the next thing built is an agent
             that acts on rules you write against these figures — intent, not a promise.
+          </p>
+          {/* One line, not a card of three "no"s (2026-09-12). It stays because
+              a tool token that hinted at yield would be claiming something it
+              cannot pay and should not promise; saying so once is the whole
+              cost of never being asked. */}
+          <p className="note">
+            It is not a claim on revenue: no yield, buyback or airdrop, and no vote over a
+            published number. The data is free to everyone either way.
           </p>
         </div>
       </section>

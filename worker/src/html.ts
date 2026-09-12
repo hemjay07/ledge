@@ -97,7 +97,7 @@ function buyersCard(body: Body): string {
   if (a === null) {
     return `
     <section class="card headline">
-      <div class="k">Distinct buyers, launch block</div>
+      <div class="k">Buyers in the launch block</div>
       <div class="fig fig-dash">—</div>
       <div class="note">No curve activity indexed for this token.</div>
     </section>`;
@@ -105,17 +105,17 @@ function buyersCard(body: Body): string {
   if (a.firstBlock === null) {
     return `
     <section class="card headline">
-      <div class="k">Distinct buyers, launch block</div>
+      <div class="k">Buyers in the launch block</div>
       <div class="fig fig-dash">—</div>
-      <div class="note">That block was not indexed. This launch predates the index.</div>
+      <div class="note">That block was never read: this launch is older than the index.</div>
     </section>`;
   }
   const zero = a.firstBlock.distinctBuyers === 0;
   return `
     <section class="card headline">
-      <div class="k">Distinct buyers, launch block ${e(formatCount(a.firstBlock.block))}</div>
+      <div class="k">Buyers in the launch block</div>
       <div class="fig">${e(formatCount(a.firstBlock.distinctBuyers))}</div>
-      <div class="note">${zero ? "Block indexed. Nobody bought in it." : "Bought in the block the token launched in."}</div>
+      <div class="note">${zero ? "The block was read, and nobody bought in it." : "Distinct wallets that bought in the block this token launched in."}</div>
     </section>`;
 }
 
@@ -142,7 +142,7 @@ function fillCard(body: Body): string {
   if (state.graduated) {
     return `
     <section class="card">
-      <div class="k">Curve fill</div>
+      <div class="k">Fill</div>
       <div class="fig fig-2">${e(outcomeWord(body, null))}</div>
       <div class="note">The curve drained into graduation. There is nothing left to fill.</div>
     </section>`;
@@ -153,7 +153,7 @@ function fillCard(body: Body): string {
   if (state.curveFilledShare === null) {
     return `
     <section class="card">
-      <div class="k">Curve fill</div>
+      <div class="k">Fill</div>
       <div class="fig fig-2 fig-dash">not available</div>
       <div class="note">${e(state.fillNote ?? "not available")}</div>
     </section>`;
@@ -168,7 +168,7 @@ function fillCard(body: Body): string {
   if (filled === null || threshold === null) {
     return `
     <section class="card">
-      <div class="k">Curve fill</div>
+      <div class="k">Fill</div>
       <div class="fig fig-2">${e(state.curveFilledWei ?? "0")} of ${e(state.graduationThresholdWei ?? "0")}</div>
       <div class="bar"><div class="bar-fill" style="width:${pct.toFixed(1)}%"></div></div>
       <div class="note">In the pair token's smallest unit; its decimals are not known${e(note)}.</div>
@@ -190,7 +190,7 @@ function fillCard(body: Body): string {
 
   return `
     <section class="card">
-      <div class="k">Curve fill</div>
+      <div class="k">Fill</div>
       <div class="fig fig-2">${e(filled)} of ${e(threshold)}</div>${shareNote}
       <div class="bar"><div class="bar-fill" style="width:${pct.toFixed(1)}%"></div></div>
       ${note ? `<div class="note">${e(note.replace(/^ — /, ""))}</div>` : ""}
@@ -219,18 +219,18 @@ function cohortCard(body: Body): string {
   if (!body.cohort) {
     return `
     <section class="card">
-      <div class="k">Tokens configured this way — ${e(label)}</div>
+      <div class="k">Launches like this one — ${e(label)}</div>
       <div class="note">The published table is not loadable.</div>
     </section>`;
   }
   return `
     <section class="card">
-      <div class="k">Tokens configured this way — ${e(label)}</div>
+      <div class="k">Launches like this one — ${e(label)}</div>
       <div class="grid grid-2">
         ${cohortRow("Last 24 hours", body.cohort.h24)}
         ${cohortRow("All time", body.cohort.allTime)}
       </div>
-      <div class="note">Share of launches that graduated.</div>
+      <div class="note">Share that graduated, with the launches each share was counted over.</div>
       <!-- outcomes: what tokens in this cohort did after graduating; lands with the outcomes tracker -->
     </section>`;
 }
@@ -267,15 +267,16 @@ function activityCard(body: Body): string {
 
   return `
     <section class="card">
-      <div class="k">Activity, ${e(a.window.label)}</div>
+      <div class="k">Since launch</div>
       <div class="grid">
         <div class="cell"><span class="cell-k">Buys</span><span class="cell-v">${e(formatCount(a.buys))}</span></div>
         <div class="cell"><span class="cell-k">Sells</span><span class="cell-v">${e(formatCount(a.sells))}</span></div>
-        <div class="cell"><span class="cell-k">Quote in</span><span class="cell-v">${quoteIn === null ? `${e(a.quoteIn)} (units unknown)` : e(quoteIn)}</span></div>
-        <div class="cell"><span class="cell-k">Quote out</span><span class="cell-v">${quoteOut === null ? `${e(a.quoteOut)} (units unknown)` : e(quoteOut)}</span></div>
+        <div class="cell"><span class="cell-k">Paid in</span><span class="cell-v">${quoteIn === null ? `${e(a.quoteIn)} (units unknown)` : e(quoteIn)}</span></div>
+        <div class="cell"><span class="cell-k">Taken out</span><span class="cell-v">${quoteOut === null ? `${e(a.quoteOut)} (units unknown)` : e(quoteOut)}</span></div>
         <div class="cell"><span class="cell-k">First buy</span><span class="cell-v">${e(first)}</span></div>
         <div class="cell"><span class="cell-k">Last activity</span><span class="cell-v">${e(last)}</span></div>
       </div>
+      <div class="note">${e(a.window.label)}.</div>
     </section>`;
 }
 
