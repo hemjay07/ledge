@@ -52,9 +52,11 @@ level. Ours is the aggregate, with n and no wallet: share of launches whose
 first buy landed within 1 s / 3 s / 5 s of the launch block, by creator-tax
 band. Needs the crawl to record the first buy per launch (one field, not
 the tape), a dated method entry, and the 5-second snipe-tax edge in the
-graduation buckets.
-**DONE when:** the figure is on `/cohorts` with n and the buckets show the
-5 s edge.
+graduation buckets. Per BRAINSTORM-2026-09-13 §1 it also gets one surface:
+on `/t/{address}`, the token's own first-buy delay beside its tax band's
+shares — a token's own fact on its own page, no wallet.
+**DONE when:** the figure is on `/cohorts` with n, the buckets show the
+5 s edge, and `/t/{address}` shows the token's own delay beside them.
 
 **A7. Backfill the record to 14 August.** pons v2's first launch (Bitquery
 archive). "All-time" then means what a reader thinks it means, and every
@@ -75,8 +77,18 @@ the launch window. Then it is frozen, committed, and its hash goes on
 
 **B2. The Telegram room.** `TELEGRAM_BOT_TOKEN`, a room, and
 `TELEGRAM_GRAVEYARD_CHAT_ID` set. *Owner's step, with me.* Until it runs,
-`/token` says "not yet running" and that stays true.
-**DONE when:** a graduation posts to the room within a minute of the tick.
+`/token` says "not yet running" and that stays true. Per
+BRAINSTORM-2026-09-13 §2 the room is the first push channel and carries a
+second thing: one daily digest computed from `number.json` (launches,
+zero-buy share, graduations, median time-to-graduation, each with n) — the
+Worker still computes no statistic.
+**DONE when:** a graduation posts to the room within a minute of the tick,
+and the digest has posted on two consecutive days.
+
+**B6. The token's success metric.** Referral visits to ledge.tools from the
+token page and the room in the first week, published on `/t/{our address}`
+— not fees (BRAINSTORM-2026-09-13, "What to adjust"). Goes into `LAUNCH.md`
+before B5.
 
 **B3. `www.ledge.tools`.** Add the domain in Vercel, change the CNAME at
 Namecheap. *Owner's step.*
@@ -115,6 +127,16 @@ population, its method, and its n.* One line under the kicker. And every
 survival/graveyard figure carries its definition inline (ours is zero buys
 in 72 h; ponsscan's is zero trades in 12 h).
 
+**C6. The comparison and the record on `/method`.** A dated ("as observed
+on 13 Sep 2026") table of definitions: ponsscan.xyz's fixed n=12 cohort
+against our n-with-window; ponsscan.com's zero-trades-in-12-h survival
+against our zero-buys-in-72-h; wallet-claiming against no wallet named.
+Facts from their public pages, no adjectives. Plus one paragraph saying the
+dated changelog and the git history of `number.json` are the append-only
+record, and where they are. With A6: a "recompute this ↗" beside each rate,
+generated from the same code path as the number, and "not enough data
+(n=17)" showing the live n.
+
 **C3. The homepage slot.** Before launch it carries the pre-registration;
 after launch it becomes "LEDGE, measured by LEDGE" — `/t/{our address}` on
 the front page under the same rules as every other token.
@@ -135,3 +157,12 @@ minimum version of C2.
   but not a pons launch — the API says so, the page prints its message.
 - First-block-buyer aggregates across launches (no wallet named). Real, and
   the weakest of the three data ideas.
+- A standing recompute bounty, funded from creator fees, for anyone who
+  reproduces a discrepancy between a published number and the chain
+  (BRAINSTORM-2026-09-13). Needs fees to exist first.
+- The pre-registration template as a public page under `/method` after
+  launch — the template only; an index of who filed one names wallets.
+- Rejected outright, with the clause: creator pages keyed by address and a
+  self-buy badge for other creators (clause 2, clause 1); paying to opt out
+  of a board (clause 5); a live ticker on the static homepage (Worker
+  computes no statistics).
