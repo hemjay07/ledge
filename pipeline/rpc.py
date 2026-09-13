@@ -18,6 +18,12 @@ from typing import Callable, Optional
 
 TOPIC_TOKEN_LAUNCHED = "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607"
 TOPIC_POOL_GRADUATED = "0x0a44ef75df69c534f43cd6c1aa3ef8983065fe5fe79ef9e79f6494e6f258c259"
+# CurveBuy(address,address,uint256,uint256,uint256,uint256), verified in
+# FIRSTBUY-BRIEF.md against a real log. Emitted by each launch's OWN curve --
+# there is no shared curve -- so it is read by topic0 alone, with no address
+# filter (rpc.get_logs(..., address=None)); the emitting curve is the log's
+# own `address`, matching worker/src/pons.ts's TOPIC_CURVE_BUY exactly.
+TOPIC_CURVE_BUY = "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455"
 
 FACTORY_ADDRESS = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
 SYMBOL_SELECTOR = "0x95d89b41"  # symbol()
@@ -99,6 +105,30 @@ def decode_token_launched(log: dict) -> dict:
         "pairToken": "0x" + _data_word(data, 0)[-40:],
         "launchConfigId": int(_data_word(data, 1), 16),
         "graduationThreshold": int(_data_word(data, 2), 16),
+        "block": int(log["blockNumber"], 16),
+        "txHash": log["transactionHash"],
+        "logIndex": int(log["logIndex"], 16),
+    }
+
+
+def decode_curve_buy(log: dict) -> dict:
+    """CurveBuy(address buyer indexed, address recipient indexed,
+    uint256 quoteIn, uint256 tokensOut, uint256 fee, uint256 tax) --
+    FIRSTBUY-BRIEF.md, verified against a real log. `curve` is the log's
+    own `address`, never a topic: every launch deploys its own curve, so
+    there is no shared emitter to filter on. `buyer` is decoded here only
+    to let the caller compute `buyerIsDeployer`; CONSTRAINTS.md #2 forbids
+    ever writing the address itself to a record."""
+    topics = log["topics"]
+    data = log["data"]
+    return {
+        "curve": log["address"],
+        "buyer": _topic_to_address(topics[1]),
+        "recipient": _topic_to_address(topics[2]),
+        "quoteIn": int(_data_word(data, 0), 16),
+        "tokensOut": int(_data_word(data, 1), 16),
+        "fee": int(_data_word(data, 2), 16),
+        "tax": int(_data_word(data, 3), 16),
         "block": int(log["blockNumber"], 16),
         "txHash": log["transactionHash"],
         "logIndex": int(log["logIndex"], 16),
@@ -240,32 +270,32 @@ class RpcClient:
         from_block: int,
         to_block: int,
         topic0: str,
-        address: str = FACTORY_ADDRESS,
+        address: Optional[str] = FACTORY_ADDRESS,
         topic1=None,
     ) -> list:
         """`address` defaults to the factory -- every existing caller is
         unchanged -- and is overridable so the same client can read the
-        Uniswap v4 PoolManager too (OUTCOMES.md). `topic1` is the optional
-        second topic filter: a single topic string, a list of topics (an OR
-        match), or None for no filter in that position. Measured against
-        the production endpoint 2026-09-12: a list of pool ids in the
-        second position returns exactly the union of what one request per
-        id would return, so a batch of pool ids costs one request rather
-        than one per id (see OUTCOMES-CRAWL-BRIEF.md report)."""
+        Uniswap v4 PoolManager too (OUTCOMES.md). `address=None` omits the
+        key from the filter entirely rather than sending a falsy one:
+        CurveBuy (FIRSTBUY-BRIEF.md) is emitted by each launch's own curve,
+        not a single known contract, so it must be read by topic0 alone.
+        `topic1` is the optional second topic filter: a single topic
+        string, a list of topics (an OR match), or None for no filter in
+        that position. Measured against the production endpoint
+        2026-09-12: a list of pool ids in the second position returns
+        exactly the union of what one request per id would return, so a
+        batch of pool ids costs one request rather than one per id (see
+        OUTCOMES-CRAWL-BRIEF.md report)."""
         topics = [topic0] if topic1 is None else [topic0, topic1]
+        params = {"fromBlock": hex(from_block), "toBlock": hex(to_block), "topics": topics}
+        if address is not None:
+            params["address"] = address
         payload = [
             {
                 "jsonrpc": "2.0",
                 "id": 0,
                 "method": "eth_getLogs",
-                "params": [
-                    {
-                        "fromBlock": hex(from_block),
-                        "toBlock": hex(to_block),
-                        "address": address,
-                        "topics": topics,
-                    }
-                ],
+                "params": [params],
             }
         ]
         # A per-item error (e.g. "log query timed out") -- or an item with no

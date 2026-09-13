@@ -64,8 +64,23 @@ from pipeline.pool import (
     is_pons_pool,
     quote_per_token,
 )
-from pipeline.recompute import POOL_BAR_NAME, crawled_at_for, load_partitions, load_samples, resolve_pair_class
-from pipeline.rpc import BATCH_PACING_SECONDS, TOPIC_POOL_GRADUATED, TOPIC_TOKEN_LAUNCHED, decode_pool_graduated, decode_token_launched
+from pipeline.recompute import (
+    POOL_BAR_NAME,
+    crawled_at_for,
+    load_firstbuys,
+    load_partitions,
+    load_samples,
+    resolve_pair_class,
+)
+from pipeline.rpc import (
+    BATCH_PACING_SECONDS,
+    TOPIC_CURVE_BUY,
+    TOPIC_POOL_GRADUATED,
+    TOPIC_TOKEN_LAUNCHED,
+    decode_curve_buy,
+    decode_pool_graduated,
+    decode_token_launched,
+)
 from pipeline.stats import build_number, format_iso
 
 REORG_WINDOW = 3000
@@ -81,6 +96,12 @@ LOG_PACING_SECONDS = 0.9
 # 200,000 blocks is ~5.6 hours of chain and measured ~15 minutes of work
 # (log windows, block headers, and the factory read for each new launch).
 MAX_FORWARD_BLOCKS = 200_000
+
+# FIRSTBUY-BRIEF.md: a plain dated append, deduped on (txHash, logIndex) just
+# like launches/graduations, so it shares plan_partition_writes's rotation
+# logic rather than needing a bespoke writer the way the pool files do.
+FIRSTBUYS_DIR = "firstbuys"
+PARTITION_KINDS = ("launches", "graduations", FIRSTBUYS_DIR)
 
 
 def _log(msg: str) -> None:
@@ -192,7 +213,7 @@ def plan_partition_writes(data_dir, today: date, new_by_day: Optional[dict] = No
     writes: list = []
     deletes: list = []
 
-    for kind in ("launches", "graduations"):
+    for kind in PARTITION_KINDS:
         kind_dir = data_dir / kind
         pending = new_by_day.get(kind, {})
         for day in sorted(_partition_days(kind_dir) | set(pending)):
@@ -330,6 +351,67 @@ def _shape_graduation(decoded: dict, launch_tokens: set) -> dict:
         "txHash": decoded["txHash"],
         "logIndex": decoded["logIndex"],
     }
+
+
+# --- first-buy timing (FIRSTBUY-BRIEF.md) -----------------------------------
+def _build_firstbuy_candidates(raw_buys: list, launches: list, existing_firstbuys: list, threshold: int) -> list:
+    """The open set is every launch at or after `threshold` with no recorded
+    outside buy yet, keyed by curve -- built from `launches` (existing
+    partitions plus this run's new ones, exactly like `known_launch_tokens`
+    elsewhere in this module). Buys are folded in (block, logIndex) order:
+    a buy on a curve outside the open set is dropped, a buy sharing the
+    launch's own txHash is the launch-tx buy (recorded once per curve), and
+    the first buy on a different txHash closes the launch by removing its
+    curve from the open set.
+
+    `launchTs` is left None for a launch new in this run -- there is no
+    header for it yet -- and filled from the same block-timestamp batch as
+    everything else in `run()`; a launch-tx record's own `ts` is always the
+    launch's `ts` (same transaction, same block), never a second lookup.
+    No buyer address is kept in the returned dict at all (CONSTRAINTS.md
+    #2): only `buyerIsDeployer`, computed here where the deployer address
+    is still in scope.
+    """
+    launch_by_curve = {l["curve"]: l for l in launches if l["block"] >= threshold}
+    existing_keys = {(r["txHash"], r["logIndex"]) for r in existing_firstbuys}
+    recorded_launchtx_curves = {r["curve"] for r in existing_firstbuys if r["inLaunchTx"]}
+    open_curves = {r["curve"] for r in existing_firstbuys if not r["inLaunchTx"]}
+    open_curves = set(launch_by_curve) - open_curves
+
+    candidates = []
+    for buy in sorted(raw_buys, key=lambda b: (b["block"], b["logIndex"])):
+        key = (buy["txHash"], buy["logIndex"])
+        if key in existing_keys:
+            continue
+        curve = buy["curve"]
+        if curve not in open_curves:
+            continue
+        launch = launch_by_curve[curve]
+        in_launch_tx = buy["txHash"] == launch["txHash"]
+        if in_launch_tx:
+            if curve in recorded_launchtx_curves:
+                continue
+            recorded_launchtx_curves.add(curve)
+        else:
+            open_curves.discard(curve)
+        candidates.append(
+            {
+                "token": launch["token"],
+                "curve": curve,
+                "launchBlock": launch["block"],
+                "launchTs": launch.get("ts"),
+                "launchTxHash": launch["txHash"],
+                "inLaunchTx": in_launch_tx,
+                "block": buy["block"],
+                "ts": None,
+                "txHash": buy["txHash"],
+                "logIndex": buy["logIndex"],
+                "quoteIn": str(buy["quoteIn"]),
+                "tax": str(buy["tax"]),
+                "buyerIsDeployer": buy["buyer"] == launch["deployer"],
+            }
+        )
+    return candidates
 
 
 def _group_by_day(records: list) -> dict:
@@ -698,6 +780,7 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     raw_grads = []
     raw_pool_inits = []
     raw_swaps = []
+    raw_buys = []
     # Seeded from data/pools/index.jsonl so a pool discovered in an earlier
     # run has its swaps read from the very first window of this one, not
     # only once this run happens to re-see its Initialize.
@@ -728,6 +811,18 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
                 raw_pool_inits.append(decoded)
                 known_pool_ids.add(decoded["id"])
         time.sleep(LOG_PACING_SECONDS)
+
+        # First-buy timing (FIRSTBUY-BRIEF.md): every CurveBuy on any curve,
+        # read by topic0 alone with no address filter, since each launch
+        # deploys its own curve and there is no single contract to filter
+        # to server-side. Skipped during a backwards backfill: those blocks
+        # predate firstBuyIndexedFromBlock by definition (that field anchors
+        # the forward cursor only and never moves), so there is nothing in
+        # that range to record.
+        if not backfilling_history:
+            for log in rpc_client.get_logs(frm, to, TOPIC_CURVE_BUY, address=None):
+                raw_buys.append(decode_curve_buy(log))
+            time.sleep(LOG_PACING_SECONDS)
         # Swaps are NOT read here. They were, until 2026-09-12, and it cost
         # the crawl its reliability: pons pools trade hard (twenty of them
         # produced 19,811 swaps in 50,000 blocks), every swap's block needs
@@ -752,11 +847,36 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     # partitions the dedupe has to consult -- is decided by its block
     # timestamp, not by the run's wall clock.
     scanned = [_shape_launch(l) for l in raw_launches]
+
+    # Loaded here, ahead of the timestamp batch below, so the first-buy open
+    # set (FIRSTBUY-BRIEF.md) can be built from every launch LEDGE has ever
+    # recorded -- existing partitions plus this run's new ones -- exactly
+    # the way `known_launch_tokens` is built further down for orphan status.
+    existing_launches = load_partitions(data_dir / "launches")
+    existing_grads = load_partitions(data_dir / "graduations")
+    existing_firstbuys = load_firstbuys(data_dir)
+    first_buy_threshold = state.get("firstBuyIndexedFromBlock")
+    if first_buy_threshold is None and not backfilling_history:
+        # Set once, on whichever run first finds it absent, to that run's
+        # own start_block -- and never moved again (METHOD.md).
+        first_buy_threshold = start_block
+    firstbuy_candidates = (
+        _build_firstbuy_candidates(raw_buys, existing_launches + scanned, existing_firstbuys, first_buy_threshold)
+        if first_buy_threshold is not None
+        else []
+    )
+
     _log(f"crawl: logs done, timestamping {len(scanned) + len(raw_grads)} records")
     timestamps = _fetch_block_timestamps(
         rpc_client,
         [r["block"] for r in scanned] + [g["block"] for g in raw_grads]
-        + [p["block"] for p in raw_pool_inits] + [s["block"] for s in raw_swaps],
+        + [p["block"] for p in raw_pool_inits] + [s["block"] for s in raw_swaps]
+        # Only the recorded buys' blocks: a launch-tx buy's ts is its
+        # launch's ts (filled below, no separate header needed unless the
+        # launch is itself new this run), and only the first outside buy
+        # per launch ever needs one at all -- at most ~2 headers per launch.
+        + [c["launchBlock"] for c in firstbuy_candidates if c["launchTs"] is None]
+        + [c["block"] for c in firstbuy_candidates if not c["inLaunchTx"]],
     )
     for record in scanned:
         record["ts"] = timestamps[record["block"]]
@@ -766,12 +886,19 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
         record["ts"] = timestamps[record["block"]]
     for record in raw_swaps:
         record["ts"] = timestamps[record["block"]]
+    for record in firstbuy_candidates:
+        if record["launchTs"] is None:
+            record["launchTs"] = timestamps[record["launchBlock"]]
+        record["ts"] = record["launchTs"] if record["inLaunchTx"] else timestamps[record["block"]]
 
     days_to_check = dedupe_day_set(timestamps.values())
     new_launches = dedupe_records(scanned, _load_existing_keys(data_dir, "launches", days_to_check))
     new_grads = dedupe_records(raw_grads, _load_existing_keys(data_dir, "graduations", days_to_check))
 
-    if not new_launches and not new_grads and not raw_pool_inits and not raw_swaps and to_block == state["lastIndexedBlock"]:
+    if (
+        not new_launches and not new_grads and not raw_pool_inits and not raw_swaps
+        and not firstbuy_candidates and to_block == state["lastIndexedBlock"]
+    ):
         return {"committed": False}
 
     # The reorg-window overlap (REORG_WINDOW blocks re-scanned every run) is
@@ -796,9 +923,6 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     last_indexed_at = None
     if not backfilling_history:
         last_indexed_at = format_iso(_fetch_block_timestamps(rpc_client, [to_block])[to_block])
-
-    existing_launches = load_partitions(data_dir / "launches")
-    existing_grads = load_partitions(data_dir / "graduations")
 
     _log(f"crawl: enriching {len(new_launches)} new launches")
     enrichment_failures = 0
@@ -832,11 +956,17 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     pool_index_by_id.update({r["pool"]: r for r in new_pool_index})
     new_pool_bars = build_pool_bars(new_swaps, pool_index_by_id, pair_tokens)
 
+    all_firstbuys = _merge_dedupe(existing_firstbuys, firstbuy_candidates)
+
     # --- stage every output in memory ------------------------------------
     partition_writes, partition_deletes = plan_partition_writes(
         data_dir,
         today,
-        {"launches": _group_by_day(enriched_launches), "graduations": _group_by_day(shaped_grads)},
+        {
+            "launches": _group_by_day(enriched_launches),
+            "graduations": _group_by_day(shaped_grads),
+            FIRSTBUYS_DIR: _group_by_day(firstbuy_candidates),
+        },
     )
     pool_bar_writes, pool_bar_deletes = plan_pool_bar_writes(data_dir, today, _group_pool_bars_by_day(new_pool_bars))
     pool_index_write = plan_pool_index_write(data_dir, new_pool_index)
@@ -852,6 +982,9 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
         new_state["lastIndexedAt"] = last_indexed_at
         if new_state.get("firstIndexedBlock") is None:
             new_state["firstIndexedBlock"] = start_block
+    # Set once and never moved again: launches before it were never read for
+    # buys at all, so a "first" for them would be false (FIRSTBUY-BRIEF.md).
+    new_state["firstBuyIndexedFromBlock"] = first_buy_threshold
     # lastRunAt / lastSuccessAt stay wall-clock: they answer whether this run
     # knew it was behind (`stale`), and nothing else. The published instant
     # is lastIndexedAt.
@@ -893,6 +1026,7 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
             pool_bars=_pool_bars_from_view(pools_after),
             backfill_points=pools_after.get("backfill.jsonl", []),
             pair_tokens=pair_tokens,
+            firstbuys=all_firstbuys,
         )
     ).encode()
     state_payload = (json.dumps(new_state, sort_keys=True, indent=2) + "\n").encode()

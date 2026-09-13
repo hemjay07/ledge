@@ -86,6 +86,34 @@ def test_topic0_constants_match_method_md():
     assert rpc.TOPIC_POOL_GRADUATED.lower() == POOL_GRADUATED_TOPIC0.lower()
 
 
+# --- FIRSTBUY-BRIEF.md: address=None must omit the filter key ---------------
+def test_get_logs_with_address_none_sends_no_address_key():
+    """CurveBuy is emitted by each launch's own curve, never the factory, so
+    it must be read by topic0 alone -- address=None -- with no address key
+    in the filter at all, not merely a falsy one."""
+    seen = {}
+
+    def capturing_transport(payload):
+        seen["params"] = payload[0]["params"][0]
+        return [{"jsonrpc": "2.0", "id": 0, "result": []}]
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=capturing_transport)
+    client.get_logs(1000, 1999, rpc.TOPIC_TOKEN_LAUNCHED, address=None)
+    assert "address" not in seen["params"]
+
+
+def test_get_logs_default_address_is_still_the_factory():
+    seen = {}
+
+    def capturing_transport(payload):
+        seen["params"] = payload[0]["params"][0]
+        return [{"jsonrpc": "2.0", "id": 0, "result": []}]
+
+    client = rpc.RpcClient(url="https://example.invalid", transport=capturing_transport)
+    client.get_logs(1000, 1999, rpc.TOPIC_TOKEN_LAUNCHED)
+    assert seen["params"]["address"] == rpc.FACTORY_ADDRESS
+
+
 # --- log decoding ------------------------------------------------------------
 def test_decode_token_launched_extracts_indexed_fields():
     log = _make_token_launched_log(
@@ -131,6 +159,40 @@ def test_decode_pool_graduated_extracts_indexed_and_data_fields():
     assert decoded["positionId"] == 42
     assert decoded["tokenAmount"] == 999
     assert decoded["pairTokenAmount"] == 8_090_000_094
+
+
+# --- FIRSTBUY-BRIEF.md: CurveBuy -- real log, verified in the brief ----------
+def test_decode_curve_buy_matches_a_real_log():
+    """A real log captured 2026-09-13 (FIRSTBUY-BRIEF.md), not hand-built:
+    CurveBuy has no address filter (each curve emits its own), so `curve`
+    comes from the log's own `address`, never a topic."""
+    address = "0xfff76406e7eb1878a803e10dc3ce6aafc3093ecd"
+    trader = "f447c6f0d1fc3b2896336bee2e3123f01b9303de"
+    word0 = "000000000000000000000000000000000000000000000000000168b3fafd6cdf"
+    word1 = "0000000000000000000000000000000000000000000006ee7245d73dadf96b56"
+    word2 = "0000000000000000000000000000000000000000000000000000039b66599302"
+    word3 = "00000000000000000000000000000000000000000000000000000ad2330cb906"
+    log = {
+        "address": address,
+        "topics": [rpc.TOPIC_CURVE_BUY, "0x" + trader.rjust(64, "0"), "0x" + trader.rjust(64, "0")],
+        "data": "0x" + word0 + word1 + word2 + word3,
+        "blockNumber": "0x3b492ac",
+        "transactionHash": "0xc7c218a5c16734b4be64916347dc25b11ac4218316ffd730fc4b60b971e695aa",
+        "logIndex": "0x3b",
+    }
+
+    decoded = rpc.decode_curve_buy(log)
+
+    assert decoded["curve"] == address
+    assert decoded["buyer"] == "0x" + trader
+    assert decoded["recipient"] == "0x" + trader
+    assert decoded["quoteIn"] == int(word0, 16)
+    assert decoded["tokensOut"] == int(word1, 16)
+    assert decoded["fee"] == int(word2, 16)
+    assert decoded["tax"] == int(word3, 16)
+    assert decoded["block"] == 0x3B492AC
+    assert decoded["txHash"] == log["transactionHash"]
+    assert decoded["logIndex"] == 0x3B
 
 
 def test_decode_pool_graduated_extracts_block_and_dedupe_key():

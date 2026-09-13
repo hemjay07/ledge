@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 import pytest
 
 from pipeline import crawl, pool
+from pipeline.rpc import TOPIC_CURVE_BUY
 from pipeline.tests.test_pool import _make_initialize_log, _make_swap_log
 
 TOKEN = "0x1111111111111111111111111111111111111111"  # < QUOTE numerically: currency0
@@ -99,11 +100,16 @@ class _PoolStubRpc:
     a list of them) is answered as the real endpoint was measured to
     behave (OUTCOMES-CRAWL-BRIEF.md report): the union of matching logs."""
 
-    def __init__(self, init_logs=(), swap_logs=(), launch_logs=(), grad_logs=(), timestamps=None):
+    def __init__(self, init_logs=(), swap_logs=(), launch_logs=(), grad_logs=(), buy_logs=(), timestamps=None):
         self.init_logs = list(init_logs)
         self.swap_logs = list(swap_logs)
         self.launch_logs = list(launch_logs)
         self.grad_logs = list(grad_logs)
+        # FIRSTBUY-BRIEF.md: CurveBuy, read by topic0 alone with no address
+        # filter (each launch's own curve emits it), so buy_logs is not
+        # scoped to a single curve address the way init/swap logs are keyed
+        # to a pool id.
+        self.buy_logs = list(buy_logs)
         self.timestamps = dict(timestamps or {})
 
     def _timestamp(self, block):
@@ -124,6 +130,8 @@ class _PoolStubRpc:
             else:
                 ids = {topic1}
             source = [l for l in self.swap_logs if ids is None or l["topics"][1] in ids]
+        elif topic0 == TOPIC_CURVE_BUY:
+            source = self.buy_logs
         else:
             source = []
         return [l for l in source if from_block <= int(l["blockNumber"], 16) <= to_block]

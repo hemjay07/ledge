@@ -782,6 +782,118 @@ def outcomes(
     }
 
 
+# FIRSTBUY-BRIEF.md, 2026-09-13: sniping is a statement about the first buy
+# from OUTSIDE the launch transaction, not the launch's own opening buy
+# (routed through something other than the deployer's address in almost
+# every launch measured). The two are kept apart as separate record kinds
+# rather than folded into one "first buy" figure.
+FIRSTBUY_POPULATION = "launches at least one hour old at crawledAt, launched at or after indexedFromBlock"
+
+
+def _firstbuy_outside_bucket(launch_ts: int, launch_block: int, outside: Optional[dict]) -> str:
+    """Same block is a block fact, not a delta, and is checked before any
+    arithmetic on seconds -- a same-block outside buy always lands in
+    `sameBlock` regardless of how its timestamp compares (METHOD.md
+    "'Same block' is a block fact and is its own bucket")."""
+    if outside is None:
+        return "none"
+    if outside["block"] == launch_block:
+        return "sameBlock"
+    delta = outside["ts"] - launch_ts
+    if delta <= 1:
+        return "within1s"
+    if delta <= 3:
+        return "within3s"
+    if delta <= 5:
+        return "within5s"
+    return "after5s"
+
+
+def _firstbuy_row(bucket: str, members: list, launch_tx_tokens: set, outside_by_token: dict) -> dict:
+    n = len(members)
+    insufficient = n < MIN_N
+
+    def share(count: int) -> Optional[float]:
+        return None if insufficient else round(count / n, 6)
+
+    launch_tx_buy = sum(1 for l in members if l["token"] in launch_tx_tokens)
+    outside_counts = {"sameBlock": 0, "within1s": 0, "within3s": 0, "within5s": 0, "after5s": 0, "none": 0}
+    for l in members:
+        outside_counts[_firstbuy_outside_bucket(l["ts"], l["block"], outside_by_token.get(l["token"]))] += 1
+
+    cumulative_same = outside_counts["sameBlock"]
+    cumulative_1s = cumulative_same + outside_counts["within1s"]
+    cumulative_3s = cumulative_1s + outside_counts["within3s"]
+    cumulative_5s = cumulative_3s + outside_counts["within5s"]
+
+    return {
+        "bucket": bucket,
+        "n": n,
+        "launchTxBuy": launch_tx_buy,
+        "launchTxBuyShare": share(launch_tx_buy),
+        "outside": outside_counts,
+        "sameBlockShare": share(cumulative_same),
+        "within1sShare": share(cumulative_1s),
+        "within3sShare": share(cumulative_3s),
+        "within5sShare": share(cumulative_5s),
+        "noneShare": share(outside_counts["none"]),
+        "insufficient": insufficient,
+    }
+
+
+def first_buy_block(launches: list, firstbuys: list, state: dict, until_ts: int) -> dict:
+    """The published `firstBuy` block (FIRSTBUY-BRIEF.md). Not a window like
+    h24/allTime: the population is every launch in the whole record that is
+    at least an hour old at `until_ts` and at or after
+    `state["firstBuyIndexedFromBlock"]` -- launches before that block were
+    never read for buys at all, so a "first" for them would be false.
+
+    `firstbuys` carries both record kinds crawl.py writes, keyed by `token`:
+    at most one `inLaunchTx: true` row (the launch's own opening buy) and at
+    most one `inLaunchTx: false` row (the first buy from outside the launch
+    transaction). Neither this function nor the record it reads ever
+    carries a buyer address (CONSTRAINTS.md #2).
+    """
+    indexed_from_block = state.get("firstBuyIndexedFromBlock")
+    if indexed_from_block is None:
+        population: list = []
+    else:
+        population = [
+            l for l in launches if l["ts"] <= until_ts - 3600 and l["block"] >= indexed_from_block
+        ]
+
+    launch_tx_tokens = {r["token"] for r in firstbuys if r["inLaunchTx"]}
+    outside_by_token = {r["token"]: r for r in firstbuys if not r["inLaunchTx"]}
+
+    cohorts = {
+        "all": [_firstbuy_row("all", population, launch_tx_tokens, outside_by_token)],
+        "taxBucket": [
+            _firstbuy_row(
+                bucket,
+                [l for l in population if _tax_bucket(l["creatorTaxBps"]) == bucket],
+                launch_tx_tokens,
+                outside_by_token,
+            )
+            for bucket in TAX_BUCKETS
+        ],
+        "pairClass": [
+            _firstbuy_row(
+                bucket,
+                [l for l in population if l["pairClass"] == bucket],
+                launch_tx_tokens,
+                outside_by_token,
+            )
+            for bucket in PAIR_BUCKETS
+        ],
+    }
+
+    return {
+        "indexedFromBlock": indexed_from_block,
+        "population": FIRSTBUY_POPULATION,
+        "cohorts": cohorts,
+    }
+
+
 def format_iso(ts: int) -> str:
     """A unix timestamp as the ISO-8601 Z string every published instant
     uses. Public because `crawledAt` is now a block timestamp and both the
@@ -859,6 +971,7 @@ def build_number(
     pool_bars: list | None = None,
     pair_tokens: dict | None = None,
     backfill_points: list | None = None,
+    firstbuys: list | None = None,
 ) -> dict:
     # `crawled_at` is chain time: the block timestamp of the last indexed
     # block, passed in by the caller (METHOD.md "Freshness"). Every window
@@ -904,4 +1017,8 @@ def build_number(
         "outcomes": outcomes(
             launches, graduations, pool_index or [], pool_bars or [], pair_tokens or {}, until, backfill_points
         ),
+        # FIRSTBUY-BRIEF.md: not windowed by h24/allTime either -- its own
+        # population (launches at least an hour old, at or after
+        # firstBuyIndexedFromBlock), gated the same way at `until`.
+        "firstBuy": first_buy_block(launches, firstbuys or [], state, until),
     }

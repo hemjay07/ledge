@@ -92,6 +92,18 @@ def load_pool_bars(data_dir: Path) -> list[dict]:
     return records
 
 
+def load_firstbuys(data_dir: Path) -> list[dict]:
+    """data/firstbuys/YYYY-MM-DD.jsonl(.gz) -- FIRSTBUY-BRIEF.md's two record
+    kinds (the launch-tx buy and the first outside buy), partitioned by the
+    buy's own block timestamp and deduped on (txHash, logIndex) exactly like
+    launches and graduations. Read with load_partitions rather than a
+    bespoke loader, because this partition needs no special handling the
+    way the pool files do (an index file, merged hour bars): it is a plain
+    dated append, one record kind indistinguishable from the other except
+    by its own `inLaunchTx` field."""
+    return load_partitions(Path(data_dir) / "firstbuys")
+
+
 def load_pool_backfill(data_dir: Path) -> list[dict]:
     """data/pools/backfill.jsonl -- one line per (pool, mark) the probe
     answered (pipeline/backfill_pools.py). Read separately and handed to
@@ -193,6 +205,7 @@ def recompute(data_dir) -> dict:
     pool_index = load_pool_index(data_dir)
     pool_bars = load_pool_bars(data_dir)
     backfill_points = load_pool_backfill(data_dir)
+    firstbuys = load_firstbuys(data_dir)
 
     for launch in launches:
         launch["pairClass"] = resolve_pair_class(launch, pair_tokens)
@@ -209,6 +222,7 @@ def recompute(data_dir) -> dict:
         pool_bars=pool_bars,
         backfill_points=backfill_points,
         pair_tokens=pair_tokens,
+        firstbuys=firstbuys,
     )
 
 
