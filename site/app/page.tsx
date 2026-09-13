@@ -82,6 +82,17 @@ export default function Home(): ReactElement {
   const ttgN = allTime.ttg.n;
 
   const raisedNothingFact = raisedNothing ? sampleFact(raisedNothing) : null;
+  /* RESEARCH-2026-09-13 §1: pons has run since July and "all-time" reads as
+     the venue's life to anyone who knows it. The record starts where it
+     starts; the caption says the date. */
+  const sinceLabel = numberFile.firstIndexedAt
+    ? new Date(numberFile.firstIndexedAt).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      })
+    : `block ${formatCount(numberFile.firstIndexedBlock)}`;
 
   return (
     <>
@@ -114,6 +125,14 @@ export default function Home(): ReactElement {
               LEDGE indexes every launch from the pons factory contract, hourly, and times every
               graduation.
             </p>
+            {/* C5 (BRAINSTORM-2026-09-13): the one line of difference. Four pons
+                sites score or publish the tape; a visitor arriving from one needs
+                to know why this page looks different, in one line, before the
+                table. It is a separate line, not part of the dek, because the dek
+                is held to 25 words by landing-copy.test.ts. */}
+            <p className="note home-difference">
+              No ratings, no wallets, no tape &mdash; the population, its method, and its n.
+            </p>
           </div>
 
           {/* ---- the table: finished inside | share | count -------------- */}
@@ -121,7 +140,7 @@ export default function Home(): ReactElement {
             <div className="scroller">
               <table>
                 <caption>
-                  Every graduation on pons, all-time, by how long it took to finish.
+                  Every graduation on pons since {sinceLabel}, by how long it took to finish.
                 </caption>
                 <thead>
                   <tr>
