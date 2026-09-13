@@ -149,6 +149,11 @@ minimum version of C2.
 
 ## D. Written down, not scheduled
 
+- `/graveyard` (2026-09-13): a row with `buys: 0, sells: 2` is on the live
+  board. A sell with no buy is impossible on-chain, so the launch block (or
+  an early block) was never read and the row is a coverage artefact, not a
+  zero-buy launch. Rows whose launch block was not read must be excluded
+  or labelled; fold into A4 with the coverage figure.
 - `/cockpit`'s window toggle: the grid shares one picker across both
   windows, and splitting it broke a functional test. Left as it is.
 - `/live`'s phone cards are ~185 px; the brief wanted ~120. Reachable only
