@@ -23,6 +23,8 @@ export const LOG_WINDOW_BLOCKS = 1000;
    a word the copy lint bans, and the lint is right to ban it in copy -- a
    User-Agent is machine configuration, so it takes the documented exemption
    rather than being spelled around. */
+import type { Env } from "./env";
+
 export const USER_AGENT = "ledge/1.0 (+https://ledge.tools)"; // lint-copy:allow — a User-Agent, not copy
 const RETRYABLE_HTTP = new Set([408, 429, 500, 502, 503, 504]);
 
@@ -180,17 +182,18 @@ export function indexBatchResponse(response: unknown, expected: number): unknown
   return out;
 }
 
-function httpTransport(url: string): Transport {
+function httpTransport(url: string, extraHeaders: Record<string, string> = {}, fetchImpl: typeof fetch = fetch): Transport {
   return async (payload) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-      const response = await fetch(url, {
+      const response = await fetchImpl(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           // Required. The endpoint answers 403 without it.
           "User-Agent": USER_AGENT,
+          ...extraHeaders,
         },
         body: JSON.stringify(payload),
         signal: controller.signal, // lint-copy:allow — AbortController, not copy
@@ -408,4 +411,24 @@ export class RpcClient {
     const result = results[0];
     return typeof result === "string" ? result : null;
   }
+}
+
+/** The client the tick and the lookup use, built from the bindings.
+
+    2026-09-13: both public endpoints refused Cloudflare's egress for an
+    hour -- 39 ticks in a row failed "rate limited" and a lookup answered
+    rpc_down -- while the same endpoints answered the box in 0.3 s. So
+    RPC_URL may point at the box's own relay (ops/rpc-proxy.mjs), which
+    forwards to the chain from the box's single steady address and admits a
+    request only when it carries the shared key. The key is a Worker secret;
+    it is sent as a header on every request when set, and never otherwise.
+    The fallback stays a public endpoint, reached directly. */
+export function rpcFromEnv(env: Env, fetchImpl: typeof fetch = fetch): RpcClient {
+  const headers: Record<string, string> = env.RPC_PROXY_KEY ? { "X-Ledge-Key": env.RPC_PROXY_KEY } : {};
+  const primary = httpTransport(env.RPC_URL, headers, fetchImpl);
+  const fallback =
+    env.RPC_URL_FALLBACK && env.RPC_URL_FALLBACK !== env.RPC_URL
+      ? httpTransport(env.RPC_URL_FALLBACK, {}, fetchImpl)
+      : undefined;
+  return new RpcClient(env.RPC_URL, primary, env.RPC_URL_FALLBACK, fallback);
 }

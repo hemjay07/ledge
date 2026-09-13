@@ -6,6 +6,9 @@ export interface Env {
   CHAIN_ID: string;
   RPC_URL: string;
   RPC_URL_FALLBACK?: string;
+  /** Shared key for the box's RPC relay (ops/rpc-proxy.mjs), sent as
+      X-Ledge-Key when RPC_URL points at it. A secret, never a var. */
+  RPC_PROXY_KEY?: string;
   NUMBER_JSON_URL: string;
   SITE_ORIGIN: string;
   TELEGRAM_BOT_TOKEN?: string;

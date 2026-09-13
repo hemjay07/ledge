@@ -3,7 +3,7 @@
    response of its own. */
 
 import type { Env } from "./env";
-import { RpcClient, RpcUnavailable } from "./rpc";
+import { RpcUnavailable, rpcFromEnv } from "./rpc";
 import { buildTokenBody, readIndex, readLaunchedToken, type TokenMetaRow } from "./lookup";
 import { curveFill, curveFillAndTokenMeta } from "./curve";
 import { loadNumber, loadPairTokens } from "./numberFile";
@@ -23,7 +23,7 @@ export async function lookupToken(
 ): Promise<LookupOutcome> {
   const nowSeconds = Math.floor(nowMs / 1000);
   const factory = env.FACTORY_ADDRESS.toLowerCase();
-  const rpc = new RpcClient(env.RPC_URL, undefined, env.RPC_URL_FALLBACK);
+  const rpc = rpcFromEnv(env);
 
   let onChain;
   try {

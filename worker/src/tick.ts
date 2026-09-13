@@ -17,7 +17,7 @@
    short reorg cannot drop a launch. */
 
 import type { Env } from "./env";
-import { RpcClient, LOG_WINDOW_BLOCKS, MAX_BATCH, RpcUnavailable } from "./rpc";
+import { RpcClient, LOG_WINDOW_BLOCKS, MAX_BATCH, RpcUnavailable, rpcFromEnv } from "./rpc";
 import {
   TOPIC_TOKEN_LAUNCHED,
   TOPIC_POOL_GRADUATED,
@@ -445,7 +445,7 @@ export async function tick(
 ): Promise<TickResult> {
   const db = env.LEDGE_DB;
   const factory = env.FACTORY_ADDRESS.toLowerCase();
-  const rpc = client ?? new RpcClient(env.RPC_URL, undefined, env.RPC_URL_FALLBACK);
+  const rpc = client ?? rpcFromEnv(env);
 
   let from = 0;
   let to = 0;

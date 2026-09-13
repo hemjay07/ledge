@@ -31,3 +31,24 @@ with the crawl's own race resolution. Installed 2026-09-12:
 
 A first trial on a few pools: `LEDGE_PROBE_LIMIT_POOLS=20 sudo -E -u ledge ops/probe.sh`
 (or set `LEDGE_PROBE_LIMIT_POOLS` in `/etc/ledge/env` temporarily).
+
+## The RPC relay (Worker egress through the box)
+
+`rpc-proxy.mjs` listens on 8545 and forwards JSON-RPC to `RPC_URL` (falling
+back once to `RPC_URL_FALLBACK` when the upstream cannot be reached at all)
+from the box's own address, because on 2026-09-13 both public endpoints
+refused Cloudflare's egress for an hour while answering the box in 0.3 s.
+It accepts only a POST carrying the shared key in `X-Ledge-Key`, and the
+firewall admits the port from Cloudflare's published ranges only.
+
+    sudo install -m 640 -o root -g ledge /dev/null /etc/ledge/proxy.env
+    sudo sh -c 'echo "RPC_PROXY_KEY=$(openssl rand -hex 32)" > /etc/ledge/proxy.env'
+    sudo cp ops/ledge-rpc-proxy.service /etc/systemd/system/
+    sudo systemctl daemon-reload && sudo systemctl enable --now ledge-rpc-proxy
+    sudo ufw allow OpenSSH
+    for ip in $(curl -s https://www.cloudflare.com/ips-v4); do sudo ufw allow from "$ip" to any port 8545 proto tcp; done
+    sudo ufw --force enable
+
+Then on the Worker: `wrangler secret put RPC_PROXY_KEY` with the same key
+(never printed; pipe it), `RPC_URL = "http://<box>:8545"` in
+`wrangler.toml`, deploy. Rotate by writing a new key to both places.

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { Env } from "../../src/env";
 import {
   MalformedBatchResponse,
   RpcClient,
@@ -7,6 +8,7 @@ import {
   indexBatchResponse,
   isRateLimited,
   type Transport,
+  rpcFromEnv,
 } from "../../src/rpc";
 
 /* The envelope pipeline/rpc.py proved. Anything here that changes changes the
@@ -142,4 +144,40 @@ describe("the subrequest budget", () => {
     },
     20_000,
   );
+});
+
+/* 2026-09-13: both public endpoints refused Cloudflare's egress for an hour
+   (the tick failed 39 ticks in a row with "rate limited"; a lookup answered
+   rpc_down) while the same endpoints answered the box in 0.3 s. The Worker
+   can therefore reach the chain through the box (ops/rpc-proxy.mjs), which
+   admits a request only with the shared key. The key travels as a header
+   on every request, and only when it is configured. */
+describe("the RPC client built from the environment", () => {
+  const baseEnv = {
+    RPC_URL: "http://box.invalid:8545",
+    RPC_URL_FALLBACK: "https://fallback.invalid",
+  } as unknown as Env;
+
+  it("sends the proxy key as a header when one is configured", async () => {
+    const seen: Array<Record<string, string>> = [];
+    const fetchFake = (async (_url: string, init: { headers: Record<string, string> }) => {
+      seen.push(init.headers);
+      return new Response(JSON.stringify([{ jsonrpc: "2.0", id: 0, result: "0x1" }]), { status: 200 });
+    }) as unknown as typeof fetch;
+    const client = rpcFromEnv({ ...baseEnv, RPC_PROXY_KEY: "k-test" } as Env, fetchFake);
+    await client.callBatch([{ method: "eth_blockNumber", params: [] }]);
+    expect(seen[0]?.["X-Ledge-Key"]).toBe("k-test");
+    expect(seen[0]?.["User-Agent"]).toBe(USER_AGENT);
+  });
+
+  it("sends no key header when none is configured", async () => {
+    const seen: Array<Record<string, string>> = [];
+    const fetchFake = (async (_url: string, init: { headers: Record<string, string> }) => {
+      seen.push(init.headers);
+      return new Response(JSON.stringify([{ jsonrpc: "2.0", id: 0, result: "0x1" }]), { status: 200 });
+    }) as unknown as typeof fetch;
+    const client = rpcFromEnv(baseEnv, fetchFake);
+    await client.callBatch([{ method: "eth_blockNumber", params: [] }]);
+    expect(seen[0]).not.toHaveProperty("X-Ledge-Key");
+  });
 });

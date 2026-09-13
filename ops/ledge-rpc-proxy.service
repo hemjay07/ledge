@@ -1,0 +1,21 @@
+[Unit]
+Description=LEDGE RPC relay for the Worker (ops/rpc-proxy.mjs)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ledge
+Group=ledge
+EnvironmentFile=/etc/ledge/env
+EnvironmentFile=/etc/ledge/proxy.env
+ExecStart=/usr/bin/node /home/ledge/ledge/ops/rpc-proxy.mjs
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
