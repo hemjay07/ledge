@@ -79,9 +79,11 @@ the launch window. Then it is frozen, committed, and its hash goes on
 `TELEGRAM_GRAVEYARD_CHAT_ID` set. *Owner's step, with me.* Until it runs,
 `/token` says "not yet running" and that stays true. Per
 BRAINSTORM-2026-09-13 §2 the room is the first push channel and carries a
-second thing: one daily digest computed from `number.json` (launches,
-zero-buy share, graduations, median time-to-graduation, each with n) — the
-Worker still computes no statistic.
+second thing: one daily digest from `number.json` (launches, graduations
+with rate, excluding-fast, median time-to-graduation, the whole record,
+each with n; 12:00 UTC; `worker/src/digest.ts`, built 2026-09-13) — the
+Worker still computes no statistic. Zero-buy share waits for a Class A
+figure; the sample on the homepage is a dated measurement, not a window.
 **DONE when:** a graduation posts to the room within a minute of the tick,
 and the digest has posted on two consecutive days.
 

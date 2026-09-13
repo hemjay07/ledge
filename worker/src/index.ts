@@ -4,6 +4,7 @@
    ungated; locking it to one origin would be an access control on a public
    instrument. Nothing here requires a wallet, an email or an account. */
 
+import { announceDigest } from "./digest";
 import type { Env } from "./env";
 import { tick } from "./tick";
 import { lookupToken } from "./service";
@@ -510,5 +511,8 @@ export default {
         if (!result.ok) console.error("tick failed", JSON.stringify(result));
       }),
     );
+    // The daily digest (worker/src/digest.ts) runs beside the tick, not
+    // inside it: its failure is a Telegram matter, never an indexing one.
+    ctx.waitUntil(announceDigest(env, Date.now()).catch((error) => console.error("digest failed", String(error))));
   },
 };
