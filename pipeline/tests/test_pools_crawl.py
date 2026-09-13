@@ -367,3 +367,31 @@ def test_pool_bars_loader_takes_only_dated_partitions(tmp_path):
 
     points = load_pool_backfill(tmp_path)
     assert points == [{"pool": "0xa", "mark": "1h", "price": "1"}]
+
+
+# --- 2026-09-13: the two writers of number.json diverged again -------------
+def test_crawl_writes_the_same_number_file_recompute_would_once_a_pool_exists(run_dir, monkeypatch):
+    """test_crawl.py pins crawl.run to recompute.py with an empty pools/
+    directory, where the outcomes block is trivially equal. The box's first
+    completed run (2026-09-13 16:30Z) discovered pools, wrote number.json
+    without them, and was failed by its own gate: recompute read the new
+    index.jsonl, the crawl's build_number call never saw it."""
+    from pipeline import recompute as recompute_mod
+    from pipeline.canonical import canonical_dumps
+
+    monkeypatch.setattr(crawl.time, "sleep", lambda *_: None)
+    _write_launch(run_dir, TOKEN)
+    grad = {
+        "token": TOKEN, "block": 1540, "ts": _iso_ts("2026-09-12", 9), "pairTokenAmount": "1",
+        "orphan": False, "txHash": "0x" + "91" * 32, "logIndex": 0,
+    }
+    (run_dir / "graduations" / "2026-09-12.jsonl").write_text(json.dumps(grad) + "\n")
+    init_log = _make_initialize_log(pool_id=POOL_ID, currency0=TOKEN, currency1=QUOTE, block=1550)
+    rpc_client = _PoolStubRpc(init_logs=[init_log], timestamps={1550: _iso_ts("2026-09-12", 10)})
+
+    crawl.run(data_dir=run_dir, rpc_client=rpc_client, head_block=1600, now=_now())
+
+    assert _read_pool_index(run_dir), "the pool was not recorded; the test would prove nothing"
+    written = (run_dir / "number.json").read_text()
+    expected = canonical_dumps(recompute_mod.recompute(run_dir))
+    assert written == expected

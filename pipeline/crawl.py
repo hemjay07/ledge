@@ -64,7 +64,7 @@ from pipeline.pool import (
     is_pons_pool,
     quote_per_token,
 )
-from pipeline.recompute import crawled_at_for, load_partitions, load_samples, resolve_pair_class
+from pipeline.recompute import POOL_BAR_NAME, crawled_at_for, load_partitions, load_samples, resolve_pair_class
 from pipeline.rpc import BATCH_PACING_SECONDS, TOPIC_POOL_GRADUATED, TOPIC_TOKEN_LAUNCHED, decode_pool_graduated, decode_token_launched
 from pipeline.stats import build_number, format_iso
 
@@ -603,6 +603,47 @@ def _load_pool_index(data_dir) -> list:
     return records
 
 
+def _pools_after_write(data_dir, writes: list, deletes: list) -> dict:
+    """data/pools as recompute.py will read it once the commit point below
+    has run: every file on disk, minus the planned deletes, with each
+    planned write's payload in place of (or added to) what is there. The
+    number is computed before the files exist, so the only way for the two
+    writers of number.json to agree is for this call to see the directory
+    the other one will."""
+    pools_dir = Path(data_dir) / POOLS_DIR
+    files = {p.name: p for p in pools_dir.iterdir()} if pools_dir.exists() else {}
+    for path in deletes:
+        files.pop(Path(path).name, None)
+    view = {name: _read_partition_file(path) for name, path in files.items()}
+    for path, payload in writes:
+        path = Path(path)
+        if path.parent != pools_dir:
+            continue
+        text = gzip.decompress(payload).decode() if path.name.endswith(".gz") else payload.decode()
+        view[path.name] = _parse_jsonl(text)
+    return view
+
+
+def _pool_index_from_view(view: dict) -> list:
+    """recompute.load_pool_index, applied to the view: index.jsonl then
+    index-backfill.jsonl, deduped on (txHash, logIndex) in that order."""
+    records, seen = [], set()
+    for name in POOL_INDEX_FILES:
+        for record in view.get(name, []):
+            key = _record_key(record)
+            if key in seen:
+                continue
+            seen.add(key)
+            records.append(record)
+    return records
+
+
+def _pool_bars_from_view(view: dict) -> list:
+    """recompute.load_pool_bars, applied to the view: dated partitions
+    only, in name order."""
+    return [r for name in sorted(view) if POOL_BAR_NAME.match(name) for r in view[name]]
+
+
 def plan_pool_index_write(data_dir, new_index_records: list, filename: str = "index.jsonl") -> Optional[tuple]:
     """data/pools/index.jsonl is a single ever-growing file, one line per
     pons pool (dozens, not thousands) -- appended to and deduped on
@@ -837,10 +878,21 @@ def run(data_dir, rpc_client, head_block: Optional[int] = None, now: Optional[da
     # exactly what happened on 2026-09-08. There is one published file, so
     # there must be one way of building it; test_crawl_matches_recompute pins
     # the two writers together.
+    # The same lesson, 2026-09-13: the box's first completed run discovered
+    # pools, and recompute.py read them from the index it had just written
+    # while this call had not been handed them. Every input recompute.py
+    # gives build_number is given here, read from the pools directory as it
+    # will be after the commit point (the planned writes applied in memory),
+    # by the same rules recompute's loaders use.
+    pools_after = _pools_after_write(data_dir, partition_writes, partition_deletes)
     number_payload = canonical_dumps(
         build_number(
             all_launches, all_grads, new_state, crawled_at,
             samples=load_samples(data_dir / "samples"),
+            pool_index=_pool_index_from_view(pools_after),
+            pool_bars=_pool_bars_from_view(pools_after),
+            backfill_points=pools_after.get("backfill.jsonl", []),
+            pair_tokens=pair_tokens,
         )
     ).encode()
     state_payload = (json.dumps(new_state, sort_keys=True, indent=2) + "\n").encode()
