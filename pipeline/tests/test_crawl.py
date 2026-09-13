@@ -16,6 +16,7 @@ Binding rules (ARCHITECTURE.md §4):
 """
 import gzip
 import json
+from pathlib import Path
 
 import pytest
 
@@ -671,3 +672,34 @@ def test_header_still_missing_after_retries_fails_the_run(monkeypatch):
         assert "block 7" in str(exc) and "after 2 retries" in str(exc)
     else:
         raise AssertionError("a header that never arrives must still fail the run")
+
+
+# 2026-09-13: the pinning test above agreed trivially on every shape its
+# fixture lacked (pools, gz archives, real samples). This one runs the crawl
+# over a copy of the committed record itself, so every shape that exists in
+# production is exercised, and grows with the record without being edited.
+REPO_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+
+
+@pytest.mark.skipif(not (REPO_DATA_DIR / "state.json").exists(), reason="no committed record beside the tests")
+def test_crawl_matches_recompute_on_a_copy_of_the_committed_record(tmp_path):
+    import shutil
+
+    from pipeline import recompute as recompute_mod
+    from pipeline.canonical import canonical_dumps
+
+    data_dir = tmp_path / "data"
+    shutil.copytree(REPO_DATA_DIR, data_dir)
+
+    class _QuietRpcClient:
+        def get_logs(self, *a, **k):
+            return []
+
+        def call_batch(self, requests):
+            return [{"timestamp": hex(1_788_000_000)} for _ in requests]
+
+    state = json.loads((data_dir / "state.json").read_text())
+    crawl.run(data_dir=data_dir, rpc_client=_QuietRpcClient(), head_block=state["lastIndexedBlock"] + 500)
+    written = (data_dir / "number.json").read_text()
+    expected = canonical_dumps(recompute_mod.recompute(data_dir))
+    assert written == expected
