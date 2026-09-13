@@ -154,9 +154,36 @@ class RpcClient:
     """Batch JSON-RPC client with 429-as-object detection and backoff.
     `transport` is injectable for tests; production uses urllib."""
 
-    def __init__(self, url: str, transport: Optional[Transport] = None):
+    def __init__(
+        self,
+        url: str,
+        transport: Optional[Transport] = None,
+        fallback_url: Optional[str] = None,
+        fallback_transport: Optional[Transport] = None,
+    ):
         self.url = url
         self.transport = transport or _urllib_transport(url)
+        # A second endpoint, tried when the first says it is busy. Added
+        # 2026-09-13 after the box failed 35 of 36 crawls overnight on
+        # rpc.ordofi.network's "the network is busy" alone; measured from the
+        # same box the same morning, the official endpoint answered 6 of 6
+        # log queries while ordofi answered 5 of 6. The Worker has had a
+        # fallback since 2026-09-11; the crawl never did. Nothing is
+        # different about what is asked -- both endpoints serve the same
+        # chain -- only who is asked when the first will not answer.
+        self.fallback: Optional[Transport] = fallback_transport or (
+            _urllib_transport(fallback_url) if fallback_url and fallback_url != url else None
+        )
+        self.fallback_used = 0
+
+    def _transport_for(self, attempt: int) -> Transport:
+        """The primary on the first try; then the two alternate, so a busy
+        primary is not asked nine times in a row while a working fallback
+        sits unused. Without a fallback this is always the primary."""
+        if self.fallback is None or attempt == 0 or attempt % 2 == 0:
+            return self.transport
+        self.fallback_used += 1
+        return self.fallback
 
     def _send_with_retry(self, payload: list, validate: Optional[Callable[[object], list]] = None) -> list:
         """Send one payload, retrying transport faults with exponential
@@ -165,7 +192,7 @@ class RpcClient:
         retry path."""
         delay = BACKOFF_BASE_SECONDS
         for attempt in range(MAX_RETRIES):
-            response = self.transport(payload)
+            response = self._transport_for(attempt)(payload)
             if is_retryable(response):
                 if attempt == MAX_RETRIES - 1:
                     raise RuntimeError(f"rpc: gave up after repeated failures: {response}")
@@ -247,15 +274,32 @@ class RpcClient:
         # the run.
         delay = BACKOFF_BASE_SECONDS
         for attempt in range(MAX_RETRIES):
-            response = self._send_with_retry(payload)
+            # "the network is busy" arrives as a per-item error inside an
+            # HTTP 200, so it never reaches _send_with_retry's endpoint
+            # alternation; it is alternated here on the same rule.
+            transport = self._transport_for(attempt)
+            response = self._send_once(payload, transport)
             item = response[0] if isinstance(response, list) and response else None
             if isinstance(item, dict) and "error" not in item and "result" in item:
                 return item["result"] or []
             if attempt == MAX_RETRIES - 1:
                 raise RuntimeError(f"rpc: eth_getLogs gave no result after retries: {item!r}")
             time.sleep(delay)
-            delay *= 2
+            delay = min(delay * 2, BACKOFF_CAP_SECONDS)
         raise RuntimeError("rpc: unreachable")
+
+    def _send_once(self, payload: list, transport: Transport) -> object:
+        """One send on one endpoint, with the transport-fault retry applied
+        to that endpoint only; get_logs owns the alternation above it."""
+        delay = BACKOFF_BASE_SECONDS
+        for attempt in range(3):
+            response = transport(payload)
+            if not is_retryable(response):
+                return response
+            if attempt < 2:
+                time.sleep(delay)
+                delay = min(delay * 2, BACKOFF_CAP_SECONDS)
+        return response
 
     def symbol_of(self, address: str) -> Optional[str]:
         payload = [

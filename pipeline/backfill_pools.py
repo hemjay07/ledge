@@ -432,6 +432,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     url = os.environ.get("RPC_URL") or "https://rpc.mainnet.chain.robinhood.com"
-    client = RpcClient(url)
+    client = RpcClient(url, fallback_url=os.environ.get("RPC_URL_FALLBACK") or None)
     outcome = run(Path(args.data_dir), client, limit_pools=args.limit_pools)
     print(f"backfill: pools indexed={outcome['poolsIndexed']} marks probed={outcome['marksProbed']}")

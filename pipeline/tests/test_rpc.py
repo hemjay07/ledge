@@ -387,3 +387,81 @@ def test_a_tls_fault_is_retried_rather_than_killing_the_run():
     client = rpc_mod.RpcClient("https://x.invalid", transport)
     assert client.get_head_block() == 16
     assert attempts["n"] == 2, "the fault must be retried, not raised"
+
+
+def _busy(id_=1):
+    return [{"jsonrpc": "2.0", "id": id_, "error": {"code": -32005, "message": "the network is busy"}}]
+
+
+def _logs(id_=1):
+    return [{"jsonrpc": "2.0", "id": id_, "result": [{"topics": ["0x1"]}]}]
+
+
+def test_get_logs_falls_back_to_second_endpoint_when_primary_is_busy(monkeypatch):
+    monkeypatch.setattr(rpc.time, "sleep", lambda s: None)
+    primary_calls, fallback_calls = [], []
+
+    def primary(payload):
+        primary_calls.append(payload)
+        return _busy(payload[0]["id"])
+
+    def fallback(payload):
+        fallback_calls.append(payload)
+        return _logs(payload[0]["id"])
+
+    client = rpc.RpcClient(url="https://a.invalid", transport=primary, fallback_transport=fallback)
+    out = client.get_logs(1, 2, "0xab")
+    assert out == [{"topics": ["0x1"]}]
+    assert len(primary_calls) == 1  # asked once, then the fallback answered
+    assert len(fallback_calls) == 1
+    assert client.fallback_used == 1
+
+
+def test_get_logs_uses_primary_only_when_it_answers(monkeypatch):
+    monkeypatch.setattr(rpc.time, "sleep", lambda s: None)
+    fallback_calls = []
+
+    def primary(payload):
+        return _logs(payload[0]["id"])
+
+    def fallback(payload):
+        fallback_calls.append(payload)
+        return _logs(payload[0]["id"])
+
+    client = rpc.RpcClient(url="https://a.invalid", transport=primary, fallback_transport=fallback)
+    client.get_logs(1, 2, "0xab")
+    assert fallback_calls == []
+    assert client.fallback_used == 0
+
+
+def test_get_logs_raises_when_both_endpoints_stay_busy(monkeypatch):
+    monkeypatch.setattr(rpc.time, "sleep", lambda s: None)
+    calls = {"a": 0, "b": 0}
+
+    def primary(payload):
+        calls["a"] += 1
+        return _busy(payload[0]["id"])
+
+    def fallback(payload):
+        calls["b"] += 1
+        return _busy(payload[0]["id"])
+
+    client = rpc.RpcClient(url="https://a.invalid", transport=primary, fallback_transport=fallback)
+    with pytest.raises(RuntimeError, match="no result after retries"):
+        client.get_logs(1, 2, "0xab")
+    assert calls["a"] > 0 and calls["b"] > 0
+
+
+def test_client_without_fallback_behaves_as_before(monkeypatch):
+    monkeypatch.setattr(rpc.time, "sleep", lambda s: None)
+    n = {"a": 0}
+
+    def primary(payload):
+        n["a"] += 1
+        return _busy(payload[0]["id"])
+
+    client = rpc.RpcClient(url="https://a.invalid", transport=primary)
+    with pytest.raises(RuntimeError, match="no result after retries"):
+        client.get_logs(1, 2, "0xab")
+    assert n["a"] == rpc.MAX_RETRIES
+    assert client.fallback is None

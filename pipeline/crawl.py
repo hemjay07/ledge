@@ -869,6 +869,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     url = os.environ.get("RPC_URL") or "https://rpc.mainnet.chain.robinhood.com"
-    client = RpcClient(url)
+    client = RpcClient(url, fallback_url=os.environ.get("RPC_URL_FALLBACK") or None)
     outcome = run(Path(args.data_dir), client, backfill_hours=args.backfill_hours)
     print(f"crawl: committed={outcome.get('committed')}")
