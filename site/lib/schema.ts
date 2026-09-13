@@ -144,6 +144,40 @@ const outcomesSchema = z.object({
   }),
 });
 
+/* A5b (design/FIRSTBUY-BRIEF.md, METHOD.md 2026-09-13). One row per cohort
+   bucket over the whole record; the six outside-buy buckets are exclusive
+   and sum to n, the shares are cumulative and null below n = 30. */
+const firstBuyRow = z.object({
+  bucket: z.string(),
+  n: z.number().int().nonnegative(),
+  launchTxBuy: z.number().int().nonnegative(),
+  launchTxBuyShare: z.number().nullable(),
+  outside: z.object({
+    sameBlock: z.number().int().nonnegative(),
+    within1s: z.number().int().nonnegative(),
+    within3s: z.number().int().nonnegative(),
+    within5s: z.number().int().nonnegative(),
+    after5s: z.number().int().nonnegative(),
+    none: z.number().int().nonnegative(),
+  }),
+  sameBlockShare: z.number().nullable(),
+  within1sShare: z.number().nullable(),
+  within3sShare: z.number().nullable(),
+  within5sShare: z.number().nullable(),
+  noneShare: z.number().nullable(),
+  insufficient: z.boolean(),
+});
+
+const firstBuySchema = z.object({
+  indexedFromBlock: z.number().int().nonnegative().nullable(),
+  population: z.string(),
+  cohorts: z.object({
+    all: z.array(firstBuyRow),
+    taxBucket: z.array(firstBuyRow),
+    pairClass: z.array(firstBuyRow),
+  }),
+});
+
 const windowShape = z.object({
   since: z.number().int().nullable(),
   until: z.number().int(),
@@ -342,6 +376,9 @@ export const numberSchema = z.object({
   /* Optional for the same reason `samples` is: a number.json written before
      OUTCOMES.md step 3 landed still parses. Not rendered anywhere yet. */
   outcomes: outcomesSchema.optional(),
+  /* Optional for the same reason: a file written before 2026-09-13 has no
+     first-buy block, and the card is simply absent. */
+  firstBuy: firstBuySchema.optional(),
 });
 
 export type NumberFile = z.infer<typeof numberSchema>;
@@ -355,3 +392,5 @@ export type Sample = z.infer<typeof sampleShape>;
 export type OutcomeMarkRow = z.infer<typeof outcomeMarkRow>;
 export type OutcomeCohortRow = z.infer<typeof outcomeCohortRow>;
 export type Outcomes = z.infer<typeof outcomesSchema>;
+export type FirstBuyRow = z.infer<typeof firstBuyRow>;
+export type FirstBuy = z.infer<typeof firstBuySchema>;

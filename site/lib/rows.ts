@@ -1,5 +1,5 @@
 import type { RegisterCell, RegisterRow } from "../components/Register";
-import type { CohortRow, WindowData } from "./schema";
+import type { CohortRow, FirstBuyRow, WindowData } from "./schema";
 import { formatCount, insufficientText, isInsufficient, rateText } from "./format";
 
 /* One place turns a cohort row into a register row, so the denominator column
@@ -104,3 +104,34 @@ export const PAIRTAX_COLUMNS = [
   "Rate",
   "Excluding fast",
 ];
+
+/* ---- first-buy timing (A5b) --------------------------------------------- */
+
+export const FIRSTBUY_COLUMNS = (first: string): string[] => [
+  first,
+  "Launches (n)",
+  "Opening buy in the launch tx",
+  "Outside buy in the launch block",
+  "within 1 s",
+  "within 3 s",
+  "within 5 s",
+  "No outside buy",
+];
+
+/** The cumulative shares stats.py published, each through the same gate as
+    every other rate: below n = 30 the cell says so. Nothing is divided here. */
+export function firstBuyRegisterRow(label: string, row: FirstBuyRow): RegisterRow {
+  const cell = (rate: number | null) => rateCell({ rate, n: row.n, insufficient: row.insufficient });
+  return {
+    label,
+    cells: [
+      { text: formatCount(row.n), kind: "n" },
+      cell(row.launchTxBuyShare),
+      cell(row.sameBlockShare),
+      cell(row.within1sShare),
+      cell(row.within3sShare),
+      cell(row.within5sShare),
+      cell(row.noneShare),
+    ],
+  };
+}

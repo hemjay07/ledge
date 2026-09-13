@@ -15,11 +15,18 @@ import {
   pairLabel,
   taxLabel,
 } from "../../lib/format";
-import { COHORT_COLUMNS, cohortFooting, cohortRegisterRow, shareCell } from "../../lib/rows";
+import { COHORT_COLUMNS, FIRSTBUY_COLUMNS, cohortFooting, cohortRegisterRow, firstBuyRegisterRow, shareCell } from "../../lib/rows";
 import { fastShareFacts } from "../../lib/summary";
 import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
+const firstBuy = numberFile.firstBuy;
+const firstBuyAll = firstBuy?.cohorts.all[0] ?? {
+  bucket: "all", n: 0, launchTxBuy: 0, launchTxBuyShare: null,
+  outside: { sameBlock: 0, within1s: 0, within3s: 0, within5s: 0, after5s: 0, none: 0 },
+  sameBlockShare: null, within1sShare: null, within3sShare: null, within5sShare: null, noneShare: null,
+  insufficient: true,
+};
 
 export const metadata: Metadata = {
   title: "Cohorts — LEDGE",
@@ -300,6 +307,40 @@ export default function Cohorts(): ReactElement {
           </p>
         </details>
       </div>
+
+      {firstBuy ? (
+        /* A5b (METHOD.md 2026-09-13). Whole record, not a window: its
+           population is stated on the card. Two facts per launch kept apart:
+           the launch transaction's own opening buy, and the first buy from
+           any other transaction -- sniping is a statement about the second. */
+        <div className="card" id="h-firstbuy">
+          <div className="card-header">
+            <h2 className="kicker card-kicker">FIRST BUY</h2>
+            <span className="note note--fine">{firstBuy.population}</span>
+          </div>
+          <p className="note">
+            {firstBuy.indexedFromBlock === null
+              ? "First buys are not yet indexed: the crawl records them from the first run after 13 Sep 2026, and every row below is n = 0 until then."
+              : `First buys are indexed from block ${formatCount(firstBuy.indexedFromBlock)}. Launches before it were never read for buys and are outside this population.`}{" "}
+            Shares from the launch block on are cumulative. A launch&rsquo;s own opening buy, sent
+            in the launch transaction, is counted separately and never as an outside buy.
+          </p>
+          <Register
+            ariaLabel="First-buy timing by creator tax"
+            caption={`When the first outside buy landed, by creator tax, n = ${formatCount(firstBuyAll.n)} launches.`}
+            columns={FIRSTBUY_COLUMNS("Creator tax")}
+            rows={firstBuy.cohorts.taxBucket.map((r) => firstBuyRegisterRow(taxLabel(r.bucket), r))}
+            foot={firstBuyRegisterRow("All", firstBuyAll)}
+          />
+          <Register
+            ariaLabel="First-buy timing by pair token"
+            caption={`When the first outside buy landed, by the token a launch is paired against, n = ${formatCount(firstBuyAll.n)} launches.`}
+            columns={FIRSTBUY_COLUMNS("Pair token")}
+            rows={firstBuy.cohorts.pairClass.map((r) => firstBuyRegisterRow(pairLabel(r.bucket), r))}
+            foot={firstBuyRegisterRow("All", firstBuyAll)}
+          />
+        </div>
+      ) : null}
 
       <Footer />
     </main>
