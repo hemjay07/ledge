@@ -94,3 +94,5 @@ without the banner — and it has not been met yet.
 | 09-13 | 35 of 36 box runs failed on ordofi "busy" | 2 | fallback endpoint; official endpoint primary |
 | 09-13 | ordofi `Initialize` query 75 s/window | 2 | measured; endpoint order swapped; recorded in INDEXER.md |
 | 09-13 | crawl built `number.json` without the pools it wrote | 1, 3 | pools view; committed-record test |
+| 09-13 | both public RPCs refused Cloudflare's egress; live tick down from 18:05Z | 2 | RPC relay on the box + keyed Worker client (owner flips it) |
+| 09-13 | one box push lost a race with a hand push at 19:07Z | — | expected; the runner keeps the commit and pushes next run (it did) |

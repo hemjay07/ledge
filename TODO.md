@@ -25,10 +25,21 @@ Blocks A2 and A3. Everything else can proceed without it.
 `workflow_dispatch` as the phone fallback. `staleAfterSeconds` 7200 → 1800.
 **DONE when:** four consecutive timer runs commit, the banner is down for a
 full day, and the GitHub publish jobs still fire on the data push.
+*2026-09-13 23:00Z: 13 consecutive pushes since 18:47Z (one push race with
+a hand push, recovered next run), publish jobs fire, bound lowered. What
+remains is the full day without the banner.*
 
 **A3. Cut the live index over.** `INDEXER.md` §2 and §4.3. The Node runner
 is built and tested (`worker/host/`); this is installing it, running it
 beside the Worker cron for an hour, then removing the cron.
+*2026-09-13: both public endpoints refused Cloudflare's egress from 18:05Z
+(190+ consecutive tick failures) while answering the box in 0.3 s. The
+smaller fix is built and running: an RPC relay on the box
+(`ops/rpc-proxy.mjs`, keyed, Cloudflare ranges only) and a keyed Worker
+client. Owner's step to flip it: `wrangler secret put RPC_PROXY_KEY` with
+the key from `/etc/ledge/proxy.env` on the box, `RPC_URL =
+"http://176.97.72.180:8545"` in `worker/wrangler.toml`, deploy. If the
+relay holds, A3's D1 shim is not needed.*
 **DONE when:** coverage of sampled launches ≥ 99% for a day, the Worker's
 `[triggers]` are gone, and the tick's own log shows no gap over an hour.
 
@@ -57,6 +68,13 @@ on `/t/{address}`, the token's own first-buy delay beside its tax band's
 shares — a token's own fact on its own page, no wallet.
 **DONE when:** the figure is on `/cohorts` with n, the buckets show the
 5 s edge, and `/t/{address}` shows the token's own delay beside them.
+*2026-09-13: pipeline, stats, method entry and the `/cohorts` card are
+live (first reading, n = 21,293: 79.9% of launches carry an opening buy
+in the launch tx; of outside first buys, 39.9% land within 1 s and 60.0%
+within 5 s of the launch block; 24.6% had none after an hour). The
+`/t/{address}` surface is not built: the Worker holds no first-buy record
+outside its own window, so it needs either a per-token KV publish from the
+crawl or a lookup file. Decide before building.*
 
 **A7. Backfill the record to 14 August.** pons v2's first launch (Bitquery
 archive). "All-time" then means what a reader thinks it means, and every
