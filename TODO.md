@@ -46,6 +46,20 @@ then the backfill from 2026-09-05.
 **DONE when:** the +24 h figure has n ≥ 30 in at least two
 time-to-graduation buckets and the method entry is written.
 
+**A5b. First-buy timing.** From RESEARCH-2026-09-13 §6: sniping is the
+pain everyone names and someone else already measures it at the wallet
+level. Ours is the aggregate, with n and no wallet: share of launches whose
+first buy landed within 1 s / 3 s / 5 s of the launch block, by creator-tax
+band. Needs the crawl to record the first buy per launch (one field, not
+the tape), a dated method entry, and the 5-second snipe-tax edge in the
+graduation buckets.
+**DONE when:** the figure is on `/cohorts` with n and the buckets show the
+5 s edge.
+
+**A7. Backfill the record to 14 August.** pons v2's first launch (Bitquery
+archive). "All-time" then means what a reader thinks it means, and every
+cohort's n grows by about three weeks of launches.
+
 **A6. Outcomes on the surfaces.** The cohort card on `/t/{address}` (the
 slot is already commented in), a column on `/graduated`, and the homepage
 line once it clears n.
@@ -94,6 +108,12 @@ does not exist. No autocomplete, no fuzzy match, no "verified" marker, no
 logging of popular queries. Needs a one-time name backfill (~165k tokens,
 ~550 multicalls, an hour on the box) or it covers 0.3% of the record and its
 silence lies.
+
+**C5. The one line of difference on the homepage.** Four sites score; one
+publishes the tape daily. Ours: *no scores, no wallets, no tape — the
+population, its method, and its n.* One line under the kicker. And every
+survival/graveyard figure carries its definition inline (ours is zero buys
+in 72 h; ponsscan's is zero trades in 12 h).
 
 **C3. The homepage slot.** Before launch it carries the pre-registration;
 after launch it becomes "LEDGE, measured by LEDGE" — `/t/{our address}` on
