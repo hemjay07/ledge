@@ -29,7 +29,12 @@ Graduation = TypedDict("Graduation", {"token": str, "block": int, "ts": int})
 
 MIN_N = 30
 FAST_CUTOFF = 300  # seconds
-DEFAULT_STALE_AFTER_SECONDS = 7200
+# 7200 until 2026-09-13: the crawl ran on GitHub's scheduler, which skipped
+# and queued, and two hours was the honest bound. On the box the timer is
+# every 10 minutes and a run takes under two, measured over 13 consecutive
+# pushes on 2026-09-13; 30 minutes is now three missed runs, which is a
+# stall worth a banner (METHOD.md 2026-09-13).
+DEFAULT_STALE_AFTER_SECONDS = 1800
 
 FACTORY_ADDRESS = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
 CHAIN_ID = 4663

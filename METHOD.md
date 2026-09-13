@@ -87,7 +87,7 @@ Only about a day of pool data exists as of 2026-09-12, so almost every cohort cu
 - **`crawledAt` is chain time, not clock time.** It is the block timestamp of the last block LEDGE indexed (`headBlock`), read from that block's header like every other timestamp here — never the wall clock of the machine that ran the crawl. A window closing at a wall clock reaches past the chain LEDGE has actually read: those minutes hold no launches because they were never scanned, and every rate computed over them is divided by a denominator that is missing them. The crawl records the instant in `state.json` as `lastIndexedAt`; `recompute.py` reads it straight back as `crawledAt`.
 - **A run that indexes nothing new does not move it.** `crawledAt` advances only when the cursor advances. A backwards backfill, which extends the record into older blocks and leaves the cursor alone, leaves `crawledAt` exactly where it was.
 - Every rendered figure shows "updated {age} ago" computed from `crawledAt`.
-- **Age is the consumer's computation, not a field.** `number.json` is a static file and cannot age its own contents. Any consumer — the page, the card, a third party reading `/number.json` — computes `now − crawledAt` and compares it to the published `staleAfterSeconds` (7200). If `crawledAt` is older than that at render time, the page shows the stale banner.
+- **Age is the consumer's computation, not a field.** `number.json` is a static file and cannot age its own contents. Any consumer — the page, the card, a third party reading `/number.json` — computes `now − crawledAt` and compares it to the published `staleAfterSeconds` (1800; 7200 before 2026-09-13). If `crawledAt` is older than that at render time, the page shows the stale banner.
 - `lastRunAt` and `lastSuccessAt` in `state.json` stay wall-clock times. They answer one question — did the run that wrote this file know it was already behind — and feed the `stale` flag below. They are never published as `crawledAt`.
 - **`stale` in the file means one thing: the run that generated the file knew it was already behind** — it recorded a failure since its last success (`consecutiveFailures > 0`, or `lastRunAt` after `lastSuccessAt`, or no successful run yet). A successful run publishes `stale: false` however old the data later becomes. A failed run commits nothing at all, so `crawledAt` simply ages and the banner appears from the age computation above.
 
@@ -99,6 +99,8 @@ Only about a day of pool data exists as of 2026-09-12, so almost every cohort cu
 - Anyone can run the same script against the same files and get the same numbers.
 
 ## Changelog of definitions
+
+- 2026-09-13 — **`staleAfterSeconds` lowered from 7200 to 1800.** No figure changed; only the bound after which a consumer shows the stale banner. The crawl moved from GitHub's scheduler, which skipped and queued runs, to a timer on LEDGE's own box that runs every 10 minutes and finishes in under two, measured over 13 consecutive pushes on 2026-09-13. Thirty minutes is three missed runs — a stall, not a queue — and that is what the banner is for.
 
 - 2026-09-13 — new definitions, no existing figure changed: **first-buy timing**.
 

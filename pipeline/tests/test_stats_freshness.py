@@ -58,7 +58,7 @@ def test_stale_is_false_in_the_normal_successful_run_path(make_launch):
 
 def test_stale_is_true_when_last_success_predates_generation_beyond_threshold(make_launch):
     launches = [make_launch(ts=i) for i in range(30)]
-    # lastRunAt is well over 2 hours (default staleAfterSeconds=7200) after
+    # lastRunAt is well over 30 minutes (default staleAfterSeconds=1800) after
     # lastSuccessAt -- the generating run knows its own data is old.
     state = _state(
         last_run_at="2026-09-06T15:00:03Z",
@@ -139,7 +139,7 @@ def test_stale_does_not_track_wall_clock_age_of_crawled_at(make_launch):
     result = build_number(launches, [], state, crawled_at="2020-01-01T00:00:00Z")
     assert result["stale"] is False
     assert result["crawledAt"] == "2020-01-01T00:00:00Z"
-    assert result["staleAfterSeconds"] == 7200
+    assert result["staleAfterSeconds"] == 1800  # 7200 until 2026-09-13, METHOD.md entry
 
 
 def test_schema_version_is_2_after_nullable_shares(make_launch):
