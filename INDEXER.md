@@ -41,11 +41,16 @@ scheduler drift.
 **Box.** Hetzner CX22 (2 vCPU, 4 GB, ~€4/month) or DigitalOcean $6 droplet.
 Ubuntu 24.04. Nothing else on it.
 
-**RPC.** `rpc.ordofi.network` primary, `rpc.mainnet.chain.robinhood.com`
-fallback — same as now, but from one steady process rather than bursts of
-50. If either still rate-limits a single client, the next step is our own
-node (Robinhood Chain is an Arbitrum Orbit chain; ~$20–40/month box). Not
-before it is shown to be needed.
+**RPC.** `rpc.mainnet.chain.robinhood.com` primary, `rpc.ordofi.network`
+fallback — the reverse of the GitHub-era order, changed 2026-09-13 after the
+box failed 35 of 36 crawls overnight on ordofi's "the network is busy" and a
+measurement from the box put the unfiltered `Initialize` query at 75 s on
+ordofi against 0.3 s on the official endpoint (launches and graduations:
+2.3 s / 1.5 s against 0.3 s / 0.3 s). The crawl's client alternates to the
+fallback after one busy answer (`pipeline/rpc.py`). If both still
+rate-limit a single steady client, the next step is our own node (Robinhood
+Chain is an Arbitrum Orbit chain; ~$20–40/month box). Not before it is shown
+to be needed.
 
 ## The four pieces
 

@@ -13,7 +13,9 @@ Watch it: `journalctl -u ledge-crawl -f`. Run once by hand:
 `sudo systemctl start ledge-crawl` (the lock makes a second start a no-op).
 
 `/etc/ledge/env` holds `RPC_URL` and `RPC_URL_FALLBACK`, mode 640 root:ledge,
-and is not in the repository.
+and is not in the repository. Since 2026-09-13 the primary is the official
+endpoint and ordofi is the fallback (INDEXER.md, "RPC", has the measurement);
+the pipeline alternates to the fallback after one busy answer.
 
 ## The probe (outcomes backfill)
 
