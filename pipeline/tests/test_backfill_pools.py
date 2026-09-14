@@ -317,3 +317,59 @@ def test_real_bar_wins_over_probe_for_the_same_mark():
     assert mark["n"] == n
     assert mark["fromProbe"] == 0
     assert mark["median"] == pytest.approx(2.0)
+
+
+# --- 2026-09-14: the probe must scan the history BELOW the crawl's index ----
+# The crawl has read Initialize forward only since 2026-09-12; everything
+# earlier in the record (from firstIndexedBlock) has no pool row, so 2,500 of
+# 3,078 graduations had no outcome. find_pools resumed from the index's
+# highest block and so never looked back.
+class _RangeRecorder:
+    def __init__(self):
+        self.ranges = []
+
+    def get_logs(self, from_block, to_block, topic0, address=None, topic1=None):
+        self.ranges.append((from_block, to_block))
+        return []
+
+    def call_batch(self, requests):
+        return [{"timestamp": hex(0)} for _ in requests]
+
+
+def test_find_pools_scans_the_gap_below_the_crawls_index(tmp_path):
+    state = _state(firstIndexedBlock=100_000, lastIndexedBlock=120_000)
+    (tmp_path / "state.json").write_text(json.dumps(state))
+    pools = tmp_path / "pools"
+    pools.mkdir()
+    # the crawl's own index starts late in the record
+    (pools / "index.jsonl").write_text(json.dumps(_pool_record(block=115_000)) + "\n")
+    (tmp_path / "launches").mkdir()
+    rpc = _RangeRecorder()
+
+    backfill_pools.find_pools(tmp_path, rpc, state)
+
+    assert rpc.ranges, "nothing was scanned"
+    assert rpc.ranges[0][0] == 100_000, "the scan must start at firstIndexedBlock"
+    # the gap is covered contiguously up to the crawl's first row; the stretch
+    # above the whole index is scanned too, as it always was
+    gap = [(f, t) for f, t in rpc.ranges if t <= 114_999]
+    assert gap[-1][1] == 114_999
+    assert all(gap[i + 1][0] == gap[i][1] + 1 for i in range(len(gap) - 1))
+    assert max(to for _, to in rpc.ranges) == 120_000
+
+
+def test_find_pools_resumes_inside_the_gap_from_its_own_backfill_index(tmp_path):
+    state = _state(firstIndexedBlock=100_000, lastIndexedBlock=120_000)
+    (tmp_path / "state.json").write_text(json.dumps(state))
+    pools = tmp_path / "pools"
+    pools.mkdir()
+    (pools / "index.jsonl").write_text(json.dumps(_pool_record(block=115_000)) + "\n")
+    # an earlier probe pass got this far into the gap
+    (pools / "index-backfill.jsonl").write_text(json.dumps(_pool_record(pool_id="0x" + "cd" * 32, block=104_000)) + "\n")
+    (tmp_path / "launches").mkdir()
+    rpc = _RangeRecorder()
+
+    backfill_pools.find_pools(tmp_path, rpc, state)
+
+    assert rpc.ranges[0][0] == 104_001
+    assert [t for _, t in rpc.ranges if t <= 114_999][-1] == 114_999

@@ -170,6 +170,12 @@ def _fetch_timestamps(rpc_client, blocks: list) -> dict:
     return timestamps
 
 
+def _read_index_file(path: Path) -> list:
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
 def find_pools(data_dir, rpc_client, state: dict) -> list:
     """Scan Initialize on the PoolManager over the whole indexed range,
     resuming from the highest block already in data/pools/index.jsonl.
@@ -178,13 +184,26 @@ def find_pools(data_dir, rpc_client, state: dict) -> list:
     data_dir = Path(data_dir)
     existing_index = _load_pool_index(data_dir)  # both index files, deduped
     existing_keys = {(r["txHash"], r["logIndex"]) for r in existing_index}
-    resume_block = max((r["block"] for r in existing_index), default=state["firstIndexedBlock"] - 1) + 1
+
+    # 2026-09-14: the crawl has read Initialize forward only since
+    # 2026-09-12, so the record below the crawl's own first pool row has no
+    # pools at all -- 2,534 of 3,078 graduations had no outcome. The gap is
+    # scanned first, from firstIndexedBlock up to the crawl's earliest row,
+    # resuming from the highest block this probe's own index-backfill.jsonl
+    # already holds inside that gap; then anything above the whole index,
+    # as before. Two files, so a resume never mistakes the crawl's late
+    # start for its own progress.
+    crawl_index = _read_index_file(data_dir / POOLS_DIR / "index.jsonl")
+    probe_index = _read_index_file(data_dir / POOLS_DIR / "index-backfill.jsonl")
+    gap_end = min((r["block"] for r in crawl_index), default=state["lastIndexedBlock"] + 1) - 1
+    gap_resume = max((r["block"] for r in probe_index if r["block"] <= gap_end), default=state["firstIndexedBlock"] - 1) + 1
+    above_resume = max((r["block"] for r in existing_index), default=state["firstIndexedBlock"] - 1) + 1
     to_block = state["lastIndexedBlock"]
 
-    windows = plan_windows(resume_block, to_block)
+    windows = plan_windows(gap_resume, min(gap_end, to_block)) + plan_windows(above_resume, to_block)
     if not windows:
         return []
-    _log(f"backfill: scanning {len(windows)} windows for pons pools, blocks {resume_block}-{to_block}")
+    _log(f"backfill: scanning {len(windows)} windows for pons pools, blocks {windows[0][0]}-{windows[-1][1]}")
 
     raw = []
     for i, (frm, to) in enumerate(windows, 1):
