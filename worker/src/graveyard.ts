@@ -24,6 +24,7 @@
    oldest one among them -- read live off the same table the graveyard itself
    queries, never a hand-maintained date that could drift out of step with it. */
 
+import { shortAddress } from "./format";
 import type { CursorRow } from "./lookup";
 import type { PairTokenEntry } from "./buckets";
 import { pairUnits, tokenMetaOf, type DbPairToken, type DbTokenMeta } from "./board";
@@ -258,21 +259,22 @@ export function selectNewGraveyardEntries(
   return candidates.filter((candidate) => !alreadyPosted.has(candidate.token));
 }
 
-function ageLine(ageSeconds: number): string {
-  const days = Math.floor(ageSeconds / 86_400);
-  const hours = Math.floor((ageSeconds % 86_400) / 3_600);
-  if (days === 0) return `${hours} h old`;
-  return hours === 0 ? `${days} d old` : `${days} d ${hours} h old`;
+
+/* 2026-09-14: one line a reader can scan. The age is implied (every entry
+   is past 72 h by definition) and the sells count on a curve nobody bought
+   into confuses more than it tells, so both are gone; the launch-block
+   buyers stay, because that is the coordination reading. */
+function candidateLine(candidate: GraveyardCandidate): string {
+  const tax = candidate.creatorTaxBps === null ? "tax not read" : `${candidate.creatorTaxBps / 100}% tax`;
+  const buyers =
+    candidate.firstBlockBuyers === null
+      ? "launch block not indexed"
+      : `${candidate.firstBlockBuyers} ${candidate.firstBlockBuyers === 1 ? "buyer" : "buyers"} in the launch block`;
+  // The short form on the line; the full address is the link beneath it.
+  return `${shortAddress(candidate.token)} · ${PAIR_WORDS[candidate.pairClass] ?? candidate.pairClass} pair · ${tax} · ${buyers}`;
 }
 
-function candidateLine(candidate: GraveyardCandidate): string {
-  const tax = candidate.creatorTaxBps === null ? "creator tax not read" : `${candidate.creatorTaxBps} bps creator tax`;
-  const firstBlock =
-    candidate.firstBlockBuyers === null
-      ? "first-block buyers not indexed"
-      : `${candidate.firstBlockBuyers} first-block buyers`;
-  return `${candidate.token} -- ${candidate.pairClass} pair, ${tax}, ${ageLine(candidate.ageSeconds)}, ${candidate.sells} sells, ${firstBlock}.`;
-}
+const PAIR_WORDS: Record<string, string> = { eth: "ETH", stable: "stablecoin", stock: "tokenized stock", other: "other" };
 
 /** Null when there is nothing new to post -- the caller must not send an
     empty message, and this makes the caller's "was there anything" check the
@@ -287,8 +289,8 @@ export function graveyardPosts(candidates: GraveyardCandidate[], siteOrigin: str
   if (candidates.length === 0) return [];
   const heading =
     candidates.length === 1
-      ? "1 launch newly entered the graveyard: 0 buys recorded in the 72 hours since its own launch block."
-      : `${candidates.length} launches newly entered the graveyard: 0 buys recorded in the 72 hours since each one's own launch block.`;
+      ? "1 launch took no buys in its first 72 hours."
+      : `${candidates.length} launches took no buys in their first 72 hours.`;
   const lines = candidates.map((c) => `${candidateLine(c)}\n${siteOrigin}/t/${c.token}`);
   const footer = `${siteOrigin}/graveyard`;
   const posts: string[] = [];
@@ -309,10 +311,7 @@ export function graveyardPostText(
   candidates: GraveyardCandidate[],
   siteOrigin: string,
 ): string | null {
-  if (candidates.length === 0) return null;
-  const heading =
-    candidates.length === 1
-      ? "1 launch newly entered the graveyard: 0 buys recorded in the 72 hours since its own launch block."
-      : `${candidates.length} launches newly entered the graveyard: 0 buys recorded in the 72 hours since each one's own launch block.`;
-  return [heading, "", ...candidates.map(candidateLine), "", `${siteOrigin}/graveyard`].join("\n");
+  // One builder since 2026-09-14: the first chunk of graveyardPosts, which
+  // links every entry to its own page. Null when there is nothing to post.
+  return graveyardPosts(candidates, siteOrigin)[0] ?? null;
 }

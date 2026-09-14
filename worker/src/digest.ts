@@ -42,27 +42,37 @@ export function digestText(file: NumberFile, nowMs: number, siteOrigin: string):
   const ttg = h24.ttg;
   const median =
     ttg.insufficient || ttg.p50 === null
-      ? `not enough data (n=${formatCount(ttg.n)})`
-      : `${formatDuration(ttg.p50)} (n=${formatCount(ttg.n)})`;
+      ? `Median time to graduation: not enough data (n=${formatCount(ttg.n)}).`
+      : `Half the graduations took under ${formatDuration(ttg.p50)} (n=${formatCount(ttg.n)}).`;
   const all = file.allTime;
   const allFact = { rate: all.rate, n: all.launches, insufficient: all.insufficient };
+  const stamp = formatStamp(file.crawledAt);
+  const day = stamp.replace(/^Measured /, "").replace(/ \d{4} · .*$/, "");
+  const clock = stamp.replace(/^.* · /, "");
+  const since = file.firstIndexedAt ? formatStamp(file.firstIndexedAt).replace(/^Measured /, "").replace(/ \d{4} · .*$/, "") : null;
+
+  // 2026-09-14: written as a short report for a feed -- a dated heading,
+  // the day's figures, the first-buy shares, the whole record, the stamp.
   const lines = [
-    `Pons, last 24 hours: ${formatCount(h24.launches)} launches; ${formatCount(h24.graduations)} graduated, ${rateText(fact)}.`,
-    `Excluding graduations inside ${formatDuration(ef.cutoffSeconds)}: ${formatCount(ef.graduations)} of ${formatCount(h24.launches)}, ${rateText(efFact)}${oneIn}.`,
-    `Median time to graduation: ${median}.`,
-    `Whole record: ${formatCount(all.graduations)} of ${formatCount(all.launches)} launches graduated, ${rateText(allFact)}.`,
+    `pons, ${day} — the last 24 hours`,
+    "",
+    `${formatCount(h24.launches)} launches. ${formatCount(h24.graduations)} graduated, ${rateText(fact)}.`,
+    `Leaving out graduations under ${formatDuration(ef.cutoffSeconds)}: ${formatCount(ef.graduations)}, ${rateText(efFact)}${oneIn}.`,
+    median,
   ];
-  // 2026-09-14: the finding people quote (METHOD.md 2026-09-13), read
-  // from the file's own "all" row; the shares are cumulative and null
-  // below n = 30, in which case the line says so.
   const fb = file.firstBuy?.cohorts.all[0];
   if (fb) {
     const n = { n: fb.n, insufficient: fb.insufficient };
     lines.push(
-      `First outside buy, launches at least an hour old: within 1 s ${rateText({ rate: fb.within1sShare, ...n })}, within 5 s ${rateText({ rate: fb.within5sShare, ...n })}, none ${rateText({ rate: fb.noneShare, ...n })} (n=${formatCount(fb.n)}).`,
+      "",
+      `First outside buy, launches at least an hour old (n=${formatCount(fb.n)}): ${rateText({ rate: fb.within1sShare, ...n })} within 1 s, ${rateText({ rate: fb.within5sShare, ...n })} within 5 s, ${rateText({ rate: fb.noneShare, ...n })} none.`,
     );
   }
-  lines.push(`${formatStamp(file.crawledAt)}, ${formatAge(ageSeconds(file.crawledAt, nowMs))} ago.`, `${siteOrigin}/method`);
+  lines.push(
+    "",
+    `${since ? `Since ${since}: ` : "Whole record: "}${formatCount(all.graduations)} of ${formatCount(all.launches)} launches graduated, ${rateText(allFact)}.`,
+    `Measured ${clock}, ${formatAge(ageSeconds(file.crawledAt, nowMs))} ago. ${siteOrigin}/method`,
+  );
   return lines.join("\n");
 }
 

@@ -71,15 +71,16 @@ export const BOT_USERNAME = "ledgetools_bot";
    timing). Three things, each with its n; no adjective. */
 export const HELP_TEXT = (siteOrigin: string): string =>
   [
-    "LEDGE indexes every pons launch on Robinhood Chain and publishes three things, each with its sample size: how many launches graduated, out of how many; when a launch's first outside buy landed; and where a pool's price went after it graduated.",
+    "LEDGE counts pons launches on Robinhood Chain: how many graduate, how fast, and what happens after.",
     "",
-    "/number — the last 24 hours",
-    "an address — that launch's own facts, and what happened to launches like it",
+    "Send /number for the last 24 hours.",
+    "Send a token address for that launch and the launches like it.",
     "",
+    "Every figure comes with how many it was counted from.",
     `${siteOrigin}/method`,
   ].join("\n");
 
-export const UNKNOWN_DM_TEXT = "Two things: /number, or a 20-byte address.";
+export const UNKNOWN_DM_TEXT = "Send /number, or a token address.";
 
 /** Hour-bucketed counters. Returns false when the chat or the day is over its
     limit, and the caller then sends nothing at all. */

@@ -175,8 +175,8 @@ describe("the /number reply", () => {
   const text = numberText(file.h24, file.crawledAt, "12 min", "https://ledge.tools/method");
 
   it("prints both figures with their denominator, the window and the age", () => {
-    expect(text).toContain("last 24 hours");
-    expect(text).toMatch(/\d[\d,]* of \d[\d,]* launches graduated/);
+    expect(text).toContain("Last 24 hours on pons");
+    expect(text).toMatch(/of launches graduated \(\d[\d,]* of \d[\d,]*\)/);
     expect(text).toContain("12 min ago");
   });
 
@@ -371,7 +371,7 @@ describe("the /number reply, since 2026-09-14", () => {
     recordSince: "2026-09-05T15:58:32Z",
   });
   it("says the median time to graduation with its n, and where the record starts", () => {
-    expect(text).toMatch(/Median time to graduation: .*\(n=[\d,]+\)|Median time to graduation: not enough data/);
-    expect(text).toContain("since 5 Sep 2026");
+    expect(text).toMatch(/Half the graduations took under .*\(n=[\d,]+\)|Median time to graduation: not enough data/);
+    expect(text).toContain("Counted since 5 Sep");
   });
 });

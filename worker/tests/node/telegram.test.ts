@@ -30,7 +30,7 @@ describe("what the bot understands", () => {
 
   it("names the two things it understands, once, in a direct message", () => {
     expect(classify({ ...dm, text: "hello" }, "ledgebot")).toEqual({ kind: "unknown_dm" });
-    expect(UNKNOWN_DM_TEXT).toBe("Two things: /number, or a 20-byte address.");
+    expect(UNKNOWN_DM_TEXT).toBe("Send /number, or a token address.");
   });
 
   it("has nothing to say to an empty message", () => {
@@ -47,7 +47,7 @@ describe("what the bot says about itself", () => {
   const help = HELP_TEXT("https://ledge.tools");
 
   it("states what is measured and links the method, and sells nothing", () => {
-    expect(help).toContain("how many launches graduated, out of how many"); // reworded 2026-09-14
+    expect(help).toContain("how many graduate, how fast, and what happens after"); // reworded 2026-09-14
     expect(help).toContain("https://ledge.tools/method");
     expect(help).not.toMatch(/coming soon|premium|subscribe|join/i);
   });
@@ -75,8 +75,9 @@ describe("what help says now", () => {
   const help = HELP_TEXT("https://ledge.tools");
   it("names the three things published, not one", () => {
     expect(help).not.toMatch(/one thing/i);
-    expect(help).toMatch(/first (outside )?buy/i);
-    expect(help).toMatch(/after it graduated/i);
+    expect(help).toMatch(/how fast/i);
+    expect(help).toMatch(/what happens after/i);
+    expect(help).toContain("how many it was counted from");
   });
 });
 

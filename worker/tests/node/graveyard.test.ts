@@ -131,8 +131,8 @@ describe("the bot post", () => {
   it("states only the facts: no emoji, no verdict, no address other than the token's own", () => {
     const text = graveyardPostText([candidate], "https://ledge.tools");
     expect(text).not.toBeNull();
-    expect(text).toContain("0 buys");
-    expect(text).toContain(candidate.token);
+    expect(text).toContain("took no buys in its first 72 hours");
+    expect(text).toContain(`https://ledge.tools/t/${candidate.token}`); // the full address is the link
     expect(text).toContain("https://ledge.tools/graveyard");
     expect(text).not.toMatch(/rug|dead|score|risk|will (pump|moon|graduate|succeed|fail)/i);
     // eslint-disable-next-line no-control-regex
