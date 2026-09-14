@@ -67,7 +67,7 @@ jobs:
       # always be read after the fact.
       - name: upload the preview
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dispatch-preview
           path: dispatch/
