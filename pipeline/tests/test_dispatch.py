@@ -91,27 +91,27 @@ def test_the_window_excludes_launches_before_it(composed):
 
 
 def test_the_number_line_is_counts_then_the_rate(plain):
-    assert "Pons, last 7 days: 76 of 1,400 launches graduated, 5.43%." in plain
+    assert "Last 7 days on pons: 5.43% of launches graduated (76 of 1,400)." in plain
 
 
 def test_the_excluding_fast_line_carries_its_one_in_n(plain):
     assert (
-        "Excluding launches that graduated inside 5 min: 27 of 1,400, 1.93% (1 in 52)."
+        "Leaving out graduations under 5 min: 1.93%, 27 of 1,400 (1 in 52)."
         in plain
     )
 
 
 def test_the_pair_cohort_line_names_the_two_furthest_apart_with_counts(plain):
     assert (
-        "Pair token, furthest apart: Stablecoin 41 of 350 graduated, 11.7%; "
-        "Other 7 of 350, 2.0%." in plain
+        "Pair token, the two furthest apart: Stablecoin 11.7% (41 of 350), "
+        "Other 2.0% (7 of 350)." in plain
     )
 
 
 def test_the_tax_cohort_line_names_the_two_furthest_apart_with_counts(plain):
     assert (
-        "Creator tax, furthest apart: 0% 25 of 280 graduated, 8.9%; "
-        "6–10% 7 of 280, 2.5%." in plain
+        "Creator tax, the two furthest apart: 0% 8.9% (25 of 280), "
+        "6–10% 2.5% (7 of 280)." in plain
     )
 
 
@@ -121,13 +121,12 @@ def test_the_cohort_lines_state_counts_and_disclaim_a_cause(plain):
 
 def test_the_time_to_graduation_line_carries_p50_p90_and_its_n(plain):
     assert (
-        "Time to graduation, over 76 graduations measured: "
-        "half within 2 min, 9 in 10 within 1 h 8 min." in plain
+        "Half the graduations took under 2 min and 9 in 10 under 1 h 8 min (n=76)." in plain
     )
 
 
 def test_the_insight_line_is_a_fact_from_the_ladder_with_its_n(plain):
-    assert "Graduations that completed in under 60 s: 23 of 76 measured (30.3%)." in plain
+    assert "30.3% of graduations were done within 60 s (23 of 76)." in plain
 
 
 def test_the_blocks_are_in_the_briefed_order(composed):
@@ -147,7 +146,7 @@ def test_the_footer_carries_the_measurement_time_site_method_and_unsubscribe(pla
 
 
 def test_the_subject_leads_with_the_excluding_fast_figure(composed):
-    assert composed["subject"] == "LEDGE — 7 days: 1 in 52, excluding graduations inside 5 min"
+    assert composed["subject"] == "LEDGE, 7 days: 1 in 52 graduated, leaving out graduations under 5 min"
 
 
 # --- CONSTRAINTS -------------------------------------------------------------
@@ -216,22 +215,22 @@ def test_a_thin_window_renders_not_enough_data_rather_than_a_rate(thin):
 def test_a_thin_window_omits_the_insight_rather_than_inventing_one(thin):
     assert [b["id"] for b in thin["blocks"]] == ["number", "cohorts", "ttg"]
     assert "insight" not in [b["id"] for b in thin["blocks"]]
-    assert "completed in under" not in dispatch.render_text(thin)
+    assert "were done within" not in dispatch.render_text(thin)
 
 
 def test_a_thin_window_still_carries_every_denominator(thin):
     text = dispatch.render_text(thin)
     # The counts are still printed — they are observations, and suppressing
     # them would hide the sample rather than the rate. Only the rate goes.
-    assert "Pons, last 7 days: 2 of 12 launches graduated, not enough data (n=12)." in text
-    assert "Excluding launches that graduated inside 5 min: 1 of 12, not enough data (n=12)." in text
+    assert "Last 7 days on pons: not enough data (n=12) of launches graduated (2 of 12)." in text
+    assert "Leaving out graduations under 5 min: not enough data (n=12), 1 of 12." in text
     assert "Pair token: not enough data (n=12)." in text
     assert "Creator tax: not enough data (n=12)." in text
     assert "Time to graduation: not enough data (n=2)." in text
 
 
 def test_a_thin_window_subject_names_the_sample_not_a_figure(thin):
-    assert thin["subject"] == "LEDGE — 7 days: not enough data (n=12)"
+    assert thin["subject"] == "LEDGE, 7 days: not enough data (n=12)"
 
 
 def test_a_thin_window_passes_the_banned_word_check(thin):
@@ -406,24 +405,24 @@ def test_the_window_is_capped_by_the_record_not_by_seven_days(short_record):
 
 
 def test_a_short_record_names_its_real_span_in_the_heading(short_record):
-    assert short_record["heading"] == "LEDGE — the indexed record so far: 29 h to 6 Sep 2026"
+    assert short_record["heading"] == "LEDGE, the indexed record so far: 29 h to 6 Sep 2026"
 
 
 def test_a_full_window_still_says_seven_days_in_the_heading(composed):
-    assert composed["heading"] == "LEDGE — 7 days to 6 Sep 2026"
+    assert composed["heading"] == "LEDGE, 7 days to 6 Sep 2026"
     assert composed["full"] is True
     assert composed["windowSeconds"] == 7 * 86400
 
 
 def test_a_short_record_names_its_real_span_in_the_subject(short_record):
-    assert short_record["subject"].startswith("LEDGE — the indexed record so far, 29 h: ")
+    assert short_record["subject"].startswith("LEDGE, the indexed record so far, 29 h: ")
     assert "7 days" not in short_record["subject"]
 
 
 def test_every_figure_in_a_short_record_carries_the_real_span(short_record):
     text = dispatch.render_text(short_record)
     assert "7 days" not in text
-    assert "Pons, the indexed record so far, 29 h: " in text
+    assert "The indexed record so far, 29 h on pons: " in text
     assert "Two counts over the same 29 h, not a cause." in text
 
 

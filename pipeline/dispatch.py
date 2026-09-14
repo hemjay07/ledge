@@ -119,7 +119,7 @@ def window_phrase(seconds: int, full: bool) -> str:
     """The window as a figure's own label: "last 7 days", or the record's
     real span when the record is shorter than the cap."""
     span = format_span(seconds)
-    return f"last {span}" if full else f"{SHORT_WINDOW_LEAD}, {span}"
+    return f"Last {span}" if full else f"{SHORT_WINDOW_LEAD[0].upper()}{SHORT_WINDOW_LEAD[1:]}, {span}"
 
 
 class DispatchError(RuntimeError):
@@ -193,9 +193,12 @@ def _rung(ladder: list[dict], at_seconds: int) -> dict | None:
 def _number_lines(d7: dict, phrase: str) -> list[str]:
     n = d7["launches"]
     plain = rate_text(d7["rate"], n, d7["insufficient"])
+    # 2026-09-14: the rate first, the counts in brackets, the same shape the
+    # bot's /number and the daily digest use, so a reader who sees both
+    # recognises one figure.
     lines = [
-        f"Pons, {phrase}: {format_count(d7['graduations'])} of "
-        f"{format_count(n)} launches graduated, {plain}."
+        f"{phrase} on pons: {plain} of launches graduated "
+        f"({format_count(d7['graduations'])} of {format_count(n)})."
     ]
 
     ef = d7["excludingFast"]
@@ -204,8 +207,8 @@ def _number_lines(d7: dict, phrase: str) -> list[str]:
     if not is_insufficient(ef["rate"], n, ef["insufficient"]) and ef["oneIn"] is not None:
         one_in = f" (1 in {format_count(ef['oneIn'])})"
     lines.append(
-        f"Excluding launches that graduated inside {format_duration(ef['cutoffSeconds'])}: "
-        f"{format_count(ef['graduations'])} of {format_count(n)}, {ef_text}{one_in}."
+        f"Leaving out graduations under {format_duration(ef['cutoffSeconds'])}: "
+        f"{ef_text}, {format_count(ef['graduations'])} of {format_count(n)}{one_in}."
     )
     return lines
 
@@ -216,13 +219,11 @@ def _cohort_line(rows: list[dict], lead: str, label, span: str) -> str:
         return f"{lead}: not enough data (n={_cohort_n(rows)})."
     high, low = pair
     return (
-        f"{lead}, furthest apart: "
-        f"{label(high['bucket'])} {format_count(high['graduations'])} of "
-        f"{format_count(high['launches'])} graduated, "
-        f"{rate_text(high['rate'], high['launches'], high['insufficient'])}; "
-        f"{label(low['bucket'])} {format_count(low['graduations'])} of "
-        f"{format_count(low['launches'])}, "
-        f"{rate_text(low['rate'], low['launches'], low['insufficient'])}. "
+        f"{lead}, the two furthest apart: "
+        f"{label(high['bucket'])} {rate_text(high['rate'], high['launches'], high['insufficient'])} "
+        f"({format_count(high['graduations'])} of {format_count(high['launches'])}), "
+        f"{label(low['bucket'])} {rate_text(low['rate'], low['launches'], low['insufficient'])} "
+        f"({format_count(low['graduations'])} of {format_count(low['launches'])}). "
         f"Two counts over the same {span}, not a cause."
     )
 
@@ -231,9 +232,8 @@ def _ttg_line(ttg: dict) -> str:
     if ttg["insufficient"] or ttg["p50"] is None or ttg["p90"] is None:
         return f"Time to graduation: not enough data (n={ttg['n']})."
     return (
-        f"Time to graduation, over {format_count(ttg['n'])} graduations measured: "
-        f"half within {format_duration(ttg['p50'])}, "
-        f"9 in 10 within {format_duration(ttg['p90'])}."
+        f"Half the graduations took under {format_duration(ttg['p50'])} "
+        f"and 9 in 10 under {format_duration(ttg['p90'])} (n={format_count(ttg['n'])})."
     )
 
 
@@ -251,9 +251,9 @@ def _insight_line(ttg: dict) -> str | None:
     if rung is None or ttg["insufficient"] or rung["cumulativeShare"] is None:
         return None
     return (
-        f"Graduations that completed in under {format_duration(rung['atSeconds'])}: "
-        f"{format_count(rung['cumulative'])} of {format_count(ttg['n'])} measured "
-        f"({rate_text(rung['cumulativeShare'], ttg['n'], ttg['insufficient'])})."
+        f"{rate_text(rung['cumulativeShare'], ttg['n'], ttg['insufficient'])} of graduations "
+        f"were done within {format_duration(rung['atSeconds'])} "
+        f"({format_count(rung['cumulative'])} of {format_count(ttg['n'])})."
     )
 
 
@@ -262,10 +262,10 @@ def _subject(d7: dict, seconds: int, full: bool) -> str:
     ef = d7["excludingFast"]
     n = d7["launches"]
     if is_insufficient(ef["rate"], n, ef["insufficient"]) or ef["oneIn"] is None:
-        return f"LEDGE — {lead}: not enough data (n={n})"
+        return f"LEDGE, {lead}: not enough data (n={n})"
     return (
-        f"LEDGE — {lead}: 1 in {format_count(ef['oneIn'])}, "
-        f"excluding graduations inside {format_duration(ef['cutoffSeconds'])}"
+        f"LEDGE, {lead}: 1 in {format_count(ef['oneIn'])} graduated, "
+        f"leaving out graduations under {format_duration(ef['cutoffSeconds'])}"
     )
 
 
@@ -318,7 +318,7 @@ def compose(number: dict, launches: list, graduations: list) -> dict:
         "since": since,
         "until": until,
         "subject": _subject(d7, window_seconds, full),
-        "heading": f"LEDGE — {heading_lead} to {measured_on}",
+        "heading": f"LEDGE, {heading_lead} to {measured_on}",
         "blocks": blocks,
         "footer": [
             f"{stamp}.",
