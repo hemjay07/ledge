@@ -852,6 +852,10 @@ a:focus-visible,
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   margin-top: var(--s-3);
+  /* the caption below sizes itself to this box, not the viewport, so it
+     wraps inside a card on a phone instead of scrolling off with the table
+     (2026-09-14: every /cohorts caption was clipped mid-sentence at 390px) */
+  container-type: inline-size;
 }
 table {
   width: 100%;
@@ -878,7 +882,7 @@ caption {
   padding-bottom: var(--s-2);
   position: sticky;
   left: 0;
-  width: min(100%, calc(100vw - 2 * var(--pad-x)));
+  width: min(100%, 100cqw);
   box-sizing: border-box;
 }
 th,
