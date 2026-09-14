@@ -9,6 +9,8 @@ import {
   logSubrequests,
   logWindows,
   tickLogSubrequests,
+  fetchBlockTimestamps,
+  MissingBlockHeader,
 } from "../../src/tick";
 
 /* B8 — the overlap against the advance it is meant to cover.
@@ -96,5 +98,39 @@ describe("the curve topics inside the subrequest budget", () => {
   it("spends two extra requests on a steady tick", () => {
     // one minute of new chain, one window, two curve topics
     expect(tickLogSubrequests(1, BLOCKS_PER_TICK) - logSubrequests(1, BLOCKS_PER_TICK)).toBe(2);
+  });
+});
+
+/* 2026-09-14 15:52Z: the box tick failed seven passes in a row with "no
+   block header for block N" while every endpoint answered that block when
+   asked alone -- the header was empty inside a 50-item batch. The crawl met
+   the same fault on 2026-09-12 and retries the missing blocks alone
+   (pipeline/crawl.py _fetch_block_timestamps); the tick now does the same,
+   and only what is still missing after the retries fails the pass. */
+describe("a header missing from a batch", () => {
+  const header = (block: number) => ({ timestamp: "0x" + (1_700_000_000 + block).toString(16) });
+
+  it("is asked for again alone before the pass is failed", async () => {
+    const asked: number[][] = [];
+    let first = true;
+    const rpc = {
+      callBatch: async (requests: Array<{ params: [string, boolean] }>) => {
+        const blocks = requests.map((r) => parseInt(r.params[0], 16));
+        asked.push(blocks);
+        if (first) { first = false; return blocks.map((b) => (b === 12 ? null : header(b))); }
+        return blocks.map(header);
+      },
+    } as unknown as import("../../src/rpc").RpcClient;
+    const out = await fetchBlockTimestamps(rpc, [10, 11, 12, 13]);
+    expect(out.get(12)).toBe(1_700_000_012);
+    expect(asked).toEqual([[10, 11, 12, 13], [12]]);
+  });
+
+  it("still fails the pass when the header is missing after the retries", async () => {
+    const rpc = {
+      callBatch: async (requests: Array<{ params: [string, boolean] }>) =>
+        requests.map((r) => (parseInt(r.params[0], 16) === 12 ? null : header(parseInt(r.params[0], 16)))),
+    } as unknown as import("../../src/rpc").RpcClient;
+    await expect(fetchBlockTimestamps(rpc, [10, 12])).rejects.toBeInstanceOf(MissingBlockHeader);
   });
 });

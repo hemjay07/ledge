@@ -22,6 +22,7 @@ import {
   formatAge,
   formatAmount,
   formatCount,
+  formatAgeLong,
   formatDuration,
   formatOneIn,
   formatStamp,
@@ -104,7 +105,7 @@ export function headline(
 /** Where the token sits on the published table of graduation times. The share
     is stats.py's, copied; this only chooses how to say it. Null when there is
     no launch time to place. Fixed byte-for-byte against the vector file. */
-export function placementText(placement: TokenResponse["placement"]): string | null {
+export function placementText(placement: TokenResponse["placement"], graduated = false): string | null {
   if (!placement) return null;
   if (placement.reason === "no_ladder") {
     return "The table of graduation times is not published yet, so this launch is not placed on it.";
@@ -112,15 +113,23 @@ export function placementText(placement: TokenResponse["placement"]): string | n
   if (placement.reason === "before_first_step") {
     return `This launch is younger than the first step of the published table (n=${formatCount(placement.n)}).`;
   }
-  const share = placement.rung === null ? null : placement.rung.cumulativeShare;
-  if (placement.insufficient || placement.rung === null || share === null) {
+  if (placement.insufficient || placement.rung === null || share0(placement) === null) {
     return `Not enough graduations to place this launch (n=${formatCount(placement.n)}).`;
   }
   const by = formatDuration(placement.rung.atSeconds);
-  return (
-    `By ${by}, ${rateText({ rate: share, n: placement.n })} of the ${formatCount(placement.n)} ` +
-    `graduations measured in this window had already happened.`
-  );
+  // 2026-09-14: said from the reader's side. For a launch that graduated,
+  // where it sits among the others; for one that has not, how many of the
+  // graduations were already done by the time it had been live this long.
+  const share = rateText({ rate: share0(placement), n: placement.n });
+  const n = `(n=${formatCount(placement.n)})`;
+  if (graduated) {
+    return `${share} of graduations were done within ${by} ${n}.`;
+  }
+  return `${share} of graduations were done within ${by} ${n}; this launch was not.`;
+}
+
+function share0(placement: NonNullable<TokenResponse["placement"]>): number | null {
+  return placement.rung === null ? null : placement.rung.cumulativeShare;
 }
 
 /* METHOD.md "Freshness": the age is the consumer's computation, and a figure
@@ -163,10 +172,11 @@ function cohortSentence(
     !isInsufficient(ef) && window.excludingFast.oneIn !== null
       ? ` (${formatOneIn(window.excludingFast.oneIn)})`
       : "";
+  // 2026-09-14: one line, both figures, the one that leaves out the
+  // sub-cutoff graduations last so it is what the eye lands on.
   return (
-    `${lead}: ${formatCount(window.graduations)} of ${formatCount(window.launches)} graduated, ` +
-    `${rateText(fact)}. Excluding launches that graduated inside ${cutoff}: ` +
-    `${formatCount(window.excludingFast.graduations)} of ${formatCount(window.launches)}, ${rateText(ef)}${oneIn}.${note}`
+    `${lead}: ${rateText(fact)} graduated (${formatCount(window.graduations)} of ${formatCount(window.launches)}); ` +
+    `${rateText(ef)}${oneIn} leaving out graduations under ${cutoff}.${note}`
   );
 }
 
@@ -174,7 +184,7 @@ function cohortSentence(
    one is a small lie that a reader can catch: a token whose launch time IS
    indexed being told it is not. The cause decides the wording. */
 function placementSentence(body: Omit<TokenResponse, "text">): string | null {
-  const line = placementText(body.placement);
+  const line = placementText(body.placement, body.state.graduated);
   if (line !== null) return `${line}${freshnessNote(body.freshness)}`;
   if (!body.state.indexed) {
     return "The launch time is not indexed, so this launch is not placed on the table of graduation times.";
@@ -285,9 +295,11 @@ function activityQuoteText(
     sub-second estimate this index cannot support. */
 function firstOutsideBuySentence(a: NonNullable<TokenResponse["activity"]>): string {
   const buy = a.firstOutsideBuy;
-  if (buy === null) return "No outside buy recorded.";
-  if (buy.inLaunchBlock) return "First outside buy: in the launch block.";
-  if (buy.delaySeconds === null) return "No outside buy recorded.";
+  // Three different silences, kept apart: the index never looked (the row
+  // predates 2026-09-14), it looked and found none, or it found one.
+  if (buy === null) return a.launchTxBuy === null ? "First outside buy: not recorded for this launch." : "First outside buy: none yet.";
+  if (buy.inLaunchBlock) return "First outside buy: in the launch block itself.";
+  if (buy.delaySeconds === null) return "First outside buy: none yet.";
   return `First outside buy: ${formatDuration(buy.delaySeconds)} after the launch block.`;
 }
 
@@ -297,27 +309,38 @@ function firstOutsideBuySentence(a: NonNullable<TokenResponse["activity"]>): str
 function launchTxBuySentence(a: NonNullable<TokenResponse["activity"]>): string | null {
   if (a.launchTxBuy === null) return null;
   return a.launchTxBuy
-    ? "The launch transaction carried its own opening buy."
-    : "The launch transaction carried no opening buy.";
+    ? "The launch transaction bought its own opening tokens."
+    : "The launch transaction bought nothing.";
 }
 
+/** "14 Sep, 15:28 UTC" -- a time in running text, not the colophon stamp. */
+function timeOf(iso: string): string {
+  return formatStamp(iso).replace(/^Measured /, "").replace(/ \d{4} · /, ", ");
+}
+
+/* Rewritten 2026-09-14 for the reader on a phone: what happened on this
+   curve, in the order they ask it. Counts first, then when, then the
+   launch block and the first outside buy. The block window the counts
+   cover is on the site's own page, not here. */
 export function activitySentences(body: Omit<TokenResponse, "text">): string[] {
   const a = body.activity;
   if (a === null) return [];
 
   const quote = activityQuoteText(a, body.config);
+  const buyers =
+    a.firstBlock === null
+      ? "The launch block was not indexed."
+      : a.firstBlock.distinctBuyers === 0
+        ? "Nobody bought in the launch block."
+        : `${formatCount(a.firstBlock.distinctBuyers)} ${a.firstBlock.distinctBuyers === 1 ? "buyer" : "buyers"} in the launch block.`;
   const lines: string[] = [
-    `Activity, ${a.window.label}: ${formatCount(a.buys)} buys, ${formatCount(a.sells)} sells, ${quote}.`,
+    `${formatCount(a.buys)} ${a.buys === 1 ? "buy" : "buys"}, ${formatCount(a.sells)} ${a.sells === 1 ? "sell" : "sells"}, ${quote}. ${buyers}`,
   ];
 
-  const first = a.firstBuyAt === null ? "no buy recorded yet" : formatStamp(a.firstBuyAt);
-  lines.push(`First buy: ${first}. Last activity: ${formatStamp(a.lastActivityAt)}.`);
-
   lines.push(
-    a.firstBlock === null
-      ? "Distinct buyers in the launch's own block: that block was not indexed."
-      : `Distinct buyers in the launch's own block (block ${formatCount(a.firstBlock.block)}): ` +
-          `${formatCount(a.firstBlock.distinctBuyers)}.`,
+    a.firstBuyAt === null
+      ? `No buy yet. Last activity ${timeOf(a.lastActivityAt)}.`
+      : `First buy ${timeOf(a.firstBuyAt)}, last activity ${timeOf(a.lastActivityAt)}.`,
   );
 
   lines.push(firstOutsideBuySentence(a));
@@ -329,36 +352,35 @@ export function activitySentences(body: Omit<TokenResponse, "text">): string[] {
 
 /** The lookup, as plain text. Rendered by the API, the /t noscript block and
     the Telegram bot from the same objects, so the three cannot diverge. */
+/* Rewritten 2026-09-14. The order is the order a launcher asks: is it
+   alive, how far along, what happened on the curve, how did launches like
+   it do, how fresh is this. The share card's headline (`headline`) is not
+   printed here; its wording is pinned by the vector gate and belongs on the
+   card. Every rate still carries its n; the stamp still closes the reply. */
 export function lookupText(
   body: Omit<TokenResponse, "text">,
   observedMaxSeconds: number | null,
 ): string {
-  const lines: string[] = [
-    `${shortAddress(body.address)}${SEP}Pons`,
-    `${configLabel(body)}${SEP}${body.state.phaseLabel}`,
-    headline(body, observedMaxSeconds),
-  ];
+  const lines: string[] = [shortAddress(body.address)];
 
+  const config = `${pairLabel(body.config.pairClass)} pair, ${body.config.taxBucket === null ? "creator tax not read" : `${taxLabel(body.config.taxBucket)} creator tax`}`;
+  lines.push(`${config}. ${stateSentence(body, observedMaxSeconds)}`);
   if (body.notice) lines.push(body.notice);
-
-  const aged = freshnessNote(body.freshness);
-  const allTime = cohortSentence(
-    body.cohort?.allTime ?? null,
-    "Launches configured this way, all time",
-    aged,
-  );
-  const h24 = cohortSentence(body.cohort?.h24 ?? null, "In the last 24 hours", aged);
-  if (allTime) lines.push(allTime);
-  if (h24) lines.push(h24);
-  if (!allTime && !h24) {
-    lines.push("No cohort has been published for this configuration.");
-  }
-
-  const placement = placementSentence(body);
-  if (placement) lines.push(placement);
+  lines.push("");
 
   lines.push(fillSentence(body.state, body.config, cohortSuppressed(body)));
   lines.push(...activitySentences(body));
+  lines.push("");
+
+  const aged = freshnessNote(body.freshness);
+  const allTime = cohortSentence(body.cohort?.allTime ?? null, "Launches like this one", aged);
+  const h24 = cohortSentence(body.cohort?.h24 ?? null, "Last 24 hours", aged);
+  if (allTime) lines.push(allTime);
+  if (h24) lines.push(h24);
+  if (!allTime && !h24) lines.push("No figures are published for launches like this one.");
+  const placement = placementSentence(body);
+  if (placement) lines.push(placement);
+  lines.push("");
 
   if (body.cohort) lines.push(formatStamp(body.cohort.crawledAt));
   if (body.live.stale) {
@@ -366,7 +388,25 @@ export function lookupText(
   }
   lines.push(`${body.links.method}`);
 
-  return lines.join("\n");
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** "Launched 23 minutes ago. Still on the curve." Or "Graduated in 16 min,
+    launched 16 hours ago." Or "Launched 7 days ago. Died on the curve."
+    One sentence a reader can act on. "Died" keeps the
+    meaning outcomeWord gives it: older than the slowest graduation on
+    record with no PoolGraduated seen -- a settled fact, not a forecast. */
+function stateSentence(body: Omit<TokenResponse, "text">, observedMaxSeconds: number | null): string {
+  const elapsed = body.state.elapsedSeconds;
+  const ago = elapsed === null ? null : `${formatAgeLong(elapsed)} ago`;
+  const word = outcomeWord(body, observedMaxSeconds);
+  if (body.state.graduated) {
+    const took = body.state.timeToGraduationSeconds;
+    const first = took === null ? "Graduated" : `Graduated in ${formatDuration(took)}`;
+    return ago ? `${first}, launched ${ago}.` : `${first}.`;
+  }
+  if (word === "died") return `Launched ${ago}. Died on the curve: nothing this old has ever graduated.`;
+  return ago ? `Launched ${ago}. Still on the curve.` : "Still on the curve.";
 }
 
 /** The /number reply: the two figures the fold prints, both with their n. */

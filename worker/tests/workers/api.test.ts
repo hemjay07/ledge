@@ -200,7 +200,7 @@ describe("GET /api/token/{address}", () => {
     expect(body.error).toBe("number_unavailable");
     expect(body.partial.cohort).toBeNull();
     expect(body.partial.state.indexed).toBe(true);
-    expect(body.partial.text).toContain("No cohort has been published");
+    expect(body.partial.text).toContain("No figures are published for launches like this one");
   });
 
   it("prints no percentage without an n anywhere in the rendered text", async () => {

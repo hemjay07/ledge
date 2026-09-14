@@ -77,6 +77,17 @@ export function formatDurationLong(seconds: number): string {
 }
 
 /** Age of a measurement. Coarsens above an hour. */
+/** An age in words for running text: "28 minutes", "16 hours", "7 days".
+    Rounded like formatAge; a launch is not "182 h 30 min" old to a reader. */
+export function formatAgeLong(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 90) return `${s} seconds`;
+  if (s < 5400) { const m = Math.round(s / 60); return `${m} ${m === 1 ? "minute" : "minutes"}`; }
+  if (s < 172800) { const h = Math.round(s / 3600); return `${h} ${h === 1 ? "hour" : "hours"}`; }
+  const d = Math.round(s / 86400);
+  return `${d} ${d === 1 ? "day" : "days"}`;
+}
+
 export function formatAge(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   if (s < 90) return `${s} s`;

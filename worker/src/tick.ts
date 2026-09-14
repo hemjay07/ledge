@@ -339,22 +339,33 @@ async function readActivityRows(
   return new Map(rows.map((row) => [row.token, row]));
 }
 
+/** How many times a header still missing from a batch is asked for again,
+    alone, before the pass is failed. 2026-09-14: seven passes in a row
+    failed on one empty item in a 50-item batch while every endpoint served
+    that block on its own. */
+export const HEADER_RETRIES = 3;
+
 /** Block-header timestamps, batched. Never a wall clock: the whole dataset
     rests on the header being the time a thing happened. */
-async function fetchBlockTimestamps(rpc: RpcClient, blocks: number[]): Promise<Map<number, number>> {
+export async function fetchBlockTimestamps(rpc: RpcClient, blocks: number[]): Promise<Map<number, number>> {
   const distinct = [...new Set(blocks)];
   const out = new Map<number, number>();
   if (distinct.length === 0) return out;
-  const results = await rpc.callBatch(
-    distinct.map((block) => ({
-      method: "eth_getBlockByNumber",
-      params: ["0x" + block.toString(16), false],
-    })),
-  );
-  distinct.forEach((block, i) => {
-    const result = results[i] as { timestamp?: string } | null;
-    if (result?.timestamp) out.set(block, Number(BigInt(result.timestamp)));
-  });
+  let wanted = distinct;
+  for (let attempt = 0; attempt <= HEADER_RETRIES && wanted.length > 0; attempt++) {
+    const results = await rpc.callBatch(
+      wanted.map((block) => ({
+        method: "eth_getBlockByNumber",
+        params: ["0x" + block.toString(16), false],
+      })),
+    );
+    wanted.forEach((block, i) => {
+      const result = results[i] as { timestamp?: string } | null;
+      if (result?.timestamp) out.set(block, Number(BigInt(result.timestamp)));
+    });
+    // Only what is still missing is asked for again, alone.
+    wanted = wanted.filter((block) => !out.has(block));
+  }
   /* Every block that carried a log must have a header. Skipping the log and
      advancing the cursor past its block loses it for ever, and reports ok
      while doing it. Failing holds the cursor, and the next tick reads the

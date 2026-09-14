@@ -16,8 +16,10 @@ function percentagesWithoutAnN(text: string): string[] {
   for (const line of text.split("\n")) {
     PERCENT.lastIndex = 0;
     if (!PERCENT.test(line)) continue;
-    // A tax bucket ("2–3%", "0%") is a configuration label, not a figure.
-    const stripped = line.replace(/(?:tax|ETH|Stablecoin|Tokenized stock|Other)[^\n]*/g, "");
+    // A tax bucket ("2–3%", "0%") is a configuration label, not a figure;
+    // since 2026-09-14 it is printed as "2–3% creator tax", so the label
+    // is stripped from either side of the word.
+    const stripped = line.replace(/(?:tax|ETH|Stablecoin|Tokenized stock|Other)[^\n]*/g, "").replace(/\d+(?:–\d+)?% creator tax/g, "");
     PERCENT.lastIndex = 0;
     if (PERCENT.test(stripped) && !/\bn=|\bof \d|graduations measured/.test(line)) bad.push(line);
   }
@@ -104,18 +106,18 @@ describe("the lookup text", () => {
   const text = lookupText(makeBody(), MAX);
 
   it("states the cohort with both its numerator and its denominator", () => {
-    expect(text).toMatch(/\d[\d,]* of \d[\d,]* graduated/);
+    expect(text).toMatch(/graduated \(\d[\d,]* of \d[\d,]*\)/);
   });
 
   it("names the cutoff as a description, never as a verdict", () => {
-    expect(text).toContain("Excluding launches that graduated inside 5 min");
+    expect(text).toContain("leaving out graduations under 5 min");
   });
 
   it("places the launch from the published table without deriving a share", () => {
     const ladder = fixtureNumber().allTime.ttg.ladder!;
     const rung = ladder.filter((s) => s.atSeconds <= 811).pop()!;
     expect(text).toContain(`${(rung.cumulativeShare! * 100).toFixed(1)}%`);
-    expect(text).toContain("had already happened");
+    expect(text).toContain("of graduations were done within");
   });
 
   it("says the fill is not available rather than printing a zero", () => {
@@ -155,7 +157,7 @@ describe("the lookup text", () => {
 
   it("says plainly when no cohort has been published", () => {
     const t = lookupText(makeBody({ numberFile: null }), null);
-    expect(t).toContain("No cohort has been published for this configuration.");
+    expect(t).toContain("No figures are published for launches like this one.");
     expect(percentagesWithoutAnN(t)).toEqual([]);
   });
 
@@ -214,7 +216,7 @@ describe("a measurement older than the published bound", () => {
   const nineDays = lookupText(makeBody({ numberFile: agedNumber(9 * 86_400) }), MAX);
 
   it("says so on every cohort sentence", () => {
-    const cohortLines = nineDays.split("\n").filter((l) => /graduated,/.test(l));
+    const cohortLines = nineDays.split("\n").filter((l) => /graduated \(/.test(l));
     expect(cohortLines.length).toBeGreaterThan(0);
     for (const line of cohortLines) {
       expect(line).toMatch(FRESHNESS_NOTE_PATTERN);
@@ -223,7 +225,7 @@ describe("a measurement older than the published bound", () => {
   });
 
   it("says so on the placement sentence", () => {
-    const placement = nineDays.split("\n").find((l) => l.includes("had already happened"))!;
+    const placement = nineDays.split("\n").find((l) => l.includes("of graduations were done within"))!;
     expect(placement).toMatch(FRESHNESS_NOTE_PATTERN);
   });
 
@@ -260,14 +262,14 @@ describe("the bound itself, from both sides", () => {
 describe("activity facts", () => {
   it("is absent entirely when LEDGE holds no activity row for this token", () => {
     expect(activitySentences(makeBody())).toEqual([]);
-    expect(lookupText(makeBody(), MAX)).not.toContain("Activity,");
+    expect(lookupText(makeBody(), MAX)).not.toMatch(/\d+ buys?, \d+ sells?/);
   });
 
   it("states buys, sells and quote in/out against the window it counted over, verbatim", () => {
     const body = makeBody({ activity: ACTIVITY });
     const lines = activitySentences(body);
     expect(body.activity).not.toBeNull();
-    expect(lines[0]).toContain(body.activity!.window.label);
+    // the block window stays on the site page (2026-09-14); the phone reply names the counts
     expect(lines[0]).toContain(`${ACTIVITY.buys} buys`);
     expect(lines[0]).toContain(`${ACTIVITY.sells} sells`);
     expect(lines[0]).toContain("ETH in and");
@@ -275,42 +277,41 @@ describe("activity facts", () => {
 
   it("states first buy and last activity, each as a stamp", () => {
     const lines = activitySentences(makeBody({ activity: ACTIVITY }));
-    expect(lines[1]).toContain("First buy:");
-    expect(lines[1]).toContain("Last activity:");
-    expect(lines[1]).toContain("Measured");
+    expect(lines[1]).toContain("First buy ");
+    expect(lines[1]).toContain("last activity ");
+    expect(lines[1]).toMatch(/\d{1,2} \w{3}, \d{2}:\d{2} UTC/);
   });
 
   it("says 'no buy recorded yet' rather than a stamp when no buy has been seen", () => {
     const noBuy = { ...ACTIVITY, first_buy_ts: null };
     const lines = activitySentences(makeBody({ activity: noBuy }));
-    expect(lines[1]).toContain("no buy recorded yet");
+    expect(lines[1]).toContain("No buy yet");
   });
 
   it("distinguishes zero distinct buyers from an unindexed launch block", () => {
     const zero = { ...ACTIVITY, first_block_buyers: 0 };
     const zeroLines = activitySentences(makeBody({ activity: zero }));
-    expect(zeroLines[2]).toContain("block 56,172,001");
-    expect(zeroLines[2]).toContain(": 0.");
+        expect(zeroLines[0]).toContain("Nobody bought in the launch block");
 
     const neverIndexed = { ...ACTIVITY, first_block_buyers: null };
     const nullLines = activitySentences(makeBody({ activity: neverIndexed }));
-    expect(nullLines[2]).toContain("that block was not indexed");
-    expect(nullLines[2]).not.toContain(": 0.");
-    expect(zeroLines[2]).not.toEqual(nullLines[2]);
+    expect(nullLines[0]).toContain("The launch block was not indexed");
+    expect(nullLines[0]).not.toContain("Nobody bought");
+    expect(zeroLines[0]).not.toEqual(nullLines[0]);
   });
 
   it("prints the distinct buyer count for the launch's own block, and no wallet address", () => {
     const lines = activitySentences(makeBody({ activity: ACTIVITY }));
-    expect(lines[2]).toContain(`${ACTIVITY.first_block_buyers}`);
+    expect(lines[0]).toContain(`${ACTIVITY.first_block_buyers}`);
     expect(lines.join(" ")).not.toMatch(/0x[0-9a-f]{40}/i);
   });
 
   it("reaches the full /t/{address} text, after the curve fill", () => {
     const text = lookupText(makeBody({ activity: ACTIVITY }), MAX);
-    expect(text).toContain("Activity,");
+    expect(text).toMatch(/\d+ buys?, \d+ sells?/);
     expect(text).toContain(`${ACTIVITY.buys} buys`);
     const fillIndex = text.indexOf("Curve fill:");
-    const activityIndex = text.indexOf("Activity,");
+    const activityIndex = text.search(/\d+ buys?, \d+ sells?/);
     expect(fillIndex).toBeGreaterThan(-1);
     expect(activityIndex).toBeGreaterThan(fillIndex);
   });
@@ -330,7 +331,7 @@ describe("the first-outside-buy sentence", () => {
         activity: { ...ACTIVITY, first_outside_buy_block: LAUNCH.block, first_outside_buy_ts: LAUNCH.ts },
       }),
     );
-    expect(lines).toContain("First outside buy: in the launch block.");
+    expect(lines).toContain("First outside buy: in the launch block itself.");
   });
 
   it("states the delay in whole seconds after the launch block", () => {
@@ -342,19 +343,19 @@ describe("the first-outside-buy sentence", () => {
     const lines = activitySentences(
       makeBody({ activity: { ...ACTIVITY, first_outside_buy_block: null, first_outside_buy_ts: null } }),
     );
-    expect(lines).toContain("No outside buy recorded.");
+    expect(lines.join(" ")).toMatch(/First outside buy: (none yet|not recorded for this launch)\./);
   });
 
   it("states whether the launch transaction carried its own opening buy", () => {
     const seen = activitySentences(makeBody({ activity: { ...ACTIVITY, launch_tx_buy: 1 } }));
     const notSeen = activitySentences(makeBody({ activity: { ...ACTIVITY, launch_tx_buy: 0 } }));
-    expect(seen).toContain("The launch transaction carried its own opening buy.");
-    expect(notSeen).toContain("The launch transaction carried no opening buy.");
+    expect(seen).toContain("The launch transaction bought its own opening tokens.");
+    expect(notSeen).toContain("The launch transaction bought nothing.");
   });
 
   it("says nothing about the launch transaction when it is not known", () => {
     const lines = activitySentences(makeBody({ activity: { ...ACTIVITY, launch_tx_buy: null } }));
-    expect(lines.join(" ")).not.toContain("The launch transaction carried");
+    expect(lines.join(" ")).not.toContain("The launch transaction bought");
   });
 
   it("carries no verdict word", () => {

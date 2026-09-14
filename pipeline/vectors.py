@@ -389,7 +389,7 @@ def headline(number: dict, case_input: dict, cohort: dict) -> str:
     )
 
 
-def placement_sentence(placement: dict | None) -> str | None:
+def placement_sentence(placement: dict | None, graduated: bool = False) -> str | None:
     """Where the token sits on the published table of graduation times. The
     share is stats.py's, copied; only the wording is chosen here."""
     if placement is None:
@@ -406,11 +406,14 @@ def placement_sentence(placement: dict | None) -> str | None:
     share = placement["rung"]["cumulativeShare"]
     if share is None:
         return f"Not enough graduations to place this launch (n={format_count(placement['n'])})."
-    return (
-        f"By {format_duration(placement['rung']['atSeconds'])}, "
-        f"{rate_text(share, placement['n'], False)} of the {format_count(placement['n'])} "
-        "graduations measured in this window had already happened."
+    # 2026-09-14: reworded from the reader's side (worker/src/text.ts
+    # placementText). The vector cases are all ungraduated launches, so the
+    # "this launch was not" form is the one pinned here.
+    head = (
+        f"{rate_text(share, placement['n'], False)} of graduations were done within "
+        f"{format_duration(placement['rung']['atSeconds'])} (n={format_count(placement['n'])})"
     )
+    return f"{head}." if graduated else f"{head}; this launch was not."
 
 
 def _case(number: dict, name: str, why: str, **case_input) -> dict:
@@ -436,7 +439,7 @@ def _case(number: dict, name: str, why: str, **case_input) -> dict:
             "placement": placement,
             "text": {
                 "headline": headline(number, ordered, cohort),
-                "placement": placement_sentence(placement),
+                "placement": placement_sentence(placement, case_input["graduated"]),
             },
         },
     }

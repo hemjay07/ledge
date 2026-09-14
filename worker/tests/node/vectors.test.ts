@@ -176,7 +176,7 @@ describe.skipIf(!PRESENT)("the vector gate", () => {
       it("says the same thing about the placement in running text", () => {
         const rendered = lookupText(body, OBSERVED_MAX);
         if (testCase.expected.text.placement === null) {
-          expect(rendered).not.toContain("had already happened");
+          expect(rendered).not.toContain("of graduations were done within");
         } else {
           expect(rendered).toContain(testCase.expected.text.placement);
         }
