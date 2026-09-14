@@ -9,6 +9,7 @@ import {
   isRateLimited,
   type Transport,
   rpcFromEnv,
+  BATCH_PACING_MS,
 } from "../../src/rpc";
 
 /* The envelope pipeline/rpc.py proved. Anything here that changes changes the
@@ -50,17 +51,27 @@ describe("the RPC envelope", () => {
 
   it("chunks a batch at 50 with pacing between chunks", async () => {
     const sizes: number[] = [];
-    const client = new RpcClient("http://unused", async (payload) => {
-      const batch = payload as Array<{ id: number }>;
-      sizes.push(batch.length);
-      return batch.map((r) => ({ id: r.id, result: "0x0" }));
-    });
+    const slept: number[] = [];
+    const client = new RpcClient(
+      "http://unused",
+      async (payload) => {
+        const batch = payload as Array<{ id: number }>;
+        sizes.push(batch.length);
+        return batch.map((r) => ({ id: r.id, result: "0x0" }));
+      },
+      undefined,
+      undefined,
+      undefined,
+      async (ms) => { slept.push(ms); },
+    );
     const results = await client.callBatch(
       Array.from({ length: 120 }, () => ({ method: "eth_call", params: [] })),
     );
     expect(sizes).toEqual([50, 50, 20]);
     expect(results).toHaveLength(120);
-  }, 20_000);
+    // the pacing is asserted, not waited through (2026-09-14: this test was 4 s of real sleep)
+    expect(slept).toEqual([BATCH_PACING_MS, BATCH_PACING_MS]);
+  });
 });
 
 
@@ -101,8 +112,10 @@ describe("fallback endpoint", () => {
    invocation mid-tick, so the tick fails at a decision point and the cron
    retries a minute later. */
 describe("the subrequest budget", () => {
-  /* These exercise the real backoff, so they carry their own timeout and use
-     small budgets: every extra attempt is another real second of sleep. */
+  /* The backoff is recorded, not waited through: the sleeper is injected
+     (2026-09-14; these were 2.5 s of real sleep per run). The delays asked
+     for are what the tests check. */
+  const instantSleep = async (_ms: number) => {};
   const busyTransport = (counter: { n: number }): Transport => async () => {
     counter.n += 1;
     return [{ jsonrpc: "2.0", id: 0, error: { code: -32005, message: "the network is busy" } }];
@@ -119,12 +132,12 @@ describe("the subrequest budget", () => {
         undefined,
         undefined,
         2,
+        instantSleep,
       );
       await expect(client.getLogs(1, 2, "0xfactory", "0xtopic")).rejects.toThrow(RpcUnavailable);
       expect(counter.n).toBe(2);
       expect(client.subrequests).toBe(2);
     },
-    20_000,
   );
 
   it(
@@ -137,12 +150,12 @@ describe("the subrequest budget", () => {
         undefined,
         undefined,
         3,
+        instantSleep,
       );
       await expect(client.getLogs(1, 2, "0xfactory", "0xtopic")).rejects.toThrow(RpcUnavailable);
       expect(client.subrequests).toBe(counter.n);
       expect(client.subrequests).toBeGreaterThan(1);
     },
-    20_000,
   );
 });
 
