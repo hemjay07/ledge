@@ -108,6 +108,20 @@ jobs:
   # The other half of the vector gate. The `check` job proves the committed
   # vectors are what Python produces; this job proves the Worker reproduces
   # them. A drift on either side has to fail both, or it is not a gate.
+  gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # The RPC gateway (gateway/): pacing, failover, retry, cache, batch
+      # reassembly, auth -- against fake upstreams, no network. It is the
+      # only process that talks to the chain, so it is gated like the rest.
+      - name: gateway tests
+        run: npm test --prefix gateway
+
   worker:
     runs-on: ubuntu-latest
     timeout-minutes: 15

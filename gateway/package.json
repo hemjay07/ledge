@@ -1,0 +1,8 @@
+{
+  "name": "ledge-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-timeout=8000 tests/gateway.test.mjs tests/server.test.mjs"
+  }
+}

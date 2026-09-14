@@ -32,23 +32,30 @@ with the crawl's own race resolution. Installed 2026-09-12:
 A first trial on a few pools: `LEDGE_PROBE_LIMIT_POOLS=20 sudo -E -u ledge ops/probe.sh`
 (or set `LEDGE_PROBE_LIMIT_POOLS` in `/etc/ledge/env` temporarily).
 
-## The RPC relay (Worker egress through the box)
+## The RPC gateway (every chain read goes through it)
 
-`rpc-proxy.mjs` listens on 8545 and forwards JSON-RPC to `RPC_URL` (falling
-back once to `RPC_URL_FALLBACK` when the upstream cannot be reached at all)
-from the box's own address, because on 2026-09-13 both public endpoints
-refused Cloudflare's egress for an hour while answering the box in 0.3 s.
-It accepts only a POST carrying the shared key in `X-Ledge-Key`, and the
-firewall admits the port from Cloudflare's published ranges only.
+`gateway/` is one process on the box that owns all endpoint policy: pacing
+per upstream, failover between the two public endpoints on a 429, 5xx,
+transport failure or "the network is busy", a retry pass with backoff, a
+cache for answers that cannot change (block headers and log ranges below
+the reorg window), and `/metrics`. The crawl and the probe reach it on
+loopback (`RPC_URL=http://127.0.0.1:8545` in `/etc/ledge/env`, no key
+needed); the Worker reaches it by hostname with the shared key in
+`X-Ledge-Key`, and the firewall admits the port from Cloudflare's
+published ranges only. Tests: `cd gateway && npm test`.
 
-    sudo install -m 640 -o root -g ledge /dev/null /etc/ledge/proxy.env
-    sudo sh -c 'echo "RPC_PROXY_KEY=$(openssl rand -hex 32)" > /etc/ledge/proxy.env'
-    sudo cp ops/ledge-rpc-proxy.service /etc/systemd/system/
-    sudo systemctl daemon-reload && sudo systemctl enable --now ledge-rpc-proxy
+    sudo install -m 640 -o root -g ledge /dev/null /etc/ledge/gateway.env
+    sudo sh -c 'printf "GATEWAY_UPSTREAM=https://rpc.mainnet.chain.robinhood.com\nGATEWAY_UPSTREAM_FALLBACK=https://rpc.ordofi.network\nGATEWAY_KEY=%s\n" "$(openssl rand -hex 32)" > /etc/ledge/gateway.env'
+    sudo cp ops/ledge-gateway.service /etc/systemd/system/
+    sudo systemctl daemon-reload && sudo systemctl enable --now ledge-gateway
     sudo ufw allow OpenSSH
     for ip in $(curl -s https://www.cloudflare.com/ips-v4); do sudo ufw allow from "$ip" to any port 8545 proto tcp; done
     sudo ufw --force enable
+    curl -s http://127.0.0.1:8545/metrics
 
 Then on the Worker: `wrangler secret put RPC_PROXY_KEY` with the same key
-(never printed; pipe it), `RPC_URL = "http://<box>:8545"` in
-`wrangler.toml`, deploy. Rotate by writing a new key to both places.
+(never printed; pipe it), `RPC_URL = "http://<box hostname>:8545"` in
+`wrangler.toml` (a Worker cannot fetch a bare IP; `<ip>.nip.io` resolves to
+it), deploy. Rotate by writing a new key to both places. The journal prints
+one metrics line a minute: `refused`/`busy` rising on an upstream is the
+rate-limit pressure that used to be an outage.

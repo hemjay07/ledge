@@ -34,10 +34,13 @@ coverage at 39%), ordofi's "network is busy" (35 of 36 box runs), a missing
 block header (one box run), and ordofi's 75-second `Initialize` query
 (runs that would have outlived the 2-hour unit). Each time the fix was a
 budget, a retry, a fallback or a cap — correct, but each was found by the
-failure. *Guard now:* the crawl's per-window cost is measured from the box
-and written in `INDEXER.md` "RPC"; the runner has a 2-hour ceiling and the
-crawl a 200-window cap, so a slow endpoint fails visibly rather than
-silently. *Still open (A4):* the watchdog only checks freshness from
+failure. *Guard now (2026-09-14):* one RPC gateway on the box (`gateway/`,
+tested against fake upstreams, in CI) owns pacing, failover, retry and
+cache for every chain read; the clients hold no endpoint policy any more.
+Its `/metrics` line once a minute makes rate-limit pressure a number in
+the journal instead of an outage. The crawl's per-window cost is measured
+in `INDEXER.md` "RPC"; the runner has a 2-hour ceiling and the crawl a
+200-window cap, so a slow endpoint still fails visibly. *Still open (A4):* the watchdog only checks freshness from
 GitHub every six hours. The three reconciliation figures — coverage,
 agreement, freshness — belong on `/method` hourly, and a Telegram message
 when a cursor is past its bound, so the owner learns of a stall in an hour,
@@ -96,3 +99,4 @@ without the banner — and it has not been met yet.
 | 09-13 | crawl built `number.json` without the pools it wrote | 1, 3 | pools view; committed-record test |
 | 09-13 | both public RPCs refused Cloudflare's egress; live tick down from 18:05Z | 2 | RPC relay on the box + keyed Worker client (owner flips it) |
 | 09-13 | one box push lost a race with a hand push at 19:07Z | — | expected; the runner keeps the commit and pushes next run (it did) |
+| 09-14 | official endpoint refused the tick's header batch after ~50 calls/30 s from the box | 2 | the gateway: pacing + failover + cache, one place, tested |

@@ -1,5 +1,5 @@
 [Unit]
-Description=LEDGE RPC relay for the Worker (ops/rpc-proxy.mjs)
+Description=LEDGE RPC gateway (gateway/server.mjs) -- every chain read goes through here
 After=network-online.target
 Wants=network-online.target
 
@@ -7,9 +7,8 @@ Wants=network-online.target
 Type=simple
 User=ledge
 Group=ledge
-EnvironmentFile=/etc/ledge/env
-EnvironmentFile=/etc/ledge/proxy.env
-ExecStart=/usr/bin/node /home/ledge/ledge/ops/rpc-proxy.mjs
+EnvironmentFile=/etc/ledge/gateway.env
+ExecStart=/usr/bin/node /home/ledge/ledge/gateway/server.mjs
 Restart=always
 RestartSec=3
 NoNewPrivileges=true

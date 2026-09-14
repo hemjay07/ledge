@@ -41,16 +41,23 @@ scheduler drift.
 **Box.** Hetzner CX22 (2 vCPU, 4 GB, ~€4/month) or DigitalOcean $6 droplet.
 Ubuntu 24.04. Nothing else on it.
 
-**RPC.** `rpc.mainnet.chain.robinhood.com` primary, `rpc.ordofi.network`
-fallback — the reverse of the GitHub-era order, changed 2026-09-13 after the
-box failed 35 of 36 crawls overnight on ordofi's "the network is busy" and a
-measurement from the box put the unfiltered `Initialize` query at 75 s on
-ordofi against 0.3 s on the official endpoint (launches and graduations:
-2.3 s / 1.5 s against 0.3 s / 0.3 s). The crawl's client alternates to the
-fallback after one busy answer (`pipeline/rpc.py`). If both still
-rate-limit a single steady client, the next step is our own node (Robinhood
-Chain is an Arbitrum Orbit chain; ~$20–40/month box). Not before it is shown
-to be needed.
+**RPC.** Every chain read — the crawl, the probe, the Worker's tick and
+lookups — goes through one process on the box, `gateway/` (unit
+`ops/ledge-gateway.service`, port 8545). It owns all endpoint policy in
+one tested place: pacing per upstream, failover between the official
+endpoint and ordofi on a 429, 5xx, transport failure or "the network is
+busy", a retry pass with backoff, a cache for answers that cannot change
+(block headers and log ranges below the reorg window), and `/metrics`
+logged once a minute. Built 2026-09-14 after a day in which the same
+endpoint failure was fixed in three clients: ordofi refused 35 of 36
+crawls overnight; the official endpoint took 75 s for an unfiltered
+`Initialize` query against ordofi's 0.3 s; both refused Cloudflare's
+egress for six hours (190+ consecutive tick failures) while answering the
+box; and the official endpoint refused a catch-up tick's block-header
+batch after ~50 calls in 30 s from the box itself. The clients now hold
+no policy. The next steps are in TODO A3 (the tick itself on the box) and
+the node evaluation: a node of our own is the only thing that removes the
+dependency; it becomes one more upstream behind the gateway.
 
 ## The four pieces
 
