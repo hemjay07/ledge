@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { tokenShell } from "../../src/html";
 import { lookupText } from "../../src/text";
-import { ACTIVITY, ADDRESS, fixtureNumber, makeBody, NOW_SECONDS } from "./helpers";
+import { ACTIVITY, ADDRESS, fixtureNumber, makeBody, NOW_SECONDS, LAUNCH } from "./helpers";
 
 const MAX = fixtureNumber().allTime.ttg.max;
 const SITE = "https://ledge.tools";
@@ -244,5 +244,88 @@ describe("the outcomes card", () => {
   it("prints the sample size and no figure below the n = 30 floor", () => {
     const html = render({ ...GRADUATED, activity: ACTIVITY });
     expect(html).toContain("not enough data (n=12)");
+  });
+});
+
+/* design/FIRSTBUY-TOKEN-BRIEF.md: the per-token first-buy card, after the
+   buyers card -- this token's own launch-tx / first-outside-buy reading,
+   with the note beside it a verbatim cohort lookup, gated by rateText. */
+describe("the first-outside-buy card", () => {
+  function withFirstBuyCohort(n: number, insufficient: boolean) {
+    const file = JSON.parse(JSON.stringify(fixtureNumber()));
+    file.firstBuy = {
+      indexedFromBlock: 1,
+      population: "launches at least one hour old at crawledAt",
+      cohorts: {
+        all: [],
+        pairClass: [],
+        taxBucket: [
+          {
+            bucket: "2-3%",
+            n,
+            launchTxBuy: insufficient ? 10 : 380,
+            launchTxBuyShare: insufficient ? null : 0.92,
+            outside: { sameBlock: 10, within1s: 60, within3s: 20, within5s: 8, after5s: 5, none: 2 },
+            sameBlockShare: insufficient ? null : 0.03,
+            within1sShare: insufficient ? null : 0.24,
+            within3sShare: insufficient ? null : 0.29,
+            within5sShare: insufficient ? null : 0.31,
+            noneShare: insufficient ? null : 0.02,
+            insufficient,
+          },
+        ],
+      },
+    };
+    return file;
+  }
+
+  it("renders a dash when there is no activity row at all", () => {
+    const html = render({ activity: undefined });
+    const card = html.match(/<div class="k">First outside buy<\/div>([\s\S]*?)<\/section>/)?.[1] ?? "";
+    expect(card).toContain("—");
+  });
+
+  it("shows 'in the launch block' as the figure for a same-block outside buy", () => {
+    const html = render({
+      activity: { ...ACTIVITY, first_outside_buy_block: LAUNCH.block, first_outside_buy_ts: LAUNCH.ts },
+    });
+    expect(html).toContain("in the launch block");
+  });
+
+  it("shows the delay as the figure for an outside buy after the launch block", () => {
+    const html = render({ activity: ACTIVITY });
+    expect(html).toContain("12 s");
+  });
+
+  it("shows 'none recorded' when no outside buy has been seen", () => {
+    const html = render({
+      activity: { ...ACTIVITY, first_outside_buy_block: null, first_outside_buy_ts: null },
+    });
+    expect(html).toContain("none recorded");
+  });
+
+  it("prints the cohort note through rateText, nothing else below the n = 30 floor", () => {
+    const html = render({ activity: ACTIVITY, numberFile: withFirstBuyCohort(12, true) });
+    expect(html).toContain("not enough data (n=12)");
+  });
+
+  it("prints the full cohort sentence when the sample clears the floor", () => {
+    const html = render({ activity: ACTIVITY, numberFile: withFirstBuyCohort(412, false) });
+    expect(html).toContain("Of 412 launches with a 2–3% creator tax");
+    expect(html).toContain("took their first outside buy within 1 s");
+    expect(html).toContain("within 5 s");
+    expect(html).toContain("none within an hour");
+  });
+
+  it("names no cohort when the published file carries no firstBuy block", () => {
+    const html = render({ activity: ACTIVITY });
+    expect(html).toContain("No cohort has been published for this creator-tax band.");
+  });
+
+  it("carries no verdict word", () => {
+    const html = render({ activity: ACTIVITY, numberFile: withFirstBuyCohort(412, false) });
+    expect(html).not.toMatch(
+      /\b(score|grade|rating|badge|guaranteed|risk[- ]?free|sure thing|safe|rug|odds|chance|likely|will (pump|moon|graduate|succeed|fail))\b/i,
+    );
   });
 });

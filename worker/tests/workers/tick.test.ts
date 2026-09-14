@@ -725,7 +725,7 @@ describe("retention reaches the activity rows", () => {
   it("prunes an activity row whose last event is past the cutoff", async () => {
     await seedCursor(500_000, NOW);
     await env.LEDGE_DB.prepare(
-      `INSERT INTO token_activity VALUES ('0xold', 10, 1, 0, '1', '0', ?, ?, 1, NULL, NULL)`,
+      `INSERT INTO token_activity VALUES ('0xold', 10, 1, 0, '1', '0', ?, ?, 1, NULL, NULL, NULL, NULL, NULL)`,
     )
       .bind(NOW - RETENTION_SECONDS - 10, NOW - RETENTION_SECONDS - 10)
       .run();
@@ -741,7 +741,7 @@ describe("retention reaches the activity rows", () => {
         `INSERT INTO launch VALUES ('0xlive', '0xc', '0x0', 'eth', 0, NULL, 10, ?, '0xt1', 0)`,
       ).bind(NOW - RETENTION_SECONDS - 3600),
       env.LEDGE_DB.prepare(
-        `INSERT INTO token_activity VALUES ('0xlive', 10, 3, 0, '3', '0', ?, ?, 1, NULL, NULL)`,
+        `INSERT INTO token_activity VALUES ('0xlive', 10, 3, 0, '3', '0', ?, ?, 1, NULL, NULL, NULL, NULL, NULL)`,
       ).bind(NOW - RETENTION_SECONDS - 3000, NOW - 60),
     ]);
     await tickOnce();
@@ -756,7 +756,7 @@ describe("retention reaches the activity rows", () => {
         NOW - 60,
       ),
       env.LEDGE_DB.prepare(
-        `INSERT INTO token_activity VALUES ('0xgrad', 10, 3, 0, '3', '0', ?, ?, 1, NULL, NULL)`,
+        `INSERT INTO token_activity VALUES ('0xgrad', 10, 3, 0, '3', '0', ?, ?, 1, NULL, NULL, NULL, NULL, NULL)`,
       ).bind(NOW - RETENTION_SECONDS - 3000, NOW - RETENTION_SECONDS - 10),
     ]);
     await tickOnce();
@@ -914,7 +914,7 @@ describe("a pass that seeds a row for a token it already holds", () => {
   it("keeps the counters a previous pass wrote", async () => {
     await seedCursor(5000, NOW);
     await env.LEDGE_DB.prepare(
-      `INSERT INTO token_activity VALUES (?, 4000, 9, 2, '900', '20', ?, ?, 3, NULL, NULL)`,
+      `INSERT INTO token_activity VALUES (?, 4000, 9, 2, '900', '20', ?, ?, 3, NULL, NULL, NULL, NULL, NULL)`,
     )
       .bind(TOKEN_A, NOW - 400, NOW - 300)
       .run();
@@ -1015,7 +1015,7 @@ describe("the reserve read tick.ts writes", () => {
         `INSERT INTO launch VALUES (?, ?, ?, 'eth', 300, '4200000000000000000', ?, ?, '0xtx', 0)`,
       ).bind(token, curve, pairToken, launchBlock, NOW - 500),
       env.LEDGE_DB.prepare(
-        `INSERT INTO token_activity VALUES (?, ?, 1, 0, '100', '0', ?, ?, 1, NULL, NULL)`,
+        `INSERT INTO token_activity VALUES (?, ?, 1, 0, '100', '0', ?, ?, 1, NULL, NULL, NULL, NULL, NULL)`,
       ).bind(token, launchBlock, NOW - 500, NOW - 100),
       // Pre-seeded so this token is not ALSO picked up for a fresh
       // name()/symbol() read (2026-09-12, worker/schema.sql's `token_meta`
@@ -1169,7 +1169,7 @@ describe("the pair_token cache tick.ts writes", () => {
         `INSERT INTO launch VALUES (?, ?, ?, 'stock', 300, '4200000000000000000', ?, ?, '0xtx', 0)`,
       ).bind(token, curve, PAIR_TOKEN, launchBlock, NOW - 500),
       env.LEDGE_DB.prepare(
-        `INSERT INTO token_activity VALUES (?, ?, 1, 0, '100', '0', ?, ?, 1, NULL, NULL)`,
+        `INSERT INTO token_activity VALUES (?, ?, 1, 0, '100', '0', ?, ?, 1, NULL, NULL, NULL, NULL, NULL)`,
       ).bind(token, launchBlock, NOW - 500, NOW - 100),
       // Same reasoning as "the reserve read" describe block's seedBoardRow:
       // pre-seeded so this token is not also picked up for a fresh
@@ -1365,7 +1365,7 @@ describe("the token_meta cache tick.ts writes", () => {
         `INSERT INTO launch VALUES (?, ?, ?, 'eth', 300, '4200000000000000000', ?, ?, '0xtx', 0)`,
       ).bind(token, curve, "0x0000000000000000000000000000000000000000", launchBlock, NOW - 500),
       env.LEDGE_DB.prepare(
-        `INSERT INTO token_activity VALUES (?, ?, 1, 0, '100', '0', ?, ?, 1, NULL, NULL)`,
+        `INSERT INTO token_activity VALUES (?, ?, 1, 0, '100', '0', ?, ?, 1, NULL, NULL, NULL, NULL, NULL)`,
       ).bind(token, launchBlock, NOW - 500, NOW - 100),
     ]);
   }

@@ -47,6 +47,7 @@ import {
   formatCount,
   formatDuration,
   formatStamp,
+  rateText,
 } from "./format";
 import { cohortSuppressed, freshnessLine, outcomeWord } from "./text";
 
@@ -116,6 +117,61 @@ function buyersCard(body: Body): string {
       <div class="k">Buyers in the launch block</div>
       <div class="fig">${e(formatCount(a.firstBlock.distinctBuyers))}</div>
       <div class="note">${zero ? "The block was read, and nobody bought in it." : "Distinct wallets that bought in the block this token launched in."}</div>
+    </section>`;
+}
+
+/* ---- the first-outside-buy card: this token's own reading, and how launches
+   in its own creator-tax band fared (2026-09-14, design/FIRSTBUY-TOKEN-BRIEF.md)
+
+   The figure is this token's own Class B observation -- activity.firstOutsideBuy,
+   already computed in worker/src/activity.ts/tick.ts from block headers, never
+   derived here. The note beside it is a Class A cohort row, a verbatim lookup
+   into number.json's firstBuy block (lookup.ts firstBuyFor) -- through
+   rateText, so a cohort under n=30 prints "not enough data (n=...)" and
+   nothing else, never a bare share (CONSTRAINTS 4). */
+function firstOutsideBuyCard(body: Body): string {
+  const a = body.activity;
+  if (a === null) {
+    return `
+    <section class="card">
+      <div class="k">First outside buy</div>
+      <div class="fig fig-2 fig-dash">—</div>
+      <div class="note">No curve activity indexed for this token.</div>
+    </section>`;
+  }
+
+  const buy = a.firstOutsideBuy;
+  const figureText =
+    buy === null
+      ? "none recorded"
+      : buy.inLaunchBlock
+        ? "in the launch block"
+        : buy.delaySeconds === null
+          ? "none recorded"
+          : `${formatDuration(buy.delaySeconds)} after the launch block`;
+  const dash = buy === null || (!buy.inLaunchBlock && buy.delaySeconds === null);
+
+  const cohort = body.firstBuy?.cohort ?? null;
+  let note: string;
+  if (cohort === null) {
+    note = "No cohort has been published for this creator-tax band.";
+  } else if (cohort.insufficient) {
+    note = rateText({ rate: null, n: cohort.n, insufficient: true });
+  } else {
+    const within1 = rateText({ rate: cohort.within1sShare, n: cohort.n });
+    const within5 = rateText({ rate: cohort.within5sShare, n: cohort.n });
+    const none = rateText({ rate: cohort.noneShare, n: cohort.n });
+    note =
+      `Of ${formatCount(cohort.n)} launches with a ${taxLabel(cohort.bucket)} creator tax, ` +
+      `${within1} took their first outside buy within 1 s and ${within5} within 5 s; ` +
+      `${none} none within an hour.`;
+  }
+
+  return `
+    <section class="card">
+      <div class="k">First outside buy</div>
+      <div class="fig fig-2${dash ? " fig-dash" : ""}">${e(figureText)}</div>
+      <div class="note">${e(note)}</div>
     </section>`;
 }
 
@@ -776,6 +832,7 @@ export function tokenShell(
     ${headerBlock(body, observedMaxSeconds)}
     <div class="cards">
       ${buyersCard(body)}
+      ${firstOutsideBuyCard(body)}
       ${fillCard(body)}
       ${cohortCard(body)}
       ${outcomesCard(body)}

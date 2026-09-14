@@ -107,21 +107,63 @@ CREATE INDEX IF NOT EXISTS graduation_ts_idx    ON graduation (ts DESC);
 -- which is a real, distinct reading a drained or graduated curve can give.
 -- Filled by worker/src/reserve.ts, one Multicall3 aggregate3() call a tick
 -- covering the whole board population, never a per-curve RPC call.
+--
+-- launch_tx_buy / first_outside_buy_block / first_outside_buy_ts
+-- (2026-09-14, design/FIRSTBUY-TOKEN-BRIEF.md). MOAT.md #3's per-token
+-- surface: the launch's own opening buy, kept apart from the first buy from
+-- anyone else, exactly as design/FIRSTBUY-BRIEF.md's pipeline-side crawl
+-- keeps `inLaunchTx` apart from the first outside buy in `data/firstbuys/`.
+-- Both are read off the same CurveBuy logs worker/src/tick.ts already folds
+-- into this table -- no new RPC read, no (token, buyer) table, and the buyer
+-- address is never written (CONSTRAINTS 2), only whether a buy's own
+-- transaction hash equalled the launch's.
+--
+-- launch_tx_buy mirrors first_block_buyers' null/0/positive shape: 1 when a
+-- CurveBuy sharing the launch's own tx_hash was seen while the launch block
+-- was folded, 0 when that block was folded and no such buy was seen, NULL
+-- when the launch block has never been folded at all -- set once, in the
+-- same pass and under the same condition as first_block_buyers.
+--
+-- first_outside_buy_block / _ts are the earliest CurveBuy on this token's
+-- curve whose tx_hash differs from the launch's, by (block, logIndex), set
+-- once and never again -- like first_buy_ts, this is the first outside buy
+-- the index ever saw, not the most recent. first_outside_buy_ts is that
+-- block's own header timestamp, never a wall clock, so the delay from
+-- launch is a subtraction of two block-header timestamps and nothing else.
 CREATE TABLE IF NOT EXISTS token_activity (
-  token              TEXT PRIMARY KEY,       -- lowercase 0x address
-  from_block         INTEGER NOT NULL,       -- the launch block: where these counts open
-  buys               INTEGER NOT NULL DEFAULT 0,
-  sells              INTEGER NOT NULL DEFAULT 0,
-  quote_in           TEXT NOT NULL DEFAULT '0',
-  quote_out          TEXT NOT NULL DEFAULT '0',
-  first_buy_ts       INTEGER,                -- NULL until a buy is seen
-  last_activity_ts   INTEGER NOT NULL,       -- block header, never a wall clock
-  first_block_buyers INTEGER,                -- NULL when the launch block was never read
-  reserve_wei        TEXT,                   -- realQuoteReserve() from the curve, NULL = never read
-  reserve_block      INTEGER                 -- the block reserve_wei was read at, NULL = never read
+  token                   TEXT PRIMARY KEY,       -- lowercase 0x address
+  from_block              INTEGER NOT NULL,       -- the launch block: where these counts open
+  buys                    INTEGER NOT NULL DEFAULT 0,
+  sells                   INTEGER NOT NULL DEFAULT 0,
+  quote_in                TEXT NOT NULL DEFAULT '0',
+  quote_out                TEXT NOT NULL DEFAULT '0',
+  first_buy_ts             INTEGER,                -- NULL until a buy is seen
+  last_activity_ts         INTEGER NOT NULL,       -- block header, never a wall clock
+  first_block_buyers       INTEGER,                -- NULL when the launch block was never read
+  reserve_wei              TEXT,                   -- realQuoteReserve() from the curve, NULL = never read
+  reserve_block            INTEGER,                -- the block reserve_wei was read at, NULL = never read
+  launch_tx_buy            INTEGER,                -- 1 seen, 0 not seen while the launch block was read, NULL launch block never read
+  first_outside_buy_block  INTEGER,                -- NULL until seen
+  first_outside_buy_ts     INTEGER                 -- block header of that block
 );
 -- Retention prunes on the row's own last event, exactly as the other tables do.
 CREATE INDEX IF NOT EXISTS token_activity_ts_idx ON token_activity (last_activity_ts DESC);
+
+-- MIGRATION (2026-09-14). Additive and nullable, same posture as every other
+-- migration note in this file: run this by hand against the deployed
+-- database (this repo runs no migration tooling and no `wrangler d1 execute`
+-- from an agent -- a human runs this). No existing row's other columns
+-- change, and every existing row reads all three as NULL ("never read" /
+-- "never seen") until a later pass writes them: launch_tx_buy only ever
+-- gets set the pass that folds the launch's own block (the same condition
+-- first_block_buyers is set under), so an existing row whose launch block
+-- predates this migration keeps launch_tx_buy NULL for good -- that block
+-- will not be folded again. first_outside_buy_block/_ts have no such
+-- window and fill in normally the first time a qualifying buy is folded.
+--
+--   ALTER TABLE token_activity ADD COLUMN launch_tx_buy INTEGER;
+--   ALTER TABLE token_activity ADD COLUMN first_outside_buy_block INTEGER;
+--   ALTER TABLE token_activity ADD COLUMN first_outside_buy_ts INTEGER;
 
 -- MIGRATION (2026-09-12). worker/schema.sql has, until now, been edited in
 -- place and replaced wholesale on every change (see the B6 migration note

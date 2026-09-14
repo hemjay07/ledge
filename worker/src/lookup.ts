@@ -147,6 +147,32 @@ export function outcomesFor(
   return { bucket, graduations: row.graduations, marks };
 }
 
+/** What launches with this token's own creator-tax band did about their
+    first buy (pipeline/stats.py's `firstBuy` block, METHOD.md 2026-09-13,
+    design/FIRSTBUY-TOKEN-BRIEF.md). A verbatim lookup, the same pattern as
+    outcomesFor: null when the published file carries no firstBuy block yet,
+    or when this token's own tax bucket is not known, or when the band has
+    no published row. The Worker selects the fields a reader is shown; it
+    computes none of them. */
+export function firstBuyFor(
+  file: NumberFile,
+  taxBucket: string | null,
+): TokenResponse["firstBuy"] {
+  if (!file.firstBuy || taxBucket === null) return null;
+  const row = file.firstBuy.cohorts.taxBucket.find((r) => r.bucket === taxBucket);
+  if (!row) return null;
+  return {
+    cohort: {
+      bucket: row.bucket,
+      n: row.n,
+      within1sShare: row.within1sShare,
+      within5sShare: row.within5sShare,
+      noneShare: row.noneShare,
+      insufficient: row.insufficient,
+    },
+  };
+}
+
 export function cohortWindowFrom(
   row: PairTaxRow,
   windowName: WindowName,
@@ -232,9 +258,31 @@ export async function readIndex(
    indexer has read -- so "0 buys" means none were seen in that range, not
    that none were looked for. Without a cursor there is no range to name, and
    the block is withheld rather than published with an open end. */
+/** The launch's own opening buy, and the first buy from anyone else
+    (design/FIRSTBUY-TOKEN-BRIEF.md), restated beside the rest of the
+    activity block. `launch` supplies the launch block's own header
+    timestamp -- the only figure the row itself does not carry -- so the
+    delay is a subtraction of two block-header timestamps about this one
+    token (Class B), never an aggregation. Null when the launch row is not
+    in hand: without its timestamp the delay cannot be stated honestly, and
+    a block known but undated is worse than a field left absent. */
+function firstOutsideBuyFrom(
+  row: ActivityRow,
+  launch: LaunchRow | null,
+): NonNullable<TokenResponse["activity"]>["firstOutsideBuy"] {
+  if (row.first_outside_buy_block === null || launch === null) return null;
+  return {
+    block: row.first_outside_buy_block,
+    at: row.first_outside_buy_ts === null ? null : toIso(row.first_outside_buy_ts),
+    delaySeconds: row.first_outside_buy_ts === null ? null : row.first_outside_buy_ts - launch.ts,
+    inLaunchBlock: row.first_outside_buy_block === row.from_block,
+  };
+}
+
 export function activityFrom(
   row: ActivityRow | null,
   cursor: CursorRow | null,
+  launch: LaunchRow | null,
 ): TokenResponse["activity"] {
   if (row === null || cursor === null) return null;
   if (cursor.last_indexed_block < row.from_block) return null;
@@ -254,6 +302,8 @@ export function activityFrom(
       row.first_block_buyers === null
         ? null
         : { block: row.from_block, distinctBuyers: row.first_block_buyers },
+    launchTxBuy: row.launch_tx_buy === null ? null : row.launch_tx_buy === 1,
+    firstOutsideBuy: firstOutsideBuyFrom(row, launch),
   };
 }
 
@@ -302,6 +352,7 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
 
   let cohort: TokenResponse["cohort"] = null;
   let outcomes: TokenResponse["outcomes"] = null;
+  let firstBuy: TokenResponse["firstBuy"] = null;
   let freshness: TokenResponse["freshness"] = null;
   let placement: Placement | null = null;
   if (numberFile) {
@@ -327,6 +378,7 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
       allTime: allTimeRow ? cohortWindowFrom(allTimeRow, "allTime", numberFile.crawledAt) : null,
     };
     outcomes = outcomesFor(numberFile, timeToGraduationSeconds);
+    firstBuy = firstBuyFor(numberFile, taxBucket);
     /* No launch time, no placement. An unindexed token is not placed at
        "minute 0": it is not placed at all. */
     placement =
@@ -368,7 +420,8 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
     },
     cohort,
     outcomes,
-    activity: activityFrom(input.activity ?? null, cursor),
+    firstBuy,
+    activity: activityFrom(input.activity ?? null, cursor, launch),
     freshness,
     /* `reason` stays internal to ladder.ts: the pair (rung, insufficient) is
        already a complete encoding for a consumer -- a null rung with

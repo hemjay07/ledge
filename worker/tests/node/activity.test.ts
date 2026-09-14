@@ -71,6 +71,7 @@ function plan(options: {
   trades: CurveTradeLog[];
   curveToToken?: Map<string, string>;
   launchBlockOf?: Map<string, number>;
+  launchTxOf?: Map<string, string>;
   newLaunches?: Map<string, number>;
   existing?: Map<string, ActivityRow>;
   timestamps?: Map<number, number>;
@@ -86,6 +87,7 @@ function plan(options: {
     trades: options.trades,
     curveToToken: options.curveToToken ?? new Map([[CURVE_A, TOKEN_A]]),
     launchBlockOf: options.launchBlockOf ?? new Map([[TOKEN_A, 100]]),
+    launchTxOf: options.launchTxOf ?? new Map(),
     newLaunches: options.newLaunches ?? new Map(),
     existing: options.existing ?? new Map(),
     timestamps,
@@ -201,6 +203,9 @@ describe("attributing a curve log to its token", () => {
           first_buy_ts: 1_700_000_050,
           last_activity_ts: 1_700_000_060,
           first_block_buyers: 2,
+          launch_tx_buy: 1,
+          first_outside_buy_block: null,
+          first_outside_buy_ts: null,
         },
       ],
     ]);
@@ -333,6 +338,9 @@ describe("the headers the counters ask for", () => {
           first_buy_ts: 1_700_000_050,
           last_activity_ts: 1_700_000_050,
           first_block_buyers: 1,
+          launch_tx_buy: 1,
+          first_outside_buy_block: null,
+          first_outside_buy_ts: null,
         },
       ],
     ]);
@@ -379,5 +387,131 @@ describe("a replay of the same logs", () => {
       carried = new Map(rows.map((row) => [row.token, row]));
     }
     expect(carried.get(TOKEN_A)).toEqual(wholeInOnePass);
+  });
+});
+
+/* design/FIRSTBUY-TOKEN-BRIEF.md: "first buy" has two different meanings and
+   the index keeps them apart -- the launch's own opening buy (a CurveBuy
+   sharing the launch's own tx_hash) and the first buy from anyone else. */
+describe("the launch's own opening buy, kept apart from the first outside buy", () => {
+  const LAUNCH_TX = "0xlaunchtx000000000000000000000000000000000000000000000000000000";
+
+  it("marks launch_tx_buy seen from a CurveBuy sharing the launch's own tx hash", () => {
+    const { rows } = plan({
+      trades: [buy({ curve: CURVE_A, buyer: BUYER_1, quoteIn: 5n, block: 100, txHash: LAUNCH_TX })],
+      launchTxOf: new Map([[TOKEN_A, LAUNCH_TX]]),
+      newLaunches: new Map([[TOKEN_A, 100]]),
+    });
+    expect(rows[0]?.launch_tx_buy).toBe(1);
+  });
+
+  it("marks launch_tx_buy not seen when the launch block was read and no buy shared its tx hash", () => {
+    const { rows } = plan({
+      trades: [buy({ curve: CURVE_A, buyer: BUYER_1, quoteIn: 5n, block: 100, txHash: "0xsomethingelse" })],
+      launchTxOf: new Map([[TOKEN_A, LAUNCH_TX]]),
+      newLaunches: new Map([[TOKEN_A, 100]]),
+    });
+    expect(rows[0]?.launch_tx_buy).toBe(0);
+  });
+
+  it("leaves launch_tx_buy unknown when the launch block was never read", () => {
+    const { rows } = plan({
+      trades: [buy({ curve: CURVE_A, buyer: BUYER_1, quoteIn: 5n, block: 900, txHash: LAUNCH_TX })],
+      launchTxOf: new Map([[TOKEN_A, LAUNCH_TX]]),
+      // no newLaunches: this pass did not read block 100
+    });
+    expect(rows[0]?.launch_tx_buy).toBeNull();
+  });
+
+  it("finds the first outside buy as the earliest by (block, logIndex), excluding the launch tx", () => {
+    const { rows } = plan({
+      trades: [
+        buy({ curve: CURVE_A, buyer: BUYER_1, quoteIn: 5n, block: 100, txHash: LAUNCH_TX }), // excluded
+        buy({ curve: CURVE_A, buyer: BUYER_2, quoteIn: 3n, block: 102, logIndex: 1, txHash: "0xb" }),
+        buy({ curve: CURVE_A, buyer: BUYER_1, quoteIn: 2n, block: 101, logIndex: 0, txHash: "0xa" }),
+      ],
+      launchTxOf: new Map([[TOKEN_A, LAUNCH_TX]]),
+      newLaunches: new Map([[TOKEN_A, 100]]),
+    });
+    expect(rows[0]?.first_outside_buy_block).toBe(101);
+  });
+
+  it("never counts the launch's own buy as the first outside buy", () => {
+    const { rows } = plan({
+      trades: [buy({ curve: CURVE_A, buyer: BUYER_1, quoteIn: 5n, block: 100, txHash: LAUNCH_TX })],
+      launchTxOf: new Map([[TOKEN_A, LAUNCH_TX]]),
+      newLaunches: new Map([[TOKEN_A, 100]]),
+    });
+    expect(rows[0]?.first_outside_buy_block).toBeNull();
+  });
+
+  it("sets the first outside buy once and never again, like first_buy_ts", () => {
+    const existing = new Map<string, ActivityRow>([
+      [
+        TOKEN_A,
+        {
+          token: TOKEN_A,
+          from_block: 100,
+          buys: 1,
+          sells: 0,
+          quote_in: "1",
+          quote_out: "0",
+          first_buy_ts: 1_700_000_050,
+          last_activity_ts: 1_700_000_050,
+          first_block_buyers: 1,
+          launch_tx_buy: 1,
+          first_outside_buy_block: 105,
+          first_outside_buy_ts: 1_700_000_105,
+        },
+      ],
+    ]);
+    const { rows } = plan({
+      trades: [buy({ curve: CURVE_A, buyer: BUYER_2, quoteIn: 1n, block: 101, txHash: "0xnewer" })],
+      launchTxOf: new Map([[TOKEN_A, LAUNCH_TX]]),
+      existing,
+    });
+    expect(rows[0]?.first_outside_buy_block).toBe(105); // the earlier pass's record stands
+  });
+
+  it("requests the header for the earliest outside buy block only when it is not already known", () => {
+    const blocks = activityBlocks(
+      [
+        buy({ curve: CURVE_A, buyer: BUYER_1, quoteIn: 1n, block: 100, txHash: LAUNCH_TX }),
+        buy({ curve: CURVE_A, buyer: BUYER_2, quoteIn: 1n, block: 103, logIndex: 1, txHash: "0xout" }),
+      ],
+      new Map([[CURVE_A, TOKEN_A]]),
+      new Map(),
+      new Map([[TOKEN_A, LAUNCH_TX]]),
+    );
+    expect([...blocks].sort((a, b) => a - b)).toEqual([100, 103]);
+  });
+
+  it("does not ask again for an outside buy block it already holds", () => {
+    const existing = new Map<string, ActivityRow>([
+      [
+        TOKEN_A,
+        {
+          token: TOKEN_A,
+          from_block: 100,
+          buys: 1,
+          sells: 0,
+          quote_in: "1",
+          quote_out: "0",
+          first_buy_ts: 1_700_000_050,
+          last_activity_ts: 1_700_000_050,
+          first_block_buyers: 1,
+          launch_tx_buy: 0,
+          first_outside_buy_block: 105,
+          first_outside_buy_ts: 1_700_000_105,
+        },
+      ],
+    ]);
+    const blocks = activityBlocks(
+      [buy({ curve: CURVE_A, buyer: BUYER_1, quoteIn: 1n, block: 300, txHash: "0xanother" })],
+      new Map([[CURVE_A, TOKEN_A]]),
+      existing,
+      new Map([[TOKEN_A, LAUNCH_TX]]),
+    );
+    expect(blocks).toEqual([300]);
   });
 });

@@ -320,3 +320,45 @@ describe("activity facts", () => {
     expect(percentagesWithoutAnN(text)).toEqual([]);
   });
 });
+
+/* design/FIRSTBUY-TOKEN-BRIEF.md: the launch's own opening buy, kept apart
+   from the first buy from anyone else, both past tense, neither a verdict. */
+describe("the first-outside-buy sentence", () => {
+  it("states the block as a block fact when the buy landed in the launch block", () => {
+    const lines = activitySentences(
+      makeBody({
+        activity: { ...ACTIVITY, first_outside_buy_block: LAUNCH.block, first_outside_buy_ts: LAUNCH.ts },
+      }),
+    );
+    expect(lines).toContain("First outside buy: in the launch block.");
+  });
+
+  it("states the delay in whole seconds after the launch block", () => {
+    const lines = activitySentences(makeBody({ activity: ACTIVITY }));
+    expect(lines).toContain("First outside buy: 12 s after the launch block.");
+  });
+
+  it("says no outside buy was recorded when none has been seen", () => {
+    const lines = activitySentences(
+      makeBody({ activity: { ...ACTIVITY, first_outside_buy_block: null, first_outside_buy_ts: null } }),
+    );
+    expect(lines).toContain("No outside buy recorded.");
+  });
+
+  it("states whether the launch transaction carried its own opening buy", () => {
+    const seen = activitySentences(makeBody({ activity: { ...ACTIVITY, launch_tx_buy: 1 } }));
+    const notSeen = activitySentences(makeBody({ activity: { ...ACTIVITY, launch_tx_buy: 0 } }));
+    expect(seen).toContain("The launch transaction carried its own opening buy.");
+    expect(notSeen).toContain("The launch transaction carried no opening buy.");
+  });
+
+  it("says nothing about the launch transaction when it is not known", () => {
+    const lines = activitySentences(makeBody({ activity: { ...ACTIVITY, launch_tx_buy: null } }));
+    expect(lines.join(" ")).not.toContain("The launch transaction carried");
+  });
+
+  it("carries no verdict word", () => {
+    const lines = activitySentences(makeBody({ activity: ACTIVITY }));
+    expect(lines.join(" ")).not.toMatch(/\b(will |predict|score|risk|odds|probab)/i);
+  });
+});

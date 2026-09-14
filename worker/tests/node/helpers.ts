@@ -56,6 +56,12 @@ export const ACTIVITY: ActivityRow = {
   first_buy_ts: NOW_SECONDS - 800,
   last_activity_ts: NOW_SECONDS - 40,
   first_block_buyers: 7,
+  /* design/FIRSTBUY-TOKEN-BRIEF.md: the launch transaction carried its own
+     opening buy, and the first buy from anyone else landed 12 whole seconds
+     later (block 56172009 against the launch's own 56172001). */
+  launch_tx_buy: 1,
+  first_outside_buy_block: 56172009,
+  first_outside_buy_ts: NOW_SECONDS - 799,
 };
 
 export function makeBody(overrides: Partial<BuildInput> = {}): Omit<TokenResponse, "text"> {

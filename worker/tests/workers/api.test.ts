@@ -257,7 +257,7 @@ describe("GET /api/live", () => {
         `0xtx${opts.token}`,
       ),
       env.LEDGE_DB.prepare(
-        `INSERT INTO token_activity VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO token_activity VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)`,
       ).bind(
         opts.token,
         fromBlock,
@@ -795,7 +795,7 @@ describe("the units a fill is denominated in", () => {
 describe("GET /api/token/{address} — curve activity", () => {
   async function seedActivity(): Promise<void> {
     await env.LEDGE_DB.prepare(
-      `INSERT OR REPLACE INTO token_activity VALUES (?, 56172001, 41, 12, '1743200000000000000', '220000000000000000', ?, ?, 7, NULL, NULL)`,
+      `INSERT OR REPLACE INTO token_activity VALUES (?, 56172001, 41, 12, '1743200000000000000', '220000000000000000', ?, ?, 7, NULL, NULL, NULL, NULL, NULL)`,
     )
       .bind(ADDRESS, Math.floor(Date.now() / 1000) - 800, Math.floor(Date.now() / 1000) - 40)
       .run();
@@ -840,7 +840,9 @@ describe("GET /api/token/{address} — curve activity", () => {
       "buys",
       "firstBlock",
       "firstBuyAt",
+      "firstOutsideBuy",
       "lastActivityAt",
+      "launchTxBuy",
       "quoteIn",
       "quoteOut",
       "sells",

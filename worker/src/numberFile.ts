@@ -131,6 +131,42 @@ export interface Outcomes {
   cohortsExcluded: Record<string, number>;
 }
 
+/** One cohort's first-buy timing (pipeline/stats.py, design/FIRSTBUY-BRIEF.md,
+    METHOD.md 2026-09-13): the launch-tx-buy share, and the first outside
+    buy's timing broken into exclusive buckets with their cumulative shares.
+    Read verbatim by lookup.ts's firstBuyFor -- nothing here is derived by the
+    Worker, which observes, never computes a statistic. */
+export interface FirstBuyCohortRow {
+  bucket: string;
+  n: number;
+  launchTxBuy: number;
+  launchTxBuyShare: number | null;
+  outside: {
+    sameBlock: number;
+    within1s: number;
+    within3s: number;
+    within5s: number;
+    after5s: number;
+    none: number;
+  };
+  sameBlockShare: number | null;
+  within1sShare: number | null;
+  within3sShare: number | null;
+  within5sShare: number | null;
+  noneShare: number | null;
+  insufficient: boolean;
+}
+
+export interface FirstBuy {
+  indexedFromBlock: number | null;
+  population: string;
+  cohorts: {
+    all: FirstBuyCohortRow[];
+    taxBucket: FirstBuyCohortRow[];
+    pairClass: FirstBuyCohortRow[];
+  };
+}
+
 export interface NumberFile {
   schemaVersion: number;
   definitionsVersion: string;
@@ -145,6 +181,9 @@ export interface NumberFile {
       the crawl last published, and a file without outcomes is not an error,
       it is an older file. */
   outcomes?: Outcomes;
+  /** Absent in a file written before 2026-09-13 (design/FIRSTBUY-BRIEF.md),
+      same posture as outcomes above -- an older file, not an error. */
+  firstBuy?: FirstBuy;
 }
 
 export type WindowName = "h24" | "allTime";

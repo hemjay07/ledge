@@ -69,6 +69,21 @@ export interface ActivityRow {
   /** Null when the launch block itself was never read, and 0 when it was read
       and nobody bought — which is the finding, not a gap. */
   first_block_buyers: number | null;
+  /** The launch's own opening buy (design/FIRSTBUY-TOKEN-BRIEF.md): 1 when a
+      CurveBuy sharing the launch's own tx_hash was seen while the launch
+      block was folded, 0 when that block was folded and no such buy was
+      seen, null when the launch block has never been folded — the same
+      null/0/positive shape as first_block_buyers, set under the same
+      condition (planActivity's newLaunches loop). */
+  launch_tx_buy: number | null;
+  /** The earliest CurveBuy on this token's curve whose txHash differs from
+      the launch's own, by (block, logIndex). Set once and never again, like
+      first_buy_ts — the first outside buy the index ever saw, not the most
+      recent. Null until one is seen. */
+  first_outside_buy_block: number | null;
+  /** The block header timestamp of first_outside_buy_block, never a wall
+      clock. Null exactly when first_outside_buy_block is null. */
+  first_outside_buy_ts: number | null;
   /** realQuoteReserve(), read from the curve by worker/src/reserve.ts — never
       folded here. Present on this type only so a row read back out of D1
       (worker/src/tick.ts readActivityRows, `SELECT *`) carries it, letting
@@ -91,6 +106,11 @@ export interface ActivityInput {
   /** Token to its launch block, for launches folded in THIS pass — the only
       ones whose first block is in hand. */
   newLaunches: Map<string, number>;
+  /** Token to its launch's own tx_hash, for every launch LEDGE holds
+      (worker/src/tick.ts resolveCurves, from the launch rows it already
+      reads). The only thing that tells the launch's own opening buy apart
+      from the first buy from anyone else. */
+  launchTxOf: Map<string, string>;
   existing: Map<string, ActivityRow>;
   /** Block-header timestamps for the blocks activityBlocks asked for. */
   timestamps: Map<number, number>;
@@ -107,12 +127,25 @@ interface Grouped {
   trades: CurveTradeLog[];
   maxBlock: number;
   minBuyBlock: number | null;
+  /** The earliest CurveBuy, by (block, logIndex), whose txHash differs from
+      this token's own launch tx — or, when the launch tx is not known,
+      every buy qualifies, since nothing can be excluded without it. */
+  outsideMinBuy: { block: number; logIndex: number } | null;
+  /** Whether a CurveBuy sharing the launch's own tx_hash was seen among this
+      pass's trades. Only meaningful when the launch tx is known. */
+  sawLaunchTxBuy: boolean;
 }
 
-/** Trades by token, with the two blocks whose headers the counters need. */
+/** Trades by token, with the two blocks whose headers the counters need, and
+    the launch-tx-buy / first-outside-buy readings
+    (design/FIRSTBUY-TOKEN-BRIEF.md). A launch's own opening buy shares its
+    tx_hash with the launch transaction itself, and a transaction is mined in
+    exactly one block — the launch block — so telling the two apart needs no
+    block filter of its own, only the tx_hash comparison. */
 function group(
   trades: CurveTradeLog[],
   curveToToken: Map<string, string>,
+  launchTxOf: Map<string, string> = new Map(),
 ): { byToken: Map<string, Grouped>; unattributed: number } {
   const byToken = new Map<string, Grouped>();
   let unattributed = 0;
@@ -122,11 +155,25 @@ function group(
       unattributed += 1;
       continue;
     }
-    const held = byToken.get(token) ?? { trades: [], maxBlock: trade.block, minBuyBlock: null };
+    const held =
+      byToken.get(token) ??
+      { trades: [], maxBlock: trade.block, minBuyBlock: null, outsideMinBuy: null, sawLaunchTxBuy: false };
     held.trades.push(trade);
     if (trade.block > held.maxBlock) held.maxBlock = trade.block;
-    if (trade.side === "buy" && (held.minBuyBlock === null || trade.block < held.minBuyBlock)) {
-      held.minBuyBlock = trade.block;
+    if (trade.side === "buy") {
+      if (held.minBuyBlock === null || trade.block < held.minBuyBlock) held.minBuyBlock = trade.block;
+
+      const launchTx = launchTxOf.get(token);
+      const isLaunchTx = launchTx !== undefined && trade.txHash.toLowerCase() === launchTx.toLowerCase();
+      if (isLaunchTx) {
+        held.sawLaunchTxBuy = true;
+      } else if (
+        held.outsideMinBuy === null ||
+        trade.block < held.outsideMinBuy.block ||
+        (trade.block === held.outsideMinBuy.block && trade.logIndex < held.outsideMinBuy.logIndex)
+      ) {
+        held.outsideMinBuy = { block: trade.block, logIndex: trade.logIndex };
+      }
     }
     byToken.set(token, held);
   }
@@ -135,19 +182,26 @@ function group(
 
 /** The block headers the counters need, and no others. One header per curve
     log would be ~564 requests a minute against a 50-subrequest budget; what
-    is actually needed is each token's last block, plus its first buy when no
-    earlier pass has recorded one. */
+    is actually needed is each token's last block, plus its first buy and its
+    first outside buy when no earlier pass has recorded one. */
 export function activityBlocks(
   trades: CurveTradeLog[],
   curveToToken: Map<string, string>,
   existing: Map<string, ActivityRow>,
+  launchTxOf: Map<string, string> = new Map(),
 ): number[] {
-  const { byToken } = group(trades, curveToToken);
+  const { byToken } = group(trades, curveToToken, launchTxOf);
   const blocks = new Set<number>();
   for (const [token, held] of byToken) {
     blocks.add(held.maxBlock);
     if (held.minBuyBlock !== null && (existing.get(token)?.first_buy_ts ?? null) === null) {
       blocks.add(held.minBuyBlock);
+    }
+    if (
+      held.outsideMinBuy !== null &&
+      (existing.get(token)?.first_outside_buy_block ?? null) === null
+    ) {
+      blocks.add(held.outsideMinBuy.block);
     }
   }
   return [...blocks];
@@ -164,6 +218,9 @@ function seedRow(token: string, fromBlock: number, ts: number): ActivityRow {
     first_buy_ts: null,
     last_activity_ts: ts,
     first_block_buyers: null,
+    launch_tx_buy: null,
+    first_outside_buy_block: null,
+    first_outside_buy_ts: null,
   };
 }
 
@@ -183,14 +240,18 @@ function firstBlockBuyers(trades: CurveTradeLog[], launchBlock: number): number 
     hold, and a row saying zero says it, where a missing row says only that
     nothing is known. */
 export function planActivity(input: ActivityInput): ActivityPlan {
-  const { byToken, unattributed } = group(input.trades, input.curveToToken);
+  const { byToken, unattributed } = group(input.trades, input.curveToToken, input.launchTxOf);
   const rows = new Map<string, ActivityRow>();
 
   for (const [token, launchBlock] of input.newLaunches) {
     const ts = input.timestamps.get(launchBlock);
     if (ts === undefined) continue; // unreachable: the launch carries its header
     const row = input.existing.get(token) ?? seedRow(token, launchBlock, ts);
-    row.first_block_buyers = firstBlockBuyers(byToken.get(token)?.trades ?? [], launchBlock);
+    const held = byToken.get(token);
+    row.first_block_buyers = firstBlockBuyers(held?.trades ?? [], launchBlock);
+    // Same condition as first_block_buyers: only known the pass that folds
+    // the launch's own block. See worker/schema.sql's MIGRATION note.
+    row.launch_tx_buy = held?.sawLaunchTxBuy ? 1 : 0;
     rows.set(token, row);
   }
 
@@ -218,6 +279,10 @@ export function planActivity(input: ActivityInput): ActivityPlan {
 
     if (row.first_buy_ts === null && held.minBuyBlock !== null) {
       row.first_buy_ts = input.timestamps.get(held.minBuyBlock) ?? null;
+    }
+    if (row.first_outside_buy_block === null && held.outsideMinBuy !== null) {
+      row.first_outside_buy_block = held.outsideMinBuy.block;
+      row.first_outside_buy_ts = input.timestamps.get(held.outsideMinBuy.block) ?? null;
     }
     if (lastTs !== undefined && lastTs > row.last_activity_ts) row.last_activity_ts = lastTs;
     rows.set(token, row);

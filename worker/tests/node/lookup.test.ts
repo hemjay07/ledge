@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { LIVE_STALE_AFTER_SECONDS, findPairTaxRow } from "../../src/lookup";
+import { LIVE_STALE_AFTER_SECONDS, findPairTaxRow, firstBuyFor } from "../../src/lookup";
 import { taxBucketOf, pairClassOf } from "../../src/buckets";
-import { fixtureNumber, makeBody, ADDRESS, NOW_SECONDS, LAUNCH, CURVE } from "./helpers";
+import { ACTIVITY, fixtureNumber, makeBody, ADDRESS, NOW_SECONDS, LAUNCH, CURVE } from "./helpers";
 
 describe("bucket placement", () => {
   it("mirrors pipeline/stats.py's ranges exactly", () => {
@@ -165,5 +165,112 @@ describe("the live layer's own staleness", () => {
 
   it("is stale when there is no cursor at all", () => {
     expect(makeBody({ cursor: null }).live.stale).toBe(true);
+  });
+});
+
+/* design/FIRSTBUY-TOKEN-BRIEF.md: what launches with this token's own
+   creator-tax band did about their first buy, a verbatim lookup into
+   number.json's firstBuy block (pipeline/stats.py), the same pattern as
+   outcomesFor. */
+describe("the first-buy cohort lookup", () => {
+  function withFirstBuy() {
+    const file = JSON.parse(JSON.stringify(fixtureNumber()));
+    file.firstBuy = {
+      indexedFromBlock: 56000000,
+      population: "launches at least one hour old at crawledAt, launched at or after indexedFromBlock",
+      cohorts: {
+        all: [],
+        taxBucket: [
+          {
+            bucket: "2-3%",
+            n: 412,
+            launchTxBuy: 380,
+            launchTxBuyShare: 0.922,
+            outside: { sameBlock: 10, within1s: 60, within3s: 20, within5s: 8, after5s: 5, none: 2 },
+            sameBlockShare: 0.03,
+            within1sShare: 0.24,
+            within3sShare: 0.29,
+            within5sShare: 0.31,
+            noneShare: 0.02,
+            insufficient: false,
+          },
+        ],
+        pairClass: [],
+      },
+    };
+    return file;
+  }
+
+  it("returns the band's own row", () => {
+    const row = firstBuyFor(withFirstBuy(), "2-3%");
+    expect(row?.cohort.bucket).toBe("2-3%");
+    expect(row?.cohort.n).toBe(412);
+    expect(row?.cohort.within1sShare).toBe(0.24);
+    expect(row?.cohort.within5sShare).toBe(0.31);
+    expect(row?.cohort.noneShare).toBe(0.02);
+    expect(row?.cohort.insufficient).toBe(false);
+  });
+
+  it("is null when the file carries no firstBuy block", () => {
+    expect(firstBuyFor(fixtureNumber(), "2-3%")).toBeNull();
+  });
+
+  it("is null when the token's own tax bucket is not known", () => {
+    expect(firstBuyFor(withFirstBuy(), null)).toBeNull();
+  });
+
+  it("is null when the band has no published row", () => {
+    expect(firstBuyFor(withFirstBuy(), "0%")).toBeNull();
+  });
+
+  it("is assembled onto the token body, beside outcomes", () => {
+    const body = makeBody({ numberFile: withFirstBuy() });
+    expect(body.firstBuy?.cohort.bucket).toBe("2-3%");
+  });
+});
+
+/* The Worker's own reading of one token's first outside buy, kept apart from
+   the launch's own opening buy -- both Class B, both read off the activity
+   row lookup.ts already assembles, never derived from a population. */
+describe("the first-outside-buy activity reading", () => {
+  it("marks inLaunchBlock true when the buy's block equals the row's own from_block", () => {
+    const body = makeBody({
+      activity: { ...ACTIVITY, first_outside_buy_block: LAUNCH.block, first_outside_buy_ts: LAUNCH.ts },
+    });
+    expect(body.activity?.firstOutsideBuy?.inLaunchBlock).toBe(true);
+    expect(body.activity?.firstOutsideBuy?.delaySeconds).toBe(0);
+  });
+
+  it("computes the delay as a subtraction of two block-header timestamps", () => {
+    const body = makeBody({
+      activity: {
+        ...ACTIVITY,
+        first_outside_buy_block: LAUNCH.block + 3,
+        first_outside_buy_ts: LAUNCH.ts + 16,
+      },
+    });
+    expect(body.activity?.firstOutsideBuy?.inLaunchBlock).toBe(false);
+    expect(body.activity?.firstOutsideBuy?.delaySeconds).toBe(16);
+  });
+
+  it("is null when no outside buy has been recorded", () => {
+    const body = makeBody({
+      activity: { ...ACTIVITY, first_outside_buy_block: null, first_outside_buy_ts: null },
+    });
+    expect(body.activity?.firstOutsideBuy).toBeNull();
+  });
+
+  it("is null when the launch row is not in hand, even if a block is known", () => {
+    const body = makeBody({ activity: ACTIVITY, launch: null });
+    expect(body.activity?.firstOutsideBuy).toBeNull();
+  });
+
+  it("carries launchTxBuy as a boolean, or null when the launch block was never read", () => {
+    const seen = makeBody({ activity: { ...ACTIVITY, launch_tx_buy: 1 } });
+    const notSeen = makeBody({ activity: { ...ACTIVITY, launch_tx_buy: 0 } });
+    const unknown = makeBody({ activity: { ...ACTIVITY, launch_tx_buy: null } });
+    expect(seen.activity?.launchTxBuy).toBe(true);
+    expect(notSeen.activity?.launchTxBuy).toBe(false);
+    expect(unknown.activity?.launchTxBuy).toBeNull();
   });
 });

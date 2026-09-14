@@ -112,6 +112,25 @@ const outcomesForToken = z.object({
   marks: z.array(outcomeMark),
 });
 
+/* What launches with this token's own creator-tax band did about their first
+   buy (pipeline/stats.py `firstBuy`, METHOD.md 2026-09-13,
+   design/FIRSTBUY-TOKEN-BRIEF.md). A population fact carried beside the
+   token, never a statement about the token: CONSTRAINTS 1. Null until the
+   crawl publishes the firstBuy block or this token's own tax bucket is not
+   known. */
+const firstBuyCohortForToken = z.object({
+  bucket: z.string(),
+  n: z.number().int().nonnegative(),
+  within1sShare: z.number().nullable(),
+  within5sShare: z.number().nullable(),
+  noneShare: z.number().nullable(),
+  insufficient: z.boolean(),
+});
+
+const firstBuyForToken = z.object({
+  cohort: firstBuyCohortForToken,
+});
+
 const cohort = z.object({
   crawledAt: z.string(),
   definitionsVersion: z.string(),
@@ -236,6 +255,20 @@ const activity = z.object({
       distinctBuyers: z.number().int().nonnegative(),
     })
     .nullable(),
+  /* The launch's own opening buy (design/FIRSTBUY-TOKEN-BRIEF.md): whether a
+     CurveBuy sharing the launch's own tx_hash was seen. Null when the launch
+     block has never been read -- not false, which is a reading. */
+  launchTxBuy: z.boolean().nullable(),
+  /* The earliest CurveBuy on this token's curve from a transaction other
+     than the launch's own. Null when none has been recorded. */
+  firstOutsideBuy: z
+    .object({
+      block: z.number().int().nonnegative(),
+      at: z.string().nullable(),
+      delaySeconds: z.number().int().nonnegative().nullable(),
+      inLaunchBlock: z.boolean(),
+    })
+    .nullable(),
 });
 
 const live = z.object({
@@ -258,6 +291,10 @@ export const tokenResponseSchema = z
        is keyed on the time-to-graduation bucket. Absent when the published
        file carries no outcomes yet. */
     outcomes: outcomesForToken.nullable().optional(),
+    /* Beside outcomes, keyed on this token's own creator-tax band rather than
+       its time-to-graduation bucket. Absent when the published file carries
+       no firstBuy block yet. */
+    firstBuy: firstBuyForToken.nullable().optional(),
     /* Class B. Counts of this token's own curve events, with the range of
        blocks they were counted over. No rate, no ordering against any other
        token. Null when LEDGE holds no activity row for it. */

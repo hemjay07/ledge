@@ -279,6 +279,28 @@ function activityQuoteText(
     block was never indexed", 0 is "it was indexed and nobody bought" -- a
     finding, not a gap. Absent entirely when LEDGE holds no activity row for
     this token, which is a different silence than either. */
+/** The first outside buy, past tense, no verdict (design/FIRSTBUY-TOKEN-BRIEF.md):
+    "in the launch block" is a block fact, stated as such rather than as
+    "0 s"; otherwise the delay is whole seconds from block headers, never a
+    sub-second estimate this index cannot support. */
+function firstOutsideBuySentence(a: NonNullable<TokenResponse["activity"]>): string {
+  const buy = a.firstOutsideBuy;
+  if (buy === null) return "No outside buy recorded.";
+  if (buy.inLaunchBlock) return "First outside buy: in the launch block.";
+  if (buy.delaySeconds === null) return "No outside buy recorded.";
+  return `First outside buy: ${formatDuration(buy.delaySeconds)} after the launch block.`;
+}
+
+/** Whether the launch transaction carried its own opening buy. Null -- the
+    launch block never read -- says nothing at all, which is why this line is
+    only added when the reading exists. */
+function launchTxBuySentence(a: NonNullable<TokenResponse["activity"]>): string | null {
+  if (a.launchTxBuy === null) return null;
+  return a.launchTxBuy
+    ? "The launch transaction carried its own opening buy."
+    : "The launch transaction carried no opening buy.";
+}
+
 export function activitySentences(body: Omit<TokenResponse, "text">): string[] {
   const a = body.activity;
   if (a === null) return [];
@@ -297,6 +319,10 @@ export function activitySentences(body: Omit<TokenResponse, "text">): string[] {
       : `Distinct buyers in the launch's own block (block ${formatCount(a.firstBlock.block)}): ` +
           `${formatCount(a.firstBlock.distinctBuyers)}.`,
   );
+
+  lines.push(firstOutsideBuySentence(a));
+  const launchTx = launchTxBuySentence(a);
+  if (launchTx !== null) lines.push(launchTx);
 
   return lines;
 }

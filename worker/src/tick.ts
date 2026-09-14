@@ -289,26 +289,42 @@ async function resolveCurves(
   db: D1Database,
   trades: CurveTradeLog[],
   launches: TokenLaunchedLog[],
-): Promise<{ curveToToken: Map<string, string>; launchBlockOf: Map<string, number> }> {
+): Promise<{
+  curveToToken: Map<string, string>;
+  launchBlockOf: Map<string, number>;
+  /** Token to its launch's own tx_hash -- the only thing that tells the
+      launch's own opening buy apart from the first buy from anyone else
+      (design/FIRSTBUY-TOKEN-BRIEF.md, worker/src/activity.ts). Kept in step
+      with launchBlockOf: the earliest launch row is the one that actually
+      happened, and its tx is the one a buy is compared against. */
+  launchTxOf: Map<string, string>;
+}> {
   const curveToToken = new Map<string, string>();
   const launchBlockOf = new Map<string, number>();
+  const launchTxOf = new Map<string, string>();
   for (const launch of launches) {
     curveToToken.set(launch.curve, launch.token);
     const held = launchBlockOf.get(launch.token);
-    if (held === undefined || launch.block < held) launchBlockOf.set(launch.token, launch.block);
+    if (held === undefined || launch.block < held) {
+      launchBlockOf.set(launch.token, launch.block);
+      launchTxOf.set(launch.token, launch.txHash);
+    }
   }
   const unknown = [...new Set(trades.map((t) => t.curve))].filter((c) => !curveToToken.has(c));
-  const rows = await selectChunked<{ curve: string; token: string; block: number }>(
+  const rows = await selectChunked<{ curve: string; token: string; block: number; tx_hash: string }>(
     db,
-    (placeholders) => `SELECT curve, token, block FROM launch WHERE curve IN (${placeholders})`,
+    (placeholders) => `SELECT curve, token, block, tx_hash FROM launch WHERE curve IN (${placeholders})`,
     unknown,
   );
   for (const row of rows) {
     curveToToken.set(row.curve, row.token);
     const held = launchBlockOf.get(row.token);
-    if (held === undefined || row.block < held) launchBlockOf.set(row.token, row.block);
+    if (held === undefined || row.block < held) {
+      launchBlockOf.set(row.token, row.block);
+      launchTxOf.set(row.token, row.tx_hash);
+    }
   }
-  return { curveToToken, launchBlockOf };
+  return { curveToToken, launchBlockOf, launchTxOf };
 }
 
 async function readActivityRows(
@@ -508,7 +524,7 @@ export async function tick(
        over the new blocks alone. See worker/src/activity.ts. */
     const countFrom = cursor.last_indexed_block + 1;
     const trades = await fetchCurveTrades(rpc, countFrom, to);
-    const { curveToToken, launchBlockOf } = await resolveCurves(db, trades, launches);
+    const { curveToToken, launchBlockOf, launchTxOf } = await resolveCurves(db, trades, launches);
     /* Launches whose own block this pass folds: the only ones whose first
        block is in hand, and so the only ones whose first-block buyers can be
        counted. */
@@ -531,13 +547,14 @@ export async function tick(
     const timestamps = await fetchBlockTimestamps(rpc, [
       ...launches.map((l) => l.block),
       ...graduations.map((g) => g.block),
-      ...activityBlocks(trades, curveToToken, existingActivity),
+      ...activityBlocks(trades, curveToToken, existingActivity, launchTxOf),
     ]);
 
     const activity = planActivity({
       trades,
       curveToToken,
       launchBlockOf,
+      launchTxOf,
       newLaunches,
       existing: existingActivity,
       timestamps,
@@ -629,17 +646,17 @@ export async function tick(
     for (const row of activity.rows) {
       /* reserve_wei/reserve_block are carried forward from whatever this
          token held before this REPLACE, never zeroed by it: this loop folds
-         the other nine columns and has no reserve reading of its own, and an
-         INSERT OR REPLACE sets every column its statement does not name back
-         to its default -- NULL -- which would silently erase a real reading
-         on every token this tick merely traded. */
+         the other twelve columns and has no reserve reading of its own, and
+         an INSERT OR REPLACE sets every column its statement does not name
+         back to its default -- NULL -- which would silently erase a real
+         reading on every token this tick merely traded. */
       const previous = existingActivity.get(row.token);
       statements.push(
         db
           .prepare(
             `INSERT OR REPLACE INTO token_activity
-               (token, from_block, buys, sells, quote_in, quote_out, first_buy_ts, last_activity_ts, first_block_buyers, reserve_wei, reserve_block)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               (token, from_block, buys, sells, quote_in, quote_out, first_buy_ts, last_activity_ts, first_block_buyers, reserve_wei, reserve_block, launch_tx_buy, first_outside_buy_block, first_outside_buy_ts)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
             row.token,
@@ -653,6 +670,9 @@ export async function tick(
             row.first_block_buyers,
             previous?.reserve_wei ?? null,
             previous?.reserve_block ?? null,
+            row.launch_tx_buy,
+            row.first_outside_buy_block,
+            row.first_outside_buy_ts,
           ),
       );
     }
