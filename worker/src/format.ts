@@ -168,7 +168,15 @@ export function formatAmount(
 ): string | null {
   const amount = formatUnits(raw, decimals, maxPlaces);
   if (amount === null) return null;
-  return symbol === null ? amount : `${amount} ${symbol}`;
+  // 2026-09-14: a reserve of 7 wei printed as 0.000000000000000007 GME on
+  // the token page. A small exact amount stays exact (0.000001 ETH reads
+  // fine, and a curve holding something must never read as empty); one
+  // that needs more than eight decimal places to be nonzero is printed as
+  // "under 0.0001", which is true and readable, never a rounded zero.
+  const floor = `0.${"0".repeat(maxPlaces - 1)}1`;
+  const places = amount.includes(".") ? amount.length - amount.indexOf(".") - 1 : 0;
+  const shown = places > 8 && Number(amount) < Number(floor) ? `under ${floor}` : amount;
+  return symbol === null ? shown : `${shown} ${symbol}`;
 }
 
 /** Which whole minute of its life a token is in. "minute 14" on the card. */

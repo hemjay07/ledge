@@ -622,7 +622,7 @@ describe("the other endpoints", () => {
     await seedLaunch(Math.floor(Date.now() / 1000) - 811);
     chainAnswers(launchedTokenReturn());
     const html = await (await get(`/t/${ADDRESS}`)).text();
-    expect(html).toContain("ETH · creator tax");
+    expect(html).toContain("ETH pair · "); // header order since 2026-09-14
     // The zero address legitimately appears once, inside the embedded JSON
     // data island (`config.pairToken`, for programmatic consumers) -- never
     // in the rendered cards, header or sentences a reader actually reads.

@@ -108,7 +108,7 @@ function buyersCard(body: Body): string {
     <section class="card headline">
       <div class="k">Buyers in the launch block</div>
       <div class="fig fig-dash">—</div>
-      <div class="note">That block was never read: this launch is older than the index.</div>
+      <div class="note">The launch block was never read; this launch is older than the index.</div>
     </section>`;
   }
   const zero = a.firstBlock.distinctBuyers === 0;
@@ -116,7 +116,7 @@ function buyersCard(body: Body): string {
     <section class="card headline">
       <div class="k">Buyers in the launch block</div>
       <div class="fig">${e(formatCount(a.firstBlock.distinctBuyers))}</div>
-      <div class="note">${zero ? "The block was read, and nobody bought in it." : "Distinct wallets that bought in the block this token launched in."}</div>
+      <div class="note">${zero ? "Nobody bought in the launch block." : "Wallets that bought in the block this token launched in."}</div>
     </section>`;
 }
 
@@ -141,20 +141,22 @@ function firstOutsideBuyCard(body: Body): string {
   }
 
   const buy = a.firstOutsideBuy;
+  // Three silences kept apart (2026-09-14): the index never looked (the row
+  // predates the reading), it looked and found none, or it found one.
   const figureText =
     buy === null
-      ? "none recorded"
+      ? a.launchTxBuy === null ? "not recorded" : "none yet"
       : buy.inLaunchBlock
         ? "in the launch block"
         : buy.delaySeconds === null
-          ? "none recorded"
+          ? "none yet"
           : `${formatDuration(buy.delaySeconds)} after the launch block`;
   const dash = buy === null || (!buy.inLaunchBlock && buy.delaySeconds === null);
 
   const cohort = body.firstBuy?.cohort ?? null;
   let note: string;
   if (cohort === null) {
-    note = "No cohort has been published for this creator-tax band.";
+    note = "No figures are published for this creator-tax band.";
   } else if (cohort.insufficient) {
     note = rateText({ rate: null, n: cohort.n, insufficient: true });
   } else {
@@ -162,9 +164,9 @@ function firstOutsideBuyCard(body: Body): string {
     const within5 = rateText({ rate: cohort.within5sShare, n: cohort.n });
     const none = rateText({ rate: cohort.noneShare, n: cohort.n });
     note =
-      `Of ${formatCount(cohort.n)} launches with a ${taxLabel(cohort.bucket)} creator tax, ` +
-      `${within1} took their first outside buy within 1 s and ${within5} within 5 s; ` +
-      `${none} none within an hour.`;
+      `Launches with a ${taxLabel(cohort.bucket)} creator tax (n = ${formatCount(cohort.n)}): ` +
+      `${within1} took their first outside buy within 1 s, ${within5} within 5 s, ` +
+      `and ${none} none within an hour.`;
   }
 
   return `
@@ -200,7 +202,7 @@ function fillCard(body: Body): string {
     <section class="card">
       <div class="k">Fill</div>
       <div class="fig fig-2">${e(outcomeWord(body, null))}</div>
-      <div class="note">The curve drained into graduation. There is nothing left to fill.</div>
+      <div class="note">The curve emptied into the pool at graduation. There is nothing left to fill.</div>
     </section>`;
   }
 
@@ -286,7 +288,7 @@ function cohortCard(body: Body): string {
         ${cohortRow("Last 24 hours", body.cohort.h24)}
         ${cohortRow("All time", body.cohort.allTime)}
       </div>
-      <div class="note">Share that graduated, with the launches each share was counted over.</div>
+      <div class="note">The share that graduated, and how many launches it was counted over.</div>
     </section>`;
 }
 
@@ -322,7 +324,10 @@ function outcomesCard(body: Body): string {
   const outcomes = body.outcomes;
   if (!outcomes || outcomes.marks.length === 0) return "";
   const label = OUTCOME_BUCKET_LABEL[outcomes.bucket] ?? outcomes.bucket;
+  // A mark no graduation in the bucket has reached (n = 0) is absent, not a
+  // cell reading "not enough data (n=0)" -- the same rule /cohorts applies.
   const rows = outcomes.marks
+    .filter((mark) => mark.n > 0)
     .map((mark) => {
       const when = OUTCOME_MARK_LABEL[mark.mark] ?? mark.mark;
       const figure = mark.insufficient
@@ -335,7 +340,7 @@ function outcomesCard(body: Body): string {
     <section class="card">
       <div class="k">Launches that ${e(label)}</div>
       <div class="grid">${rows}</div>
-      <div class="note">Median change against each pool&rsquo;s own opening price, for the ${e(formatCount(outcomes.graduations))} launches in this bucket. A population, not this token.</div>
+      <div class="note">Median price change against each pool&rsquo;s own opening price, over the ${e(formatCount(outcomes.graduations))} graduations in this bucket. This is the population, not this token.</div>
     </section>`;
 }
 
@@ -362,7 +367,7 @@ function activityCard(body: Body): string {
 
   const first =
     a.firstBuyAt === null
-      ? "no buy recorded yet"
+      ? "none yet"
       : body.state.launchedAt === null
         ? timeOfDay(a.firstBuyAt)
         : `${timeOfDay(a.firstBuyAt)} · ${formatDuration(secondsBetween(body.state.launchedAt, a.firstBuyAt))} after launch`;
@@ -380,7 +385,7 @@ function activityCard(body: Body): string {
         <div class="cell"><span class="cell-k">First buy</span><span class="cell-v">${e(first)}</span></div>
         <div class="cell"><span class="cell-k">Last activity</span><span class="cell-v">${e(last)}</span></div>
       </div>
-      <div class="note">${e(a.window.label)}.</div>
+      <div class="note">Counted from block ${e(formatCount(a.window.fromBlock))} to ${e(formatCount(a.window.toBlock))}.</div>
     </section>`;
 }
 
@@ -411,14 +416,23 @@ function identityLine(body: Body): string {
    either way. Then one line of the token's own facts: its pair, its tax,
    its age, and how it stands -- the same word outcomeWord gives the
    sentences below, so the header and the long form never disagree. */
+/** outcomeWord's word, said for the header and the colophon: "on the curve"
+    is what the sentences say; here it is "still on the curve", and "died"
+    is "died on the curve". A graduation keeps its duration. */
+function statusWords(word: string): string {
+  if (word === "on the curve") return "still on the curve";
+  if (word === "died") return "died on the curve";
+  return word;
+}
+
 function headerBlock(body: Body, observedMaxSeconds: number | null): string {
-  const pairSym = body.config.pairSymbol ?? "pair not read";
-  const taxPart = body.config.taxBucket === null ? "creator tax not read" : `creator tax ${e(taxLabel(body.config.taxBucket))}`;
+  const pairSym = body.config.pairSymbol === null ? "pair not read" : `${body.config.pairSymbol} pair`;
+  const taxPart = body.config.taxBucket === null ? "creator tax not read" : `${e(taxLabel(body.config.taxBucket))} creator tax`;
   const agePart =
     body.state.elapsedSeconds === null
       ? "launch time not indexed"
       : `launched ${e(formatAge(body.state.elapsedSeconds))} ago`;
-  const statusPart = outcomeWord(body, observedMaxSeconds);
+  const statusPart = statusWords(outcomeWord(body, observedMaxSeconds));
   const line = [e(pairSym), taxPart, agePart, e(statusPart)].join(" · ");
 
   return `
@@ -442,7 +456,7 @@ function headerBlock(body: Body, observedMaxSeconds: number | null): string {
    TokenResponse -- see the file-level note above. */
 function metaLine(body: Body, observedMaxSeconds: number | null): string {
   const block = body.state.launchBlock === null ? "launch block not indexed" : `launch block ${e(formatCount(body.state.launchBlock))}`;
-  const status = e(outcomeWord(body, observedMaxSeconds));
+  const status = e(statusWords(outcomeWord(body, observedMaxSeconds)));
   const measured = e(formatStamp(body.observedAt));
   return `
     <p class="meta-line">
@@ -841,7 +855,7 @@ export function tokenShell(
     ${metaLine(body, observedMaxSeconds)}
     <hr>
     <details class="fact-details">
-      <summary>As text — what the bot posts</summary>
+      <summary>As text, the way the bot sends it</summary>
       <div id="fact">
         ${facts}
       </div>

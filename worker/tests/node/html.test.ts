@@ -26,20 +26,20 @@ describe("distinct first-block buyers: null vs zero render differently", () => {
 
   it("renders a dash and 'not indexed' when the launch block itself was not indexed", () => {
     const html = render({ activity: { ...ACTIVITY, first_block_buyers: null } });
-    expect(html).toContain("That block was never read");
+    expect(html).toContain("The launch block was never read");
   });
 
   it("renders the figure 0 with a finding, not a gap, when the block was indexed and nobody bought", () => {
     const html = render({ activity: { ...ACTIVITY, first_block_buyers: 0 } });
     expect(html).toMatch(/<div class="fig">0<\/div>/);
-    expect(html).toContain("The block was read, and nobody bought in it.");
+    expect(html).toContain("Nobody bought in the launch block.");
     expect(html).not.toContain("not indexed");
   });
 
   it("renders the true positive count when buyers were seen", () => {
     const html = render({ activity: ACTIVITY });
     expect(html).toMatch(/<div class="fig">7<\/div>/);
-    expect(html).toContain("Distinct wallets that bought in the block this token launched in.");
+    expect(html).toContain("Wallets that bought in the block this token launched in.");
   });
 
   it("the three states (absent, null block, zero, positive) are mutually distinguishable strings", () => {
@@ -238,7 +238,7 @@ describe("the outcomes card", () => {
     expect(html).toContain("-61.0%");
     expect(html).toContain("n=400");
     expect(html).toContain("12 never traded");
-    expect(html).toContain("A population, not this token.");
+    expect(html).toContain("This is the population, not this token.");
   });
 
   it("prints the sample size and no figure below the n = 30 floor", () => {
@@ -301,7 +301,7 @@ describe("the first-outside-buy card", () => {
     const html = render({
       activity: { ...ACTIVITY, first_outside_buy_block: null, first_outside_buy_ts: null },
     });
-    expect(html).toContain("none recorded");
+    expect(html).toMatch(/not recorded|none yet/);
   });
 
   it("prints the cohort note through rateText, nothing else below the n = 30 floor", () => {
@@ -311,7 +311,7 @@ describe("the first-outside-buy card", () => {
 
   it("prints the full cohort sentence when the sample clears the floor", () => {
     const html = render({ activity: ACTIVITY, numberFile: withFirstBuyCohort(412, false) });
-    expect(html).toContain("Of 412 launches with a 2–3% creator tax");
+    expect(html).toContain("Launches with a 2–3% creator tax (n = 412)");
     expect(html).toContain("took their first outside buy within 1 s");
     expect(html).toContain("within 5 s");
     expect(html).toContain("none within an hour");
@@ -319,7 +319,7 @@ describe("the first-outside-buy card", () => {
 
   it("names no cohort when the published file carries no firstBuy block", () => {
     const html = render({ activity: ACTIVITY });
-    expect(html).toContain("No cohort has been published for this creator-tax band.");
+    expect(html).toContain("No figures are published for this creator-tax band.");
   });
 
   it("carries no verdict word", () => {

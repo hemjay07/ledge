@@ -375,3 +375,14 @@ describe("the /number reply, since 2026-09-14", () => {
     expect(text).toContain("Counted since 5 Sep");
   });
 });
+
+describe("a reserve too small to print (2026-09-14)", () => {
+  it("says 'under 0.0001' rather than seventeen zeros, and never 0", () => {
+    const text = lookupText(
+      makeBody({ pairDecimals: 18, fill: { filledWei: "7", thresholdWei: "369000000000000000000", share: 0, note: null } }),
+      null,
+    );
+    expect(text).toContain("Curve fill: under 0.0001 ETH of 369 ETH");
+    expect(text).not.toContain("0.000000000000000007");
+  });
+});
