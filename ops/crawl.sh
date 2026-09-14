@@ -38,6 +38,11 @@ log "crawl starting"
 .venv/bin/python pipeline/crawl.py
 log "recompute --check"
 .venv/bin/python pipeline/recompute.py --check
+# The live index's coverage of this record (pipeline/coverage.py, TODO A4):
+# a Class B reading about our own index, written beside number.json and
+# pushed with it. Never fails the run -- a D1 outage is not a crawl failure.
+log "coverage"
+.venv/bin/python pipeline/coverage.py || log "coverage: not measured this run"
 
 git add data
 if git diff --cached --quiet; then

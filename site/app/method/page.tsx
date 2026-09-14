@@ -3,6 +3,9 @@ import type { ReactElement } from "react";
 import { Footer } from "../../components/Footer";
 import { numberFile } from "../../lib/number";
 import { changelogHtml, methodHtml } from "../../lib/method";
+import { readCoverage } from "../../lib/coverage";
+import { coverageCardText } from "../../lib/coverage-text";
+import { formatDayLong } from "../../lib/format";
 
 export const metadata: Metadata = {
   title: "Method — LEDGE",
@@ -15,6 +18,8 @@ const RECOMPUTE = "python pipeline/recompute.py --check";
 export default function Method(): ReactElement {
   const html = methodHtml();
   const changelog = changelogHtml();
+  const coverage = readCoverage();
+  const coverageText = coverage ? coverageCardText(coverage) : null;
 
   return (
     <main className="sheet">
@@ -116,6 +121,26 @@ export default function Method(): ReactElement {
           definitions later, this table is wrong until it is read again.
         </p>
       </div>
+
+      {coverage && coverageText ? (
+        /* INDEXER.md §3, TODO A4: the live index measured against the
+           canonical record after every crawl (pipeline/coverage.py). A count
+           about our own index, published with its n like everything else. */
+        <div className="card">
+          <div className="card-header">
+            <h2 className="kicker card-kicker">THE LIVE INDEX</h2>
+            <span className="note note--fine">measured {formatDayLong(coverage.measuredAt)}</span>
+          </div>
+          <p className="note" id="h-coverage">
+            The live board, the graveyard and each token page read from a second index that
+            follows the chain every few seconds. After every crawl, {coverage.sampled} launches
+            from the last 24 hours of the canonical record are checked against it.
+          </p>
+          <p className="note">{coverageText.coverage}</p>
+          <p className="note">{coverageText.launchBlock}</p>
+          <p className="note note--fine">{coverageText.freshness}</p>
+        </div>
+      ) : null}
 
       <div className="card">
         <div className="card-header">
