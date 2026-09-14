@@ -416,7 +416,9 @@ def test_a_failure_after_the_scan_writes_no_partition_line(run_dir, monkeypatch)
     def _boom(*a, **k):
         raise RuntimeError("simulated stats failure")
 
-    monkeypatch.setattr(crawl, "build_number", _boom)
+    # the author of number.json is recompute (2026-09-14); a failure there is
+    # the failure this test stages
+    monkeypatch.setattr(crawl.recompute_mod, "recompute", _boom)
     ts = _iso_day_ts("2026-09-06")
     rpc = _StubRpc(launch_logs=[_launch_log("0x" + "6" * 40, 1550, "0x" + "12" * 32)], timestamps={1550: ts})
     state_before = (run_dir / "state.json").read_bytes()

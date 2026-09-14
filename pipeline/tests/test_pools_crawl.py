@@ -336,7 +336,7 @@ def test_a_failure_mid_run_leaves_pools_data_unchanged(run_dir, monkeypatch):
     def _boom(*a, **k):
         raise RuntimeError("simulated stats failure")
 
-    monkeypatch.setattr(crawl, "build_number", _boom)
+    monkeypatch.setattr(crawl.recompute_mod, "recompute", _boom)  # the author of number.json since 2026-09-14
 
     init_log = _make_initialize_log(pool_id=POOL_ID, currency0=TOKEN, currency1=QUOTE, block=1550)
     swap = _make_swap_log(pool_id=POOL_ID, amount0=-(10**18), amount1=10**18, sqrt_price_x96=2**96, block=1560)

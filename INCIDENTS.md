@@ -22,10 +22,12 @@ directory exactly as recompute will read it, by recompute's own rules
 committed record and compares — so every shape the record has is
 exercised, and the test grows with the record without being edited
 (`test_crawl_matches_recompute_on_a_copy_of_the_committed_record`).
-*Still open:* the true fix is one author. `crawl.py` should stop building
-`number.json` and the runner should call `recompute.py` after it. That is a
-design change touching six tests; scheduled after the box has four clean
-runs, not during the recovery.
+*Closed 2026-09-14:* one author. `recompute()` builds `number.json` for
+the crawl too, reading the crawl's staged writes through `recompute.Staged`
+(the directory as it will be after the commit point), so the crawl holds
+no copy of the loading rules any more and the commit guarantee is
+unchanged. The two failure-injection tests now stage a failure in
+recompute, which is where a stats failure now lives.
 
 **Class 2 — a limit the code assumed and the environment did not honour.**
 GitHub's 45-minute job ceiling (swap collection, twice), Cloudflare's free
