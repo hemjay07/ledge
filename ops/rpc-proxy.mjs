@@ -59,7 +59,10 @@ async function forward(url, body) {
 
 const server = http.createServer((req, res) => {
   if (req.method !== "POST" || req.url !== "/") return reply(res, 404, "{}");
-  if (req.headers["x-ledge-key"] !== KEY) return reply(res, 401, "{}");
+  if (req.headers["x-ledge-key"] !== KEY) {
+    console.log(`rpc-proxy: refused ${req.socket.remoteAddress} (no key)`);
+    return reply(res, 401, "{}");
+  }
 
   const chunks = [];
   let size = 0;
@@ -85,7 +88,22 @@ const server = http.createServer((req, res) => {
       return reply(res, 400, "{}");
     }
     try {
-      const out = await forward(UPSTREAM, body);
+      let out = await forward(UPSTREAM, body);
+      // One line per refused answer, so a rate limit upstream is visible in
+      // the journal rather than only in the Worker's health counter.
+      if (out.status !== 200 || process.env.RPC_PROXY_LOG_ALL) {
+        console.log(`rpc-proxy: ${req.socket.remoteAddress} upstream ${out.status} for ${body.slice(0, 80)}`);
+      }
+      // 2026-09-14 00:10Z: the official endpoint answered a tick's ~50
+      // eth_getLogs with 200 and then its block-header batch with 429, from
+      // this box. A refused answer is tried once on the other endpoint; the
+      // Worker never retries a 429 inside a tick (worker/src/rpc.ts), so
+      // without this every catch-up tick died at the same step.
+      if ((out.status === 429 || out.status >= 500) && FALLBACK) {
+        const second = await forward(FALLBACK, body);
+        console.log(`rpc-proxy: fallback ${second.status} after ${out.status}`);
+        out = second;
+      }
       return reply(res, out.status, out.text);
     } catch (primaryError) {
       if (!FALLBACK) return reply(res, 502, JSON.stringify({ code: 502, message: String(primaryError) }));

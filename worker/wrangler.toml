@@ -27,7 +27,10 @@ CHAIN_ID = "4663"
 # not a judgement about which endpoint is better: the Python crawl runs from
 # GitHub's runners and keeps the official endpoint first, because from there it
 # works.
-RPC_URL = "https://rpc.ordofi.network"
+# 2026-09-13: the box's relay (ops/rpc-proxy.mjs), not a public endpoint --
+# both public endpoints refused Cloudflare's egress while answering the box
+# in 0.3 s. Needs the RPC_PROXY_KEY secret; the fallback stays direct.
+RPC_URL = "http://176.97.72.180.nip.io:8545"
 RPC_URL_FALLBACK = "https://rpc.mainnet.chain.robinhood.com"
 # The live site. These were "https://ledge.tools" -- a domain that was never
 # bought and does not resolve -- so the canonical config pointed at a dead
