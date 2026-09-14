@@ -54,9 +54,9 @@ describe("the fast-graduation finding, in the fold", () => {
     const fast = fastShareFacts(h24);
     const text = plain(finding);
     expect(text).toContain(formatRate(fast.underCutoff.rate as number, fast.n));
-    expect(text).toContain("of graduations completed inside 5 minutes");
+    expect(text).toContain("of graduations were done within 5 minutes"); // reworded 2026-09-14
     expect(text).toContain(formatRate(fast.under60.rate as number, fast.n));
-    expect(text).toContain("inside 60 seconds");
+    expect(text).toContain("within 60 seconds");
     // the sample size travels with the sentence: the fold has no heading to carry it
     expect(text).toContain(`n = ${fast.n.toLocaleString("en-US")} graduations`);
   });
@@ -115,8 +115,8 @@ describe("the registers that moved to /cohorts", () => {
     const { container } = render(<Cohorts />);
     const text = plain(container);
     expect(container.querySelector('[id^="h-fast-"]')).not.toBeNull();
-    expect(text).toContain("of graduations completed inside 5 minutes");
-    expect(text).toContain("inside 60 seconds");
+    expect(text).toContain("of graduations were done within 5 minutes"); // reworded 2026-09-14
+    expect(text).toContain("within 60 seconds");
   });
 
   /* 2026-09-12: the "#h-cohorts" LedgerEntry this pinned was dropped with the

@@ -8,6 +8,7 @@ import { Stat } from "../../components/Stat";
 import { allTime, h24, numberFile, type WindowData } from "../../lib/number";
 import {
   formatCount,
+  formatDayLong,
   formatDurationLong,
   formatOneIn,
   histogramLabel,
@@ -30,6 +31,16 @@ import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 const outcomes = numberFile.outcomes;
+/* A mark no cohort has reached yet (+7 d, on a record this young) would be a
+   whole column of "not enough data (n=0)". It is shown once any cohort has a
+   graduation old enough; until then the column is absent, not empty. */
+const OUTCOME_MARK_LABELS: Record<string, string> = { "1h": "+1 h", "24h": "+24 h", "7d": "+7 d" };
+const outcomeMarks = (["1h", "24h", "7d"] as const).filter((m) =>
+  Object.values(outcomes?.cohorts ?? {}).some((rows) => rows.some((r) => r.marks[m].n > 0)),
+);
+const sinceLabel = numberFile.firstIndexedAt
+  ? formatDayLong(numberFile.firstIndexedAt)
+  : `block ${formatCount(numberFile.firstIndexedBlock)}`;
 /* The time-to-graduation buckets of the outcomes block (pipeline/stats.py
    _outcome_bucket_key): under 10 s, 10 s to the 5-minute cutoff, over it. */
 const TTG_LABELS: Record<string, string> = {
@@ -48,7 +59,7 @@ const firstBuyAll = firstBuy?.cohorts.all[0] ?? {
 export const metadata: Metadata = {
   title: "Cohorts — LEDGE",
   description:
-    "Every cohort of the Pons Number in full: pair token, creator tax, hour of day, day of week, and the launches-per-deployer distribution, each with its sample size.",
+    "How pons launches graduate, by pair token, creator tax, hour and day; when the first outside buy landed; and where the price went after graduation. Every figure with its sample size.",
 };
 
 /* While the all-time window holds exactly the launches the 24-hour window
@@ -135,7 +146,7 @@ function cohortTables(w: WindowData, label: string): ReactElement[] {
               updatedAt={crawledAt}
               insufficient={fast.underCutoff.insufficient}
             />{" "}
-            of graduations completed inside {cutoffWords};{" "}
+            of graduations were done within {cutoffWords}, and{" "}
             <Stat
               className="mono"
               name={`fast-under-60-${label}`}
@@ -145,7 +156,7 @@ function cohortTables(w: WindowData, label: string): ReactElement[] {
               updatedAt={crawledAt}
               insufficient={fast.under60.insufficient}
             />{" "}
-            inside 60 seconds.
+            within 60 seconds.
           </>
         )}
       </p>
@@ -153,7 +164,7 @@ function cohortTables(w: WindowData, label: string): ReactElement[] {
     <Register
       key="pair"
       ariaLabel={`Graduation rate by pair token, ${label}`}
-      caption={`Graduation rate by the token a launch is paired against, n = ${nLaunches} launches.`}
+      caption={`By the token a launch is paired against, n = ${nLaunches} launches.`}
       columns={COHORT_COLUMNS("Pair token")}
       rows={w.cohorts.pair.map((r) => cohortRegisterRow(pairLabel(r.bucket), r))}
       foot={cohortFooting(w)}
@@ -162,7 +173,7 @@ function cohortTables(w: WindowData, label: string): ReactElement[] {
     <Register
       key="tax"
       ariaLabel={`Graduation rate by creator tax, ${label}`}
-      caption={`Graduation rate by the creator tax read from the factory at launch, n = ${nLaunches} launches.`}
+      caption={`By creator tax, n = ${nLaunches} launches.`}
       columns={COHORT_COLUMNS("Creator tax")}
       rows={w.cohorts.tax.map((r) => cohortRegisterRow(taxLabel(r.bucket), r))}
       foot={cohortFooting(w)}
@@ -171,7 +182,7 @@ function cohortTables(w: WindowData, label: string): ReactElement[] {
     <Register
       key="hour"
       ariaLabel={`Graduation rate by hour of day, UTC, ${label}`}
-      caption={`Graduation rate by hour of day (UTC), hours with at least one launch, n = ${nLaunches} launches.`}
+      caption={`By hour of day, UTC, n = ${nLaunches} launches.`}
       columns={COHORT_COLUMNS("Hour (UTC)")}
       rows={observedHours.map((r) => cohortRegisterRow(hourLabel(r.bucket), r))}
       foot={cohortFooting(w)}
@@ -180,7 +191,7 @@ function cohortTables(w: WindowData, label: string): ReactElement[] {
     <Register
       key="day"
       ariaLabel={`Graduation rate by day of week, UTC, ${label}`}
-      caption={`Graduation rate by day of week (UTC), days with at least one launch, n = ${nLaunches} launches.`}
+      caption={`By day of week, UTC, n = ${nLaunches} launches.`}
       columns={COHORT_COLUMNS("Day (UTC)")}
       rows={observedDays.map((r) => cohortRegisterRow(r.bucket, r))}
       foot={cohortFooting(w)}
@@ -213,7 +224,7 @@ function cohortTables(w: WindowData, label: string): ReactElement[] {
       </p>
       <Register
         ariaLabel={`Distribution of launches per deployer, ${label}`}
-        caption={`Deployers by how many tokens they launched, n = ${formatCount(distinct)} deployers. No addresses.`}
+        caption={`How many tokens each deployer launched, n = ${formatCount(distinct)} deployers. No addresses are shown.`}
         columns={["Launches per deployer", "Deployers (n)", `Share of ${formatCount(distinct)}`]}
         rows={w.deployers.histogram.map((row) => ({
           label: histogramLabel(row.bucket),
@@ -263,9 +274,9 @@ function windowHeadline(w: WindowData, label: string, key: string): ReactElement
           insufficient={w.excludingFast.insufficient}
         />
         <span className="at-k">
-          excluding launches that graduated inside {formatDurationLong(w.excludingFast.cutoffSeconds)}
-          {w.excludingFast.oneIn === null ? "" : ` · ${formatOneIn(w.excludingFast.oneIn)}`} ·{" "}
+          leaving out graduations under {formatDurationLong(w.excludingFast.cutoffSeconds)}:{" "}
           {formatCount(w.excludingFast.graduations)} of {formatCount(w.launches)}
+          {w.excludingFast.oneIn === null ? "" : `, ${formatOneIn(w.excludingFast.oneIn)}`}
         </span>
       </div>
     </div>
@@ -316,11 +327,11 @@ export default function Cohorts(): ReactElement {
           <summary>How this is counted</summary>
           {allTimeIsSameMeasurement ? <p className="note">{SAME_MEASUREMENT_NOTE}</p> : null}
           <p className="note">
-            A row under n&nbsp;=&nbsp;30 prints its sample size instead of a percentage.
+            Rows with fewer than 30 launches show the count instead of a rate.
           </p>
           <p className="note note--fine">
-            All-time is indexed from block {formatCount(numberFile.firstIndexedBlock)} to block{" "}
-            {formatCount(numberFile.headBlock)}.
+            All time means since {sinceLabel}, block {formatCount(numberFile.firstIndexedBlock)} to
+            block {formatCount(numberFile.headBlock)}.
           </p>
         </details>
       </div>
@@ -338,29 +349,28 @@ export default function Cohorts(): ReactElement {
             </span>
           </div>
           <p className="note">
-            The price of the graduated pool at +1 h, +24 h and +7 d after the graduation, against the
-            pool&rsquo;s opening price, from the pool&rsquo;s own swaps. Each cell is the median change
-            with the number of graduations whose mark had passed when this was measured; a mark
-            with no swap by then is counted as no trade, not as a price. Below n&nbsp;=&nbsp;30 a
-            cell prints its sample size instead of a figure.
+            The pool&rsquo;s price at {outcomeMarks.map((m) => OUTCOME_MARK_LABELS[m]).join(", ")} after
+            graduation, against its opening price. Each cell is the median for the graduations old
+            enough to have reached that mark, with their number. A pool with no trade by the mark
+            counts as no trade, not as a price.
           </p>
           <Register
             ariaLabel="Price after graduation by time to graduation"
             caption="Change against the opening price, by how long the graduation took."
-            columns={OUTCOME_COLUMNS("Time to graduation")}
-            rows={outcomes.cohorts.ttg.map((r) => outcomeRegisterRow(TTG_LABELS[r.bucket] ?? r.bucket, r))}
+            columns={OUTCOME_COLUMNS("Time to graduation", outcomeMarks)}
+            rows={outcomes.cohorts.ttg.map((r) => outcomeRegisterRow(TTG_LABELS[r.bucket] ?? r.bucket, r, outcomeMarks))}
           />
           <Register
             ariaLabel="Price after graduation by pair token"
             caption="Change against the opening price, by the token the launch was paired against."
-            columns={OUTCOME_COLUMNS("Pair token")}
-            rows={outcomes.cohorts.pair.map((r) => outcomeRegisterRow(pairLabel(r.bucket), r))}
+            columns={OUTCOME_COLUMNS("Pair token", outcomeMarks)}
+            rows={outcomes.cohorts.pair.map((r) => outcomeRegisterRow(pairLabel(r.bucket), r, outcomeMarks))}
           />
           <Register
             ariaLabel="Price after graduation by creator tax"
             caption="Change against the opening price, by creator tax."
-            columns={OUTCOME_COLUMNS("Creator tax")}
-            rows={outcomes.cohorts.tax.map((r) => outcomeRegisterRow(taxLabel(r.bucket), r))}
+            columns={OUTCOME_COLUMNS("Creator tax", outcomeMarks)}
+            rows={outcomes.cohorts.tax.map((r) => outcomeRegisterRow(taxLabel(r.bucket), r, outcomeMarks))}
           />
         </div>
       ) : null}
@@ -373,14 +383,14 @@ export default function Cohorts(): ReactElement {
         <div className="card" id="h-firstbuy">
           <div className="card-header">
             <h2 className="kicker card-kicker">FIRST BUY</h2>
-            <span className="note note--fine">{firstBuy.population}</span>
+            <span className="note note--fine">launches at least one hour old</span>
           </div>
           <p className="note">
             {firstBuy.indexedFromBlock === null
-              ? "First buys are not yet indexed: the crawl records them from the first run after 13 Sep 2026, and every row below is n = 0 until then."
-              : `First buys are indexed from block ${formatCount(firstBuy.indexedFromBlock)}. Launches before it were never read for buys and are outside this population.`}{" "}
-            Shares from the launch block on are cumulative. A launch&rsquo;s own opening buy, sent
-            in the launch transaction, is counted separately and never as an outside buy.
+              ? "First buys are not yet indexed; every row below is n = 0 until the first crawl that records them."
+              : `Counted from block ${formatCount(firstBuy.indexedFromBlock)}; earlier launches were never read for buys.`}{" "}
+            Shares are cumulative from the launch block. The launch&rsquo;s own opening buy, sent in
+            the launch transaction, is counted separately.
           </p>
           <Register
             ariaLabel="First-buy timing by creator tax"

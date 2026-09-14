@@ -96,7 +96,7 @@ export default function NumberCard(): ReactElement {
                     updatedAt={crawledAt}
                     insufficient={fast.underCutoff.insufficient}
                   />{" "}
-                  of graduations completed inside {cutoffWords};{" "}
+                  of graduations were done within {cutoffWords}, and{" "}
                   <Stat
                     className="mono"
                     name="fast-under-60"
@@ -106,7 +106,7 @@ export default function NumberCard(): ReactElement {
                     updatedAt={crawledAt}
                     insufficient={fast.under60.insufficient}
                   />{" "}
-                  inside 60 seconds.{" "}
+                  within 60 seconds.{" "}
                   <span className="den">
                     (n&nbsp;=&nbsp;<span className="mono">{formatCount(fast.n)}</span> graduations ·
                     24 h)

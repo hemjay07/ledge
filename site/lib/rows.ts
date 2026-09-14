@@ -107,15 +107,18 @@ export const PAIRTAX_COLUMNS = [
 
 /* ---- first-buy timing (A5b) --------------------------------------------- */
 
+/* Short heads (2026-09-14): eight columns must fit a phone's scroller
+   without each head wrapping to three lines. "≤ 1 s" reads as the
+   cumulative share it is. */
 export const FIRSTBUY_COLUMNS = (first: string): string[] => [
   first,
   "Launches (n)",
-  "Opening buy in the launch tx",
-  "Outside buy in the launch block",
-  "within 1 s",
-  "within 3 s",
-  "within 5 s",
-  "No outside buy",
+  "Opening buy in launch tx",
+  "Same block",
+  "≤ 1 s",
+  "≤ 3 s",
+  "≤ 5 s",
+  "None",
 ];
 
 /** The cumulative shares stats.py published, each through the same gate as
@@ -138,12 +141,15 @@ export function firstBuyRegisterRow(label: string, row: FirstBuyRow): RegisterRo
 
 /* ---- outcomes after a graduation (A6) ------------------------------------ */
 
-export const OUTCOME_COLUMNS = (first: string): string[] => [
+export type OutcomeMark = "1h" | "24h" | "7d";
+const OUTCOME_HEAD: Record<OutcomeMark, string> = { "1h": "+1 h, median", "24h": "+24 h, median", "7d": "+7 d, median" };
+
+/** The marks any cohort has reached; the page decides which (a column of
+    n = 0 is absent, not printed). */
+export const OUTCOME_COLUMNS = (first: string, marks: readonly OutcomeMark[]): string[] => [
   first,
   "Graduations (n)",
-  "+1 h, median",
-  "+24 h, median",
-  "+7 d, median",
+  ...marks.map((m) => OUTCOME_HEAD[m]),
   "No trade by +24 h",
 ];
 
@@ -158,15 +164,13 @@ function changeCell(mark: OutcomeMarkRow): RegisterCell {
   return { text: `${sign}${Math.abs(mark.median * 100).toFixed(1)}% (n=${formatCount(mark.n)})`, kind: "fig" };
 }
 
-export function outcomeRegisterRow(label: string, row: OutcomeCohortRow): RegisterRow {
+export function outcomeRegisterRow(label: string, row: OutcomeCohortRow, marks: readonly OutcomeMark[]): RegisterRow {
   const h24 = row.marks["24h"];
   return {
     label,
     cells: [
       { text: formatCount(row.graduations), kind: "n" },
-      changeCell(row.marks["1h"]),
-      changeCell(h24),
-      changeCell(row.marks["7d"]),
+      ...marks.map((m) => changeCell(row.marks[m])),
       rateCell({ rate: h24.noTradeShare, n: h24.n, insufficient: h24.insufficient }),
     ],
   };
