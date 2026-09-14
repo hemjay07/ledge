@@ -55,9 +55,12 @@ crawls overnight; the official endpoint took 75 s for an unfiltered
 egress for six hours (190+ consecutive tick failures) while answering the
 box; and the official endpoint refused a catch-up tick's block-header
 batch after ~50 calls in 30 s from the box itself. The clients now hold
-no policy. The next steps are in TODO A3 (the tick itself on the box) and
-the node evaluation: a node of our own is the only thing that removes the
-dependency; it becomes one more upstream behind the gateway.
+no policy. The tick itself moved to the box the same night (§2, done
+2026-09-14 00:54Z). A node of our own was evaluated on paper the same
+day — `NODE-EVALUATION.md`: 64 GB RAM, TBs of NVMe and an Ethereum L1
+endpoint of our own, so not now; a paid provider becomes one more upstream
+behind the gateway when the exhausted counter stops being zero or the
+backfill is scheduled.
 
 ## The four pieces
 
