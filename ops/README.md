@@ -32,6 +32,16 @@ with the crawl's own race resolution. Installed 2026-09-12:
 A first trial on a few pools: `LEDGE_PROBE_LIMIT_POOLS=20 sudo -E -u ledge ops/probe.sh`
 (or set `LEDGE_PROBE_LIMIT_POOLS` in `/etc/ledge/env` temporarily).
 
+## The box
+
+is*hosting Lite: **1 vCPU, 957 MB RAM, 20 GB disk**, Ubuntu 22.04, plus a
+2 GB swap file added 2026-09-14 after the kernel killed the probe's
+recompute (a crawl, a probe recompute and the gateway together exceed the
+memory). Four services share it: `ledge-gateway` (~50–250 MB), `ledge-tick`
+(~60 MB), `ledge-crawl` (~350 MB while it runs), `ledge-probe` (~350 MB
+while it runs). Do not run the probe while a crawl is due; the next plan up
+(2 GB) removes the constraint for about $5/month more.
+
 ## The RPC gateway (every chain read goes through it)
 
 `gateway/` is one process on the box that owns all endpoint policy: pacing

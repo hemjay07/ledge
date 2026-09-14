@@ -64,18 +64,30 @@ class Pacer {
   }
 }
 
+/* Bounded by bytes, not entries: a cached 1,000-block log range is a few
+   hundred kilobytes, a header a few hundred bytes, and the box has 1 GB
+   of memory in total (2026-09-14 01:10Z: the gateway had grown to 218 MB
+   in 35 minutes under an entry cap, and the kernel killed the probe's
+   recompute beside it). Size is the JSON length of what is stored. */
 class Lru {
-  constructor(max) { this.max = max; this.map = new Map(); }
+  constructor(maxBytes) { this.maxBytes = maxBytes; this.bytes = 0; this.map = new Map(); }
   get(k) {
     if (!this.map.has(k)) return undefined;
-    const v = this.map.get(k);
-    this.map.delete(k); this.map.set(k, v);
-    return v;
+    const e = this.map.get(k);
+    this.map.delete(k); this.map.set(k, e);
+    return e.value;
   }
-  set(k, v) {
-    if (this.map.has(k)) this.map.delete(k);
-    this.map.set(k, v);
-    if (this.map.size > this.max) this.map.delete(this.map.keys().next().value);
+  set(k, value) {
+    const size = JSON.stringify(value).length;
+    if (size > this.maxBytes) return;
+    if (this.map.has(k)) { this.bytes -= this.map.get(k).size; this.map.delete(k); }
+    this.map.set(k, { value, size });
+    this.bytes += size;
+    while (this.bytes > this.maxBytes && this.map.size > 0) {
+      const oldest = this.map.keys().next().value;
+      this.bytes -= this.map.get(oldest).size;
+      this.map.delete(oldest);
+    }
   }
   get size() { return this.map.size; }
 }
@@ -116,7 +128,7 @@ export function createGateway(options) {
   if (upstreams.length === 0) throw new Error("gateway: at least one upstream is required");
   const retryDelays = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
   const reorgWindow = options.reorgWindow ?? 3000;
-  const cache = new Lru(options.cacheEntries ?? 50_000);
+  const cache = new Lru(options.cacheBytes ?? 32 * 1024 * 1024);
   const fetchImpl = options.fetch ?? fetch;
   const metrics = { requests: 0, items: 0, cache: { hits: 0, misses: 0, stored: 0 }, retries: 0, exhausted: 0 };
   let head = null;
@@ -227,6 +239,6 @@ export function createGateway(options) {
 
   return {
     handle,
-    metrics: () => ({ ...metrics, head, cacheSize: cache.size, upstreams: upstreams.map((u) => ({ url: u.url, ...u.stats })) }),
+    metrics: () => ({ ...metrics, head, cacheSize: cache.size, cacheBytes: cache.bytes, upstreams: upstreams.map((u) => ({ url: u.url, ...u.stats })) }),
   };
 }

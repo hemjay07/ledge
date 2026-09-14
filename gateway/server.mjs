@@ -35,6 +35,7 @@ export function startServer(env = process.env, listen = true) {
     upstreams,
     minIntervalMs: Number(env.GATEWAY_MIN_INTERVAL_MS ?? 150),
     concurrency: Number(env.GATEWAY_CONCURRENCY ?? 3),
+    cacheBytes: Number(env.GATEWAY_CACHE_BYTES ?? 32 * 1024 * 1024),
   });
 
   const isLoopback = (req) => ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress);
@@ -80,7 +81,7 @@ export function startServer(env = process.env, listen = true) {
     server.listen(port, "0.0.0.0", () => console.log(`gateway: listening on ${port}, upstreams ${upstreams.map((u) => new URL(u).host).join(", ")}`));
     ticker = setInterval(() => {
       const m = gateway.metrics();
-      console.log(`gateway: requests=${m.requests} items=${m.items} cache=${m.cache.hits}/${m.cache.misses} retries=${m.retries} exhausted=${m.exhausted} ` +
+      console.log(`gateway: requests=${m.requests} items=${m.items} cache=${m.cache.hits}/${m.cache.misses} cacheMB=${(m.cacheBytes / 1048576).toFixed(1)} retries=${m.retries} exhausted=${m.exhausted} ` +
         m.upstreams.map((u) => `${new URL(u.url).host} ok=${u.ok} refused=${u.refused} busy=${u.busy} failed=${u.failed}`).join(" | "));
     }, 60_000);
     ticker.unref();

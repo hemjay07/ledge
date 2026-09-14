@@ -100,3 +100,4 @@ without the banner — and it has not been met yet.
 | 09-13 | both public RPCs refused Cloudflare's egress; live tick down from 18:05Z | 2 | RPC relay on the box + keyed Worker client (owner flips it) |
 | 09-13 | one box push lost a race with a hand push at 19:07Z | — | expected; the runner keeps the commit and pushes next run (it did) |
 | 09-14 | official endpoint refused the tick's header batch after ~50 calls/30 s from the box | 2 | the gateway: pacing + failover + cache, one place, tested |
+| 09-14 | the box is 1 vCPU / 957 MB / 20 GB, not the 4 GB assumed; OOM killed the probe's recompute beside the gateway (218 MB cache) and a crawl | 2 | 2 GB swap; gateway cache bounded by bytes (32 MB), not entries; box size written in ops/README.md; probe and crawl not to overlap (open) |

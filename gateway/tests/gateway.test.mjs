@@ -169,3 +169,18 @@ test("refuses a body that is not JSON-RPC before any upstream call", async () =>
   assert.equal(a.calls.length, 0);
   a.close();
 });
+
+test("the cache is bounded by bytes and evicts the oldest entries first", async () => {
+  const big = "x".repeat(10_000);
+  const a = await fakeUpstream((items) => ok(items, (i) => (i.method === "eth_blockNumber" ? "0x" + HEAD.toString(16) : big + i.params[0])));
+  const g = gw(a, undefined, { cacheBytes: 25_000 });
+  await g.handle([req("eth_blockNumber", [])]);
+  const blocks = [1, 2, 3].map((n) => "0x" + (HEAD - 50_000 - n).toString(16));
+  for (const b of blocks) await g.handle([req("eth_getBlockByNumber", [b, false])]);
+  const m = g.metrics();
+  assert.ok(m.cacheBytes <= 25_000, `cacheBytes ${m.cacheBytes}`);
+  assert.equal(m.cacheSize, 2); // the first block was evicted
+  await g.handle([req("eth_getBlockByNumber", [blocks[0], false])]);
+  assert.equal(g.metrics().cache.hits, 0);
+  a.close();
+});
