@@ -103,3 +103,7 @@ without the banner — and it has not been met yet.
 | 09-13 | one box push lost a race with a hand push at 19:07Z | — | expected; the runner keeps the commit and pushes next run (it did) |
 | 09-14 | official endpoint refused the tick's header batch after ~50 calls/30 s from the box | 2 | the gateway: pacing + failover + cache, one place, tested |
 | 09-14 | the box is 1 vCPU / 957 MB / 20 GB, not the 4 GB assumed; OOM killed the probe's recompute beside the gateway (218 MB cache) and a crawl | 2 | 2 GB swap; gateway cache bounded by bytes (32 MB), not entries; box size written in ops/README.md; probe and crawl not to overlap (open) |
+| 09-14 | both boards printed `count` (the 200-row cap) as the population; the graveyard's headline figure was the cap | 4 | `total` beside `count` on both responses; the site says "200 of 55,385" |
+| 09-14 | the bot's reply was rewritten; the site's lookup panel walks that text by line order and mis-slotted it for ~1 h | 1 | walker follows the new order; fixtures re-rendered by the Worker's own builder; run the site suite after any text.ts change |
+| 09-14 | one empty header in a 50-block batch failed seven box ticks in a row | 2 | per-block retry in the tick (as the crawl has had since 09-12) |
+| 09-14 | the box runner ignores SIGTERM; every restart waits 90 s for SIGKILL | 2 | open: handle the signal in worker/host/main.ts |

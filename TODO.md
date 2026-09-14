@@ -49,6 +49,11 @@ cron (`wrangler.toml [triggers]` already changed in the repo), then the
 coverage check (≥ 99% of sampled launches for a day).*
 **DONE when:** coverage of sampled launches ≥ 99% for a day, the Worker's
 `[triggers]` are gone, and the tick's own log shows no gap over an hour.
+*2026-09-14 17:38Z: the Worker's minute cron is gone (owner deployed); the
+tick runs on the box; first coverage reading 200 of 200 sampled launches
+present, launch block read for all 200, cursor 11 s old. The reading now
+repeats after every crawl (`pipeline/coverage.py`) and is on `/method`, so
+the "for a day" half is a matter of reading tomorrow's series.*
 
 **A4. The watchdog and the reconciliation figures.** `INDEXER.md` §3 plus
 the Telegram alert. Coverage, agreement, freshness — hourly, published on
@@ -56,6 +61,10 @@ the Telegram alert. Coverage, agreement, freshness — hourly, published on
 past its bound.
 **DONE when:** the figures are on `/method` and killing the service on
 purpose produces a message within the hour.
+*2026-09-14: coverage and freshness are on `/method` (THE LIVE INDEX),
+measured after every crawl. Not done: the agreement figure (25 curves'
+reserves re-read against the stored reading) and the Telegram message to
+the owner when a cursor is past its bound.*
 
 **A5. Post-graduation outcomes.** `OUTCOMES.md`, steps 1–3 (decode
 `Initialize`/`Swap` on the PoolManager, hour bars in the data partitions,
@@ -99,9 +108,12 @@ cohort's n grows by about three weeks of launches.
 **A6. Outcomes on the surfaces.** The cohort card on `/t/{address}` (the
 slot is already commented in), a column on `/graduated`, and the homepage
 line once it clears n.
-*2026-09-14: the AFTER GRADUATION card is on `/cohorts` (three registers,
-medians with n, no-trade share). `/t/{address}` and `/graduated` still
-to do.*
+*2026-09-14: the AFTER GRADUATION card is on `/cohorts` and the
+per-bucket card on `/t/{address}`. Not done: a per-row +24 h column on
+`/graduated` — that is a per-token price change computed from two chain
+readings, which belongs in the pipeline (a `changeAt24h` per graduation
+in the record), not in the site's build script; it needs its own dated
+method entry first.*
 
 ---
 
@@ -188,6 +200,18 @@ anyone can grep the index without an endpoint. Cheap, and it is the honest
 minimum version of C2.
 
 ---
+
+## E. The copy pass (2026-09-14) and what follows it
+
+Done, surface by surface, each shown before it shipped: the bot (help,
+/number, the address reply, the digest, the graveyard post), the homepage,
+`/cohorts`, `/live`, `/graduated`, `/graveyard`, `/t/{address}`, `/method`
+(the changelog folded last), `/token`, the card page, the weekly dispatch.
+Found on the way and fixed: both boards printed the 200-row cap as the
+population; the site's lookup panel mis-slotted the rewritten reply for an
+hour; captions clipped at phone width; a 7-wei reserve printed as
+0.000000000000000007. Next: the first-outside-buy alert
+(`design/ALERT-BRIEF.md`), then the `/graduated` column above.
 
 ## D. Written down, not scheduled
 
