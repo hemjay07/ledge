@@ -43,7 +43,7 @@ jobs:
             echo "CLOUDFLARE_API_TOKEN or LEDGE_D1_NAME is unset — the Worker is not deployed yet."
           fi
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         if: steps.gate.outputs.ready == 'true'
         with:
           python-version: "3.12"
