@@ -71,21 +71,21 @@ describe("the field", () => {
 describe("a full lookup", () => {
   it("prints every sentence the API sent, verbatim", async () => {
     const container = await lookUp(ok);
-    await waitFor(() => expect(container.textContent).toContain("minute 13"));
+    await waitFor(() => expect(container.textContent).toContain("Launched 14 minutes ago"));
     const text = container.textContent ?? "";
     for (const line of ok.text.split("\n")) {
-      if (line.startsWith("https://")) continue; // the method URL is the entry's link target
+      if (line.startsWith("https://") || line.trim() === "") continue; // the method URL is the entry's link target
       expect(text).toContain(line);
     }
   });
 
   it("carries the config line, the cohort with its n, and the placement", async () => {
     const container = await lookUp(ok);
-    await waitFor(() => expect(container.textContent).toContain("ETH · 2–3%"));
+    await waitFor(() => expect(container.textContent).toContain("ETH pair, 2–3% creator tax"));
     const text = container.textContent ?? "";
-    expect(text).toContain("on the bonding curve");
-    expect(text).toContain("of 2,324 graduated");
-    expect(text).toContain("had already happened");
+    expect(text).toContain("Still on the curve");
+    expect(text).toContain("(34 of 2,324)");
+    expect(text).toContain("of graduations were done within");
     expect(text).toContain("Curve fill:");
   });
 
@@ -97,7 +97,7 @@ describe("a full lookup", () => {
 
   it("says nothing a reader could act on", async () => {
     const container = await lookUp(ok);
-    await waitFor(() => expect(container.textContent).toContain("minute 13"));
+    await waitFor(() => expect(container.textContent).toContain("Launched 14 minutes ago"));
     const text = (container.textContent ?? "").toLowerCase();
     for (const word of ["score", "risk", "safe", "rug", "likely", "predict", "odds", "chance"]) {
       expect(text).not.toContain(word);
@@ -129,11 +129,11 @@ describe("a full lookup", () => {
 describe("a partial", () => {
   it("prints the objection and the four facts that survived it", async () => {
     const container = await lookUp(notIndexed);
-    await waitFor(() => expect(container.textContent).toContain("launch time not indexed"));
+    await waitFor(() => expect(container.textContent).toContain("Launched more than 7 days ago"));
     const text = container.textContent ?? "";
     expect(text).toContain(notIndexed.message);
-    expect(text).toContain("ETH · 2–3%");
-    expect(text).toContain("of 2,324 graduated");
+    expect(text).toContain("ETH pair, 2–3% creator tax");
+    expect(text).toContain("(34 of 2,324)");
     expect(text).toContain("is not placed on the table of graduation times");
   });
 });

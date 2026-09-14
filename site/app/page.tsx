@@ -8,6 +8,7 @@ import { Stat } from "../components/Stat";
 import { allTime, numberFile } from "../lib/number";
 import {
   formatCount,
+  formatDayLong,
   formatDuration,
   isInsufficient,
   renderableSample,
@@ -86,12 +87,7 @@ export default function Home(): ReactElement {
      the venue's life to anyone who knows it. The record starts where it
      starts; the caption says the date. */
   const sinceLabel = numberFile.firstIndexedAt
-    ? new Date(numberFile.firstIndexedAt).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      })
+    ? formatDayLong(numberFile.firstIndexedAt)
     : `block ${formatCount(numberFile.firstIndexedBlock)}`;
 
   return (
@@ -122,8 +118,8 @@ export default function Home(): ReactElement {
               finished in under 10&nbsp;seconds.
             </h1>
             <p className="dek home-dek">
-              LEDGE indexes every launch from the pons factory contract, hourly, and times every
-              graduation.
+              LEDGE counts every pons launch and times every graduation. Every number here says how
+              many it was counted from.
             </p>
             {/* C5 (BRAINSTORM-2026-09-13): the one line of difference. Four pons
                 sites score or publish the tape; a visitor arriving from one needs
@@ -131,7 +127,8 @@ export default function Home(): ReactElement {
                 table. It is a separate line, not part of the dek, because the dek
                 is held to 25 words by landing-copy.test.ts. */}
             <p className="note home-difference">
-              No ratings, no wallets, no tape &mdash; the population, its method, and its n.
+              Nothing here is rated and no wallet is named. Just what the whole population did, and
+              how it was counted.
             </p>
           </div>
 
@@ -212,6 +209,9 @@ export default function Home(): ReactElement {
                 of pons launches never take a single buy.
               </p>
               <p className="note note--fine">{sampleProvenance(raisedNothing)}</p>
+              <p className="note note--fine">
+                <Link href="/graveyard">The graveyard</Link> counts this every day.
+              </p>
             </div>
           ) : null}
 
@@ -226,7 +226,7 @@ export default function Home(): ReactElement {
                 n = <span className="mono">{formatCount(allTime.ttg.n)}</span> graduations.
               </p>
               <p className="note note--fine">
-                <em>Two populations: a spike at the instant end, a trough, then a broad hump.</em>
+                <em>Two kinds of graduation: a spike inside the first seconds, then a gap, then the broad hump of the rest.</em>
               </p>
             </div>
           </div>
@@ -236,25 +236,25 @@ export default function Home(): ReactElement {
           {/* ---- three doors ---------------------------------------------- */}
           <Link className="card home-door home-door-1" href="/live">
             <span className="kicker card-kicker">Live</span>
-            <p className="note">Every curve taking buys right now, ranked however you sort it.</p>
+            <p className="note">Every curve taking buys right now.</p>
           </Link>
           <Link className="card home-door home-door-2" href="/graduated">
             <span className="kicker card-kicker">Graduated</span>
-            <p className="note">Every launch that crossed the threshold, in full.</p>
+            <p className="note">Every launch that graduated, and how long it took.</p>
           </Link>
           <Link className="card home-door home-door-3" href="/graveyard">
             <span className="kicker card-kicker">Graveyard</span>
-            <p className="note">Every launch that never graduated.</p>
+            <p className="note">Every launch that took no buys in its first 72 hours.</p>
           </Link>
 
           {/* LEDGE's own launch: pre-registration, then /t/{address} — REVAMP.md 2026-09-12 */}
           </HomeLiveProvider>
         </div>
 
+
         <p className="note home-rest">
-          More: <Link href="/number">the Pons Number</Link> ·{" "}
-          <Link href="/cohorts">cohorts by pair, tax, hour and day</Link> ·{" "}
-          <Link href="/cockpit">pair &times; tax</Link> · <Link href="/method">how it is counted</Link>.
+          Also: <Link href="/number">the card</Link> · <Link href="/cohorts">cohorts</Link> ·{" "}
+          <Link href="/cockpit">pair &times; tax</Link> · <Link href="/method">method</Link>.
         </p>
 
         <Footer />

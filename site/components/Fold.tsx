@@ -89,7 +89,7 @@ export function Fold({
               <span className="mono">
                 {formatCount(sample.count)} of {formatCount(sample.sampled)}
               </span>{" "}
-              sampled · {formatDayLong(sample.measuredAt)} · {SAMPLE_METHOD_SHORT}
+              sampled on {formatDayLong(sample.measuredAt)}, {SAMPLE_METHOD_SHORT}.
             </p>
           </>
         ) : null}

@@ -103,9 +103,10 @@ export function readLookup(payload: unknown): LookupResult {
 export interface LookupLines {
   /** shortened address · Pons */
   identity: string | null;
-  /** pair class · creator tax · phase */
+  /** "ETH pair, 2–3% creator tax. Launched 23 minutes ago. Still on the curve." */
   config: string | null;
-  /** the death-card line: minute N · outcome · cohort · pair · tax */
+  /** the death-card line: minute N · outcome · cohort · pair · tax. Not in
+      the running text since 2026-09-14 (it belongs on the card), so null. */
   headline: string | null;
   /** the API's objection, where it sent one inside the body */
   notice: string | null;
@@ -144,17 +145,36 @@ const EMPTY: LookupLines = {
 /** worker/src/text.ts `lookupText` writes its lines in a fixed order, and
     which optional lines it wrote is decided by fields that travel in the same
     response. So the block is walked, not pattern-matched: a cohort sentence is
-    whichever line stands where text.ts put it, whatever it says. */
+    whichever line stands where text.ts put it, whatever it says.
+
+    Order since 2026-09-14 (the reply rewritten for a reader on a phone):
+    identity; config and state; the notice; the fill; the activity lines;
+    the cohort lines (or the one line saying none is published); the
+    placement; the stamp; the live layer's own staleness; the method link.
+    Blank lines separate the groups and are skipped. The headline (the death
+    card's own line) is no longer in the running text; the slot stays, null,
+    so a renderer that printed it prints one line fewer. */
 export function splitLookupText(body: TokenResponse): LookupLines {
-  const lines = body.text.split("\n");
+  const lines = body.text.split("\n").filter((l) => l.trim() !== "");
   let i = 0;
   const next = (): string | null => (i < lines.length ? (lines[i++] as string) : null);
 
   const out: LookupLines = { ...EMPTY, cohort: [], activity: [] };
   out.identity = next();
   out.config = next();
-  out.headline = next();
   if (body.notice !== null) out.notice = next();
+
+  out.fill = next();
+  /* worker/src/text.ts `activitySentences`: the counts line, the times line,
+     the first-outside-buy line, and the launch-transaction line only when
+     that reading exists -- read off the same fields the Worker branched on. */
+  if (body.activity !== null) {
+    const count = 3 + (body.activity.launchTxBuy === null ? 0 : 1);
+    for (let n = 0; n < count; n += 1) {
+      const line = next();
+      if (line !== null) out.activity.push(line);
+    }
+  }
 
   const windows = [body.cohort?.allTime ?? null, body.cohort?.h24 ?? null].filter(
     (w) => w !== null,
@@ -169,19 +189,8 @@ export function splitLookupText(body: TokenResponse): LookupLines {
       if (line !== null) out.cohort.push(line);
     }
   }
-
   out.placement = next();
-  out.fill = next();
-  /* worker/src/text.ts `activitySentences` writes exactly three lines when the
-     response carries an activity block and none at all when it does not, so
-     the count is read off the same field the Worker branched on rather than
-     matched against the text. */
-  if (body.activity !== null) {
-    for (let n = 0; n < 3; n += 1) {
-      const line = next();
-      if (line !== null) out.activity.push(line);
-    }
-  }
+
   if (body.cohort !== null) out.stamp = next();
   if (body.live.stale) out.staleNote = next();
   out.methodUrl = next();

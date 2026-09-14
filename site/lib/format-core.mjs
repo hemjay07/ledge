@@ -144,7 +144,7 @@ export const SAMPLE_CLAUSE = "of Pons launches never take a single buy.";
 
 /** How the sample was taken, in the length a fine-print line holds. The full
     method stays in the file, under `method`. */
-export const SAMPLE_METHOD_SHORT = "read from each launch's own bonding curve";
+export const SAMPLE_METHOD_SHORT = "read from each curve";
 
 /** The sample as a rate fact: its share over the number it sampled. A sample
     with no `sampled` count has no denominator and therefore no printable
@@ -159,13 +159,11 @@ export function sampleSentence(sample) {
   return `${rateText(sampleFact(sample))} ${SAMPLE_CLAUSE}`;
 }
 
-/** "187 of 200 sampled · 8 September 2026 · read from each launch's own
-    bonding curve" — the count, the denominator, the date, the method. */
+/** "187 of 200 sampled on 8 September 2026, read from each curve." — the
+    count, the denominator, the date, the method, in one sentence. */
 export function sampleProvenance(sample) {
-  return (
-    `${formatCount(sample.count)} of ${formatCount(sample.sampled)} sampled` +
-    ` · ${formatDayLong(sample.measuredAt)} · ${SAMPLE_METHOD_SHORT}`
-  );
+  // 2026-09-14: one plain sentence, not three fragments with middle dots.
+  return `${formatCount(sample.count)} of ${formatCount(sample.sampled)} sampled on ${formatDayLong(sample.measuredAt)}, ${SAMPLE_METHOD_SHORT}.`;
 }
 
 /** The sample a surface may render: one that carries its own denominator.

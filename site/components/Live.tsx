@@ -907,7 +907,7 @@ export function HomeNowCard(): ReactElement {
   return (
     <section className="card home-now" aria-label="Curves taking buys right now">
       <div className="card-header">
-        <span className="kicker card-kicker">NOW · taking buys · ranked by buys</span>
+        <span className="kicker card-kicker">NOW · curves taking buys</span>
       </div>
       <div className="card-body">
         {result === null ? <div className="hairline-pulse" /> : null}
@@ -924,7 +924,7 @@ export function HomeNowCard(): ReactElement {
             </p>
             <div className="scroller">
               <table className="home-now-table">
-                <caption>The first five tracked curves, ranked by buys.</caption>
+                <caption>The five busiest curves right now, by buys.</caption>
                 <thead>
                   <tr>
                     <th scope="col">Token</th>

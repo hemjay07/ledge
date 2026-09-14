@@ -34,7 +34,7 @@ function copyOf(startMarker: string, endMarker: string): string {
    no-verdict) run against the new ones unchanged. */
 const HOOK_DEK = copyOf('<p className="dek home-dek">', "</p>");
 const HOME_REST = copyOf('<p className="note home-rest">', "</p>");
-const FINDING_ITALIC = copyOf("<em>Two populations", "</em>");
+const FINDING_ITALIC = copyOf("<em>Two kinds of graduation", "</em>");
 
 /* The pair-token finding was WITHDRAWN from this page on 2026-09-10, not
    moved. It said the pair token makes no difference once fast graduations are
@@ -110,10 +110,10 @@ describe("the hook's dek", () => {
     expect(HOOK_DEK.toLowerCase()).not.toMatch(/\byou should\b|\bstart\b|\btry\b|\bget\b/);
   });
 
-  it("says what LEDGE does: indexes every launch, hourly, and times every graduation", () => {
-    expect(HOOK_DEK).toMatch(/factory contract/i);
-    expect(HOOK_DEK).toMatch(/hourly/i);
-    expect(HOOK_DEK).toMatch(/graduation/i);
+  it("says what LEDGE does and what every number carries (reworded 2026-09-14)", () => {
+    expect(HOOK_DEK).toMatch(/counts every pons launch/i);
+    expect(HOOK_DEK).toMatch(/times every graduation/i);
+    expect(HOOK_DEK).toMatch(/how many it was counted from/i);
   });
 });
 

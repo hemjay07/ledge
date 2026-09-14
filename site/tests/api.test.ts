@@ -106,40 +106,42 @@ describe("the sentences, taken back apart", () => {
   it("puts every line of a full lookup in exactly one slot, and loses none", () => {
     const b = body(ok);
     const lines = splitLookupText(b);
+    /* the order text.ts writes since 2026-09-14; blank separator lines are
+       not slots and are dropped on both sides */
     const rendered = [
       lines.identity,
       lines.config,
-      lines.headline,
       lines.notice,
-      ...lines.cohort,
-      lines.placement,
       lines.fill,
       ...lines.activity,
+      ...lines.cohort,
+      lines.placement,
       lines.stamp,
       lines.staleNote,
       lines.methodUrl,
     ].filter((l) => l !== null);
-    expect(rendered).toEqual(b.text.split("\n"));
+    expect(rendered).toEqual(b.text.split("\n").filter((l) => l.trim() !== ""));
   });
 
   it("renders the API's sentences verbatim, never a rebuilt one", () => {
     const lines = splitLookupText(body(ok));
-    expect(lines.headline).toBe(
-      "minute 13 · on the curve · cohort 1.46% (n=2,324) · ETH · 2–3%",
-    );
+    expect(lines.headline).toBeNull(); // the card's line is not in the running text since 2026-09-14
+    expect(lines.config).toBe("ETH pair, 2–3% creator tax. Launched 14 minutes ago. Still on the curve.");
     expect(lines.cohort).toHaveLength(2);
-    expect(lines.cohort[0]).toContain("Launches configured this way, all time:");
+    expect(lines.cohort[0]).toContain("Launches like this one:");
     expect(lines.cohort[0]).toContain("of 2,324");
     expect(lines.placement).toBe(
-      "By 10 min, 76.4% of the 535 graduations measured in this window had already happened. These figures were measured 303 d ago — older than the 2 h freshness bound.",
+      "76.4% of graduations were done within 10 min (n=535); this launch was not. These figures were measured 303 d ago — older than the 2 h freshness bound.",
     );
     expect(lines.fill).toContain("Curve fill:");
+    expect(lines.activity).toHaveLength(3);
+    expect(lines.activity[0]).toContain("41 buys, 12 sells");
   });
 
   it("keeps the notice in its own slot when the launch is not indexed", () => {
     const lines = splitLookupText(body(notIndexed));
     expect(lines.notice).toContain("Launched more than 7 days ago");
-    expect(lines.headline).toContain("launch time not indexed");
+    expect(lines.config).toBe("ETH pair, 2–3% creator tax. Still on the curve.");
     expect(lines.placement).toBe(
       "The launch time is not indexed, so this launch is not placed on the table of graduation times.",
     );
@@ -147,7 +149,7 @@ describe("the sentences, taken back apart", () => {
 
   it("says so in one line when no cohort has been published", () => {
     const lines = splitLookupText(body(numberUnavailable));
-    expect(lines.cohort).toEqual(["No cohort has been published for this configuration."]);
+    expect(lines.cohort).toEqual(["No figures are published for launches like this one."]);
     expect(lines.stamp).toBeNull();
   });
 
@@ -174,7 +176,7 @@ describe("the sentences, taken back apart", () => {
   it("survives a truncated block rather than mislabelling a line", () => {
     const b = body(ok);
     const lines = splitLookupText({ ...b, text: b.text.split("\n").slice(0, 3).join("\n") });
-    expect(lines.headline).not.toBeNull();
+    expect(lines.config).not.toBeNull();
     expect(lines.cohort).toEqual([]);
     expect(lines.placement).toBeNull();
     expect(lines.methodUrl).toBeNull();
