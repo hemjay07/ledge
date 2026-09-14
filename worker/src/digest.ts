@@ -18,6 +18,9 @@ import { loadNumber, type NumberFile } from "./numberFile";
 import { sendMessage, withinLimits } from "./telegram";
 
 export const DIGEST_HOUR_UTC = 12;
+/** The one cron Cloudflare keeps (wrangler.toml [triggers]); must fire
+    inside DIGEST_HOUR_UTC or shouldPostDigest refuses it. */
+export const DIGEST_CRON = "5 12 * * *";
 export const KV_DIGEST_POSTED = "digest:posted";
 
 /** The UTC day a clock reading falls in, as the KV value that marks it posted. */

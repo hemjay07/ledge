@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DIGEST_HOUR_UTC, digestDayKey, digestText, shouldPostDigest } from "../../src/digest";
+import { DIGEST_CRON, DIGEST_HOUR_UTC, digestDayKey, digestText, shouldPostDigest } from "../../src/digest";
 import { fixtureNumber, NOW_SECONDS } from "./helpers";
 
 /* BRAINSTORM-2026-09-13 §2: the room is the first push channel, and the
@@ -60,5 +60,14 @@ describe("the once-a-day gate", () => {
 
   it("posts again the next day", () => {
     expect(shouldPostDigest(atHour(DIGEST_HOUR_UTC), "2026-09-12")).toBe(true);
+  });
+});
+
+describe("the cron Cloudflare keeps", () => {
+  it("fires inside the digest hour, so the gate accepts it", () => {
+    const [minute, hour] = DIGEST_CRON.split(" ");
+    expect(Number(hour)).toBe(DIGEST_HOUR_UTC);
+    expect(Number(minute)).toBeGreaterThanOrEqual(0);
+    expect(Number(minute)).toBeLessThan(60);
   });
 });

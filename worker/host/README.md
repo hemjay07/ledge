@@ -16,10 +16,10 @@ Cloudflare D1 database over its HTTP API, in a loop. See `INDEXER.md` section
 2. Clone the repo and install dependencies:
 
    ```bash
-   sudo mkdir -p /opt/ledge
-   sudo chown "$USER" /opt/ledge
-   git clone <repo-url> /opt/ledge
-   cd /opt/ledge/worker
+   sudo mkdir -p /home/ledge/ledge
+   sudo chown "$USER" /home/ledge/ledge
+   git clone <repo-url> /home/ledge/ledge
+   cd /home/ledge/ledge/worker
    npm ci
    ```
 
@@ -59,21 +59,23 @@ Cloudflare D1 database over its HTTP API, in a loop. See `INDEXER.md` section
    sudo chown ledge:ledge /etc/ledge/env
    ```
 
-   `D1_API_TOKEN` is a Cloudflare API token scoped to D1 write on the `ledge`
-   database only — not the same thing as a `wrangler login` session. Create
-   it under My Profile -> API Tokens on the Cloudflare dashboard.
+   `D1_API_TOKEN` is a Cloudflare API token (My Profile -> API Tokens ->
+   Custom, permission Account · D1 · Edit) — not a `wrangler login`
+   session. `RPC_URL` is the gateway on loopback, `http://127.0.0.1:8545`
+   (ops/README.md); no fallback is needed there, the gateway holds it.
+   Installed on the box 2026-09-14 00:54Z.
 
 5. Create the `ledge` system user if it does not already exist:
 
    ```bash
    sudo useradd --system --no-create-home --shell /usr/sbin/nologin ledge
-   sudo chown -R ledge:ledge /opt/ledge
+   sudo chown -R ledge:ledge /home/ledge/ledge
    ```
 
 6. Install the systemd unit:
 
    ```bash
-   sudo cp /opt/ledge/worker/host/ledge-tick.service /etc/systemd/system/ledge-tick.service
+   sudo cp /home/ledge/ledge/worker/host/ledge-tick.service /etc/systemd/system/ledge-tick.service
    sudo systemctl daemon-reload
    sudo systemctl enable --now ledge-tick
    ```
@@ -89,7 +91,7 @@ Cloudflare D1 database over its HTTP API, in a loop. See `INDEXER.md` section
 Run one tick by hand first, without touching the Worker's cron:
 
 ```bash
-cd /opt/ledge/worker
+cd /home/ledge/ledge/worker
 node dist/host.mjs --once
 ```
 
@@ -110,4 +112,4 @@ The tick classifies a launch's pair token from `data/pair-tokens.json`, which
 the crawl publishes. On the box the repository is checked out for the crawl,
 so the runner reads the same file from disk: `PAIR_TOKENS_PATH` (default
 `../data/pair-tokens.json`, relative to the runner's working directory,
-which the unit sets to `/opt/ledge/worker`).
+which the unit sets to `/home/ledge/ledge/worker`).

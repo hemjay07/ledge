@@ -1,14 +1,17 @@
 [Unit]
-Description=ledge live indexer (worker/src/tick.ts run under Node)
-Documentation=https://github.com/ledge/ledge/blob/main/INDEXER.md
-After=network-online.target
+Description=LEDGE live indexer (worker/src/tick.ts under Node, worker/host/main.ts)
+Documentation=https://github.com/hemjay07/ledge/blob/main/INDEXER.md
+After=network-online.target ledge-gateway.service
 Wants=network-online.target
 
 [Service]
 User=ledge
-WorkingDirectory=/opt/ledge/worker
+Group=ledge
+# The crawl's checkout: the runner reads data/pair-tokens.json from it, and
+# `npm ci && npm run build:host` in worker/ produces dist/host.mjs there.
+WorkingDirectory=/home/ledge/ledge/worker
 EnvironmentFile=/etc/ledge/env
-ExecStart=/usr/bin/node /opt/ledge/worker/dist/host.mjs
+ExecStart=/usr/bin/node /home/ledge/ledge/worker/dist/host.mjs
 Restart=always
 RestartSec=5
 # The loop itself already runs forever; a crash restarts clean rather than

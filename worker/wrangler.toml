@@ -3,10 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2026-08-22"
 compatibility_flags = ["nodejs_compat"]
 
-# The minute indexer. One tick a minute; a tick that fails leaves the cursor
-# where it was and the next tick simply covers a wider window.
+# 2026-09-14: the minute indexer moved to the box (worker/host/, INDEXER.md
+# §2) -- Cloudflare's cron, subrequest budget and CPU ceiling were the
+# limits behind every live-layer stall. Only the daily digest stays here
+# (worker/src/digest.ts DIGEST_CRON; the handler dispatches on the cron
+# expression). Putting "* * * * *" back would run the tick here again.
 [triggers]
-crons = ["* * * * *"]
+crons = ["5 12 * * *"]
 
 [vars]
 FACTORY_ADDRESS = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"

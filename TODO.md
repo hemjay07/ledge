@@ -40,6 +40,13 @@ client. Owner's step to flip it: `wrangler secret put RPC_PROXY_KEY` with
 the key from `/etc/ledge/proxy.env` on the box, `RPC_URL =
 "http://176.97.72.180:8545"` in `worker/wrangler.toml`, deploy. If the
 relay holds, A3's D1 shim is not needed.*
+*2026-09-14 00:54Z: done differently and better — the gateway (`gateway/`)
+replaced the relay, and the tick itself now runs on the box
+(`ledge-tick.service`, `worker/host/`) against D1 over its HTTP API with the
+owner's D1 token, a tick every 10 s, beside the Worker's cron for the
+overlap hour. Remaining: the owner deploys the Worker with the daily-only
+cron (`wrangler.toml [triggers]` already changed in the repo), then the
+coverage check (≥ 99% of sampled launches for a day).*
 **DONE when:** coverage of sampled launches ≥ 99% for a day, the Worker's
 `[triggers]` are gone, and the tick's own log shows no gap over an hour.
 

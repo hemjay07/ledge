@@ -4,7 +4,7 @@
    ungated; locking it to one origin would be an access control on a public
    instrument. Nothing here requires a wallet, an email or an account. */
 
-import { announceDigest } from "./digest";
+import { DIGEST_CRON, announceDigest } from "./digest";
 import type { Env } from "./env";
 import { tick } from "./tick";
 import { lookupToken } from "./service";
@@ -505,14 +505,19 @@ export default {
     return apiError("not_found", "No such route.", 404);
   },
 
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    // 2026-09-14: the minute tick runs on the box (worker/host/, INDEXER.md
+    // §2); Cloudflare keeps only the daily cron, for the digest. A minute
+    // cron, if one is ever configured again, still runs the tick -- the
+    // dispatch is by the cron expression, so the two cannot be confused.
+    if (event.cron === DIGEST_CRON) {
+      ctx.waitUntil(announceDigest(env, Date.now()).catch((error) => console.error("digest failed", String(error))));
+      return;
+    }
     ctx.waitUntil(
       tick(env).then((result) => {
         if (!result.ok) console.error("tick failed", JSON.stringify(result));
       }),
     );
-    // The daily digest (worker/src/digest.ts) runs beside the tick, not
-    // inside it: its failure is a Telegram matter, never an indexing one.
-    ctx.waitUntil(announceDigest(env, Date.now()).catch((error) => console.error("digest failed", String(error))));
   },
 };
