@@ -15,11 +15,28 @@ import {
   pairLabel,
   taxLabel,
 } from "../../lib/format";
-import { COHORT_COLUMNS, FIRSTBUY_COLUMNS, cohortFooting, cohortRegisterRow, firstBuyRegisterRow, shareCell } from "../../lib/rows";
+import {
+  COHORT_COLUMNS,
+  FIRSTBUY_COLUMNS,
+  OUTCOME_COLUMNS,
+  cohortFooting,
+  cohortRegisterRow,
+  firstBuyRegisterRow,
+  outcomeRegisterRow,
+  shareCell,
+} from "../../lib/rows";
 import { fastShareFacts } from "../../lib/summary";
 import { SAME_MEASUREMENT_NOTE, sameMeasurement } from "../../lib/windows";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
+const outcomes = numberFile.outcomes;
+/* The time-to-graduation buckets of the outcomes block (pipeline/stats.py
+   _outcome_bucket_key): under 10 s, 10 s to the 5-minute cutoff, over it. */
+const TTG_LABELS: Record<string, string> = {
+  u10: "under 10 s",
+  mid: "10 s to 5 min",
+  over: "over 5 min",
+};
 const firstBuy = numberFile.firstBuy;
 const firstBuyAll = firstBuy?.cohorts.all[0] ?? {
   bucket: "all", n: 0, launchTxBuy: 0, launchTxBuyShare: null,
@@ -307,6 +324,46 @@ export default function Cohorts(): ReactElement {
           </p>
         </details>
       </div>
+
+      {outcomes ? (
+        /* A6 (METHOD.md 2026-09-12): what the pool's price did after the
+           graduation, against its own opening price. Medians only, each
+           with the n of graduations whose mark had elapsed at crawledAt;
+           "no trade" is an outcome of its own, not a gap. */
+        <div className="card" id="h-outcomes">
+          <div className="card-header">
+            <h2 className="kicker card-kicker">AFTER GRADUATION</h2>
+            <span className="note note--fine">
+              {formatCount(outcomes.matched)} graduations with a pons pool
+            </span>
+          </div>
+          <p className="note">
+            The price of the graduated pool at +1 h, +24 h and +7 d after the graduation, against the
+            pool&rsquo;s opening price, from the pool&rsquo;s own swaps. Each cell is the median change
+            with the number of graduations whose mark had passed when this was measured; a mark
+            with no swap by then is counted as no trade, not as a price. Below n&nbsp;=&nbsp;30 a
+            cell prints its sample size instead of a figure.
+          </p>
+          <Register
+            ariaLabel="Price after graduation by time to graduation"
+            caption="Change against the opening price, by how long the graduation took."
+            columns={OUTCOME_COLUMNS("Time to graduation")}
+            rows={outcomes.cohorts.ttg.map((r) => outcomeRegisterRow(TTG_LABELS[r.bucket] ?? r.bucket, r))}
+          />
+          <Register
+            ariaLabel="Price after graduation by pair token"
+            caption="Change against the opening price, by the token the launch was paired against."
+            columns={OUTCOME_COLUMNS("Pair token")}
+            rows={outcomes.cohorts.pair.map((r) => outcomeRegisterRow(pairLabel(r.bucket), r))}
+          />
+          <Register
+            ariaLabel="Price after graduation by creator tax"
+            caption="Change against the opening price, by creator tax."
+            columns={OUTCOME_COLUMNS("Creator tax")}
+            rows={outcomes.cohorts.tax.map((r) => outcomeRegisterRow(taxLabel(r.bucket), r))}
+          />
+        </div>
+      ) : null}
 
       {firstBuy ? (
         /* A5b (METHOD.md 2026-09-13). Whole record, not a window: its

@@ -24,8 +24,10 @@ export interface RegisterProps {
   /** column heads; one of them must carry "(n)" or the table does not build */
   columns: string[];
   rows: RegisterRow[];
-  /** the All footing: how a reader checks the buckets sum to the population */
-  foot: RegisterRow;
+  /** the All footing: how a reader checks the buckets sum to the population.
+      Optional only for a register whose rows do not sum to one population
+      (the after-graduation marks, where every cell carries its own n). */
+  foot?: RegisterRow;
   caption: string;
   ariaLabel: string;
   /** when given, the table is wrapped as a numbered entry in the register */
@@ -84,16 +86,18 @@ export function Register(props: RegisterProps): ReactElement {
             </tr>
           ))}
         </tbody>
-        <tfoot>
-          <tr>
-            <th scope="row">{foot.label}</th>
-            {foot.cells.map((cell, i) => (
-              <td className={cellClass(cell.kind ?? "fig")} key={columns[i + 1] ?? i}>
-                {cell.node ?? cell.text}
-              </td>
-            ))}
-          </tr>
-        </tfoot>
+        {foot ? (
+          <tfoot>
+            <tr>
+              <th scope="row">{foot.label}</th>
+              {foot.cells.map((cell, i) => (
+                <td className={cellClass(cell.kind ?? "fig")} key={columns[i + 1] ?? i}>
+                  {cell.node ?? cell.text}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        ) : null}
       </table>
     </div>
   );

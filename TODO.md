@@ -63,6 +63,9 @@ the `outcomes` block in `pipeline/stats.py`, a dated `METHOD.md` entry),
 then the backfill from 2026-09-05.
 **DONE when:** the +24 h figure has n ≥ 30 in at least two
 time-to-graduation buckets and the method entry is written.
+*2026-09-14 01:13Z: met by the first probe pass (20 pools): +24 h has
+n = 43 (10 s–5 min) and n = 69 (over 5 min); medians −90.0% and −91.6%
+against the opening price. Full probe (670 marks) running.*
 
 **A5b. First-buy timing.** From RESEARCH-2026-09-13 §6: sniping is the
 pain everyone names and someone else already measures it at the wallet
@@ -90,6 +93,9 @@ cohort's n grows by about three weeks of launches.
 **A6. Outcomes on the surfaces.** The cohort card on `/t/{address}` (the
 slot is already commented in), a column on `/graduated`, and the homepage
 line once it clears n.
+*2026-09-14: the AFTER GRADUATION card is on `/cohorts` (three registers,
+medians with n, no-trade share). `/t/{address}` and `/graduated` still
+to do.*
 
 ---
 

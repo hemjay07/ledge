@@ -1,5 +1,5 @@
 import type { RegisterCell, RegisterRow } from "../components/Register";
-import type { CohortRow, FirstBuyRow, WindowData } from "./schema";
+import type { CohortRow, FirstBuyRow, OutcomeCohortRow, OutcomeMarkRow, WindowData } from "./schema";
 import { formatCount, insufficientText, isInsufficient, rateText } from "./format";
 
 /* One place turns a cohort row into a register row, so the denominator column
@@ -132,6 +132,42 @@ export function firstBuyRegisterRow(label: string, row: FirstBuyRow): RegisterRo
       cell(row.within3sShare),
       cell(row.within5sShare),
       cell(row.noneShare),
+    ],
+  };
+}
+
+/* ---- outcomes after a graduation (A6) ------------------------------------ */
+
+export const OUTCOME_COLUMNS = (first: string): string[] => [
+  first,
+  "Graduations (n)",
+  "+1 h, median",
+  "+24 h, median",
+  "+7 d, median",
+  "No trade by +24 h",
+];
+
+/** A change against the opening price, as stats.py published it: a signed
+    percentage with one decimal and the mark's own n, or the floor sentence.
+    Formatting only; the median is the file's. */
+function changeCell(mark: OutcomeMarkRow): RegisterCell {
+  if (isInsufficient({ rate: mark.median, n: mark.n, insufficient: mark.insufficient }) || mark.median === null) {
+    return { text: insufficientText(mark.n), kind: "thin" };
+  }
+  const sign = mark.median < 0 ? "\u2212" : "+";
+  return { text: `${sign}${Math.abs(mark.median * 100).toFixed(1)}% (n=${formatCount(mark.n)})`, kind: "fig" };
+}
+
+export function outcomeRegisterRow(label: string, row: OutcomeCohortRow): RegisterRow {
+  const h24 = row.marks["24h"];
+  return {
+    label,
+    cells: [
+      { text: formatCount(row.graduations), kind: "n" },
+      changeCell(row.marks["1h"]),
+      changeCell(h24),
+      changeCell(row.marks["7d"]),
+      rateCell({ rate: h24.noTradeShare, n: h24.n, insufficient: h24.insufficient }),
     ],
   };
 }
