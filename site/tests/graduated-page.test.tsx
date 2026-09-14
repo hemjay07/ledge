@@ -39,7 +39,7 @@ describe("the /graduated page's structure", () => {
     const { container } = render(<Graduated />);
     const text = container.textContent ?? "";
     expect(text).toContain(formatCount(graduatedFile.excludedNoLaunch));
-    expect(text).toContain("launch is not on record"); // 2026-09-12 copy pass
+    expect(text).toContain("no launch on record"); // reworded 2026-09-14
   });
 
   /* Only the first page ships in the HTML -- 2,500+ rows in one document was

@@ -312,10 +312,10 @@ function LadderContext(): ReactElement {
         </table>
       </div>
       <p className="note note--fine">
-        Median time to graduate {ttg.p50 === null ? "not enough data" : formatDurationLong(ttg.p50)}
-        ; slowest observed {ttg.max === null ? "not enough data" : formatDurationLong(ttg.max)}. n
+        {ttg.p50 === null ? "Median: not enough data" : `Half took under ${formatDurationLong(ttg.p50)}`}
+        ; the slowest took {ttg.max === null ? "not enough data" : formatDurationLong(ttg.max)}. n
         {" = "}
-        {formatCount(ttg.n)} matched graduations, {formatStamp(numberFile.crawledAt)}.
+        {formatCount(ttg.n)} graduations. {formatStamp(numberFile.crawledAt)}.
       </p>
     </>
   );
@@ -496,10 +496,10 @@ export function GraduatedBoard({
   function countLine(): string {
     const shown = formatCount(pageRows.length);
     if (!filtered) {
-      return `${shown} of ${formatCount(totalCount)} graduated tokens shown`;
+      return `${shown} of ${formatCount(totalCount)} graduations shown`;
     }
     const matched = formatCount(sortedRows.length);
-    return `${shown} of ${matched} matching tokens shown (${matched} of ${formatCount(totalCount)} total)`;
+    return `${shown} of ${matched} matching graduations shown (${matched} of ${formatCount(totalCount)} in all)`;
   }
 
   const ageText = unreadable
@@ -634,10 +634,9 @@ export function GraduatedBoard({
           >
             <table>
               <caption>
-                Time to graduate is launch to graduation, from the chain.{" "}
+                Time to graduate is measured from the launch block to the graduation block.{" "}
                 {formatCount(totalGraduationRows - excludedNoLaunch - excludedUnmatched)} graduations
-                are timed; {formatCount(excludedNoLaunch)} are not, because their launch is not on
-                record
+                are timed; {formatCount(excludedNoLaunch)} have no launch on record and are not
                 {excludedUnmatched > 0
                   ? `, and ${formatCount(excludedUnmatched)} more could not be matched to a launch`
                   : ""}
@@ -709,15 +708,12 @@ export function GraduatedBoard({
           <details className="board-what-counts">
             <summary>How these are counted</summary>
             <p className="lede">
-              Time to graduate is one token&rsquo;s own graduation timestamp minus its own launch
-              timestamp -- a fact about that token, not a rate over the population. The ladder above
-              is the population figure, computed once by the same pipeline that produces the rest of
-              the site and gated at n = 30; this list never recomputes a share or a percentage.
+              Time to graduate is one token&rsquo;s own graduation time minus its own launch time: a
+              fact about that token, not a rate. The table above is the population figure, computed
+              by the same pipeline as the rest of the site and gated at n&nbsp;=&nbsp;30; this list
+              never computes a share.
             </p>
-            <p className="note">
-              No row carries a label beyond its own facts. The duration is printed; nothing here
-              says what it means.
-            </p>
+            <p className="note">Each row is the duration and nothing else.</p>
           </details>
         </>
       )}

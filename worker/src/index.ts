@@ -29,6 +29,7 @@ import {
   pairTokenMapFromRows,
   tokenMetaMapFromRows,
   type BoardDbRow,
+  BOARD_TOTAL_QUERY,
 } from "./board";
 
 /** Every row of the live pair-token cache, read once per request alongside
@@ -58,6 +59,8 @@ import {
   isGraveyardSortKey,
   type GraveyardDbRow,
   type GraveyardScopeDbRow,
+  GRAVEYARD_TOTAL_QUERY,
+  GRAVEYARD_AGE_SECONDS,
 } from "./graveyard";
 import { ageSeconds, formatAge, normaliseAddress, toIso } from "./format";
 import {
@@ -181,7 +184,7 @@ async function handleLive(env: Env, nowMs: number, url: URL): Promise<Response> 
      once a minute by the tick, and it lets a row say "4.2 ETH" instead of
      4200000000000000000. No decimals() call per row -- 121 rows could never
      afford one, and decimals.ts forbids guessing the exponent. */
-  const [[rowsResult, cursorResult, pairTokenResult, tokenMetaResult], pairTokens] = await Promise.all([
+  const [[rowsResult, cursorResult, pairTokenResult, tokenMetaResult, totalResult], pairTokens] = await Promise.all([
     env.LEDGE_DB.batch([
     env.LEDGE_DB.prepare(BOARD_QUERY),
     env.LEDGE_DB.prepare(
@@ -189,9 +192,11 @@ async function handleLive(env: Env, nowMs: number, url: URL): Promise<Response> 
     ),
     env.LEDGE_DB.prepare(PAIR_TOKEN_QUERY),
     env.LEDGE_DB.prepare(TOKEN_META_QUERY),
+    env.LEDGE_DB.prepare(BOARD_TOTAL_QUERY),
     ]),
     loadPairTokens(env, nowMs),
   ]);
+  const total = Number((totalResult?.results[0] as { total?: number } | undefined)?.total ?? 0);
   const cursor = (cursorResult?.results[0] as CursorRow | undefined) ?? null;
   const dbRows = (rowsResult?.results ?? []) as unknown as BoardDbRow[];
   const dbPairTokens = pairTokenMapFromRows((pairTokenResult?.results ?? []) as unknown as PairTokenDbRow[]);
@@ -204,6 +209,7 @@ async function handleLive(env: Env, nowMs: number, url: URL): Promise<Response> 
     lastIndexedBlock: cursor ? cursor.last_indexed_block : null,
     sortedBy: sortParam,
     count: rows.length,
+    total: Math.max(total, rows.length),
     rows,
     live: {
       stale: liveStale(cursor, nowSeconds),
@@ -240,7 +246,7 @@ async function handleGraveyard(env: Env, nowMs: number, url: URL): Promise<Respo
     );
   }
 
-  const [[rowsResult, scopeResult, cursorResult, pairTokenResult, tokenMetaResult], pairTokens] =
+  const [[rowsResult, scopeResult, cursorResult, pairTokenResult, tokenMetaResult, totalResult], pairTokens] =
     await Promise.all([
       env.LEDGE_DB.batch([
         env.LEDGE_DB.prepare(GRAVEYARD_QUERY),
@@ -250,9 +256,11 @@ async function handleGraveyard(env: Env, nowMs: number, url: URL): Promise<Respo
         ),
         env.LEDGE_DB.prepare(PAIR_TOKEN_QUERY),
         env.LEDGE_DB.prepare(TOKEN_META_QUERY),
+        env.LEDGE_DB.prepare(GRAVEYARD_TOTAL_QUERY).bind(nowSeconds - GRAVEYARD_AGE_SECONDS),
       ]),
       loadPairTokens(env, nowMs),
     ]);
+  const total = Number((totalResult?.results[0] as { total?: number } | undefined)?.total ?? 0);
   const cursor = (cursorResult?.results[0] as CursorRow | undefined) ?? null;
   const dbRows = (rowsResult?.results ?? []) as unknown as GraveyardDbRow[];
   const scopeRow = (scopeResult?.results[0] as GraveyardScopeDbRow | undefined) ?? null;
@@ -267,6 +275,7 @@ async function handleGraveyard(env: Env, nowMs: number, url: URL): Promise<Respo
     lastIndexedBlock: cursor ? cursor.last_indexed_block : null,
     sortedBy: sortParam,
     count: rows.length,
+    total: Math.max(total, rows.length),
     rows,
     scope,
     live: {

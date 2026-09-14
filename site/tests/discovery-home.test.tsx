@@ -157,7 +157,7 @@ describe("the live pulse", () => {
   it("carries the live board's own population as the first reading's denominator", async () => {
     const { container } = render(<LivePulse />);
     await waitFor(() => expect(container.querySelector(".pulse-reading")).not.toBeNull());
-    expect(container.textContent).toContain(`of ${formatCount(live.count)}`);
+    expect(container.textContent).toContain(`of the ${formatCount(live.count)} most recently active`);
   });
 
   /* The guarantee under test is that an unreachable live layer is SAID, never

@@ -74,6 +74,17 @@ export const BOARD_QUERY = `
    LIMIT 500
 `;
 
+/** How many curves the board's population holds, before the 200-row cap.
+    2026-09-14: the site printed the capped `count` as the population
+    ("200 curves with activity"); this is the number that sentence needs. */
+export const BOARD_TOTAL_QUERY = `
+  SELECT COUNT(*) AS total
+    FROM token_activity a
+    JOIN launch l
+      ON l.token = a.token
+     AND l.block = (SELECT MIN(l2.block) FROM launch l2 WHERE l2.token = a.token)
+`;
+
 export interface BoardDbRow {
   token: string;
   pair_class: string;

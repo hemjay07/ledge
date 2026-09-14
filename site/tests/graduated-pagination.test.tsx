@@ -116,7 +116,7 @@ describe("GraduatedBoard's build-time first page", () => {
     const pairSelect = screen.getByLabelText("Pair token") as HTMLSelectElement;
     fireEvent.change(pairSelect, { target: { value: "eth" } });
 
-    await waitFor(() => expect(container.textContent).toMatch(/of 20 matching tokens shown \(20 of 60 total\)/));
+    await waitFor(() => expect(container.textContent).toMatch(/of 20 matching graduations shown \(20 of 60 in all\)/));
     // The population ladder above the row list legitimately carries a
     // percentage (a rate with its own n, CONSTRAINTS 4) -- this checks the
     // filtered ROW LIST never grows one of its own, scoped past the ladder.
@@ -146,13 +146,13 @@ describe("GraduatedBoard's build-time first page", () => {
 
     const pairSelect = screen.getByLabelText("Pair token") as HTMLSelectElement;
     fireEvent.change(pairSelect, { target: { value: "eth" } });
-    await waitFor(() => expect(container.textContent).toContain("matching tokens shown"));
+    await waitFor(() => expect(container.textContent).toContain("matching graduations shown"));
 
     const reset = container.querySelector(".board-filters-reset") as HTMLAnchorElement;
     expect(reset).toBeTruthy();
     fireEvent.click(reset);
 
-    await waitFor(() => expect(container.textContent).toContain(`${PAGE_SIZE} of 60 graduated tokens shown`));
+    await waitFor(() => expect(container.textContent).toContain(`${PAGE_SIZE} of 60 graduations shown`));
     expect(container.querySelector(".board-filters-reset")).toBeNull();
   });
 });

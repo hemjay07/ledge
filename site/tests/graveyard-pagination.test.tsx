@@ -43,7 +43,7 @@ describe("the graveyard's pagination", () => {
     answerWith(PAYLOAD);
     const { container } = render(<GraveyardBoard />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(PAGE_SIZE));
-    expect(container.textContent).toContain(`${PAGE_SIZE} of 55 launches at zero buys`);
+    expect(container.textContent).toContain(`${PAGE_SIZE} of the 55 listed shown`);
     const pages = totalPagesFor(55);
     expect(container.textContent).toContain(`page 1 of ${pages}`);
 
@@ -64,7 +64,7 @@ describe("the graveyard's filters", () => {
     fireEvent.change(pairSelect, { target: { value: "stable" } });
 
     // 55 rows, odd index -> stable: 27
-    await waitFor(() => expect(container.textContent).toMatch(/of 27 matching launches shown \(27 of 55 total\)/));
+    await waitFor(() => expect(container.textContent).toMatch(/of 27 matching launches shown \(27 of the 55 listed\)/));
   });
 
   it("narrows by age with a numeric lower bound", async () => {
@@ -76,6 +76,6 @@ describe("the graveyard's filters", () => {
     fireEvent.change(ageFromInput, { target: { value: String(259200 + 50 * 100) } });
 
     // ageSeconds = 259200 + i*100 >= 259200+5000 -> i >= 50 -> rows 50..54 (5 rows)
-    await waitFor(() => expect(container.textContent).toMatch(/of 5 matching launches shown \(5 of 55 total\)/));
+    await waitFor(() => expect(container.textContent).toMatch(/of 5 matching launches shown \(5 of the 55 listed\)/));
   });
 });

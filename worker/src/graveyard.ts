@@ -58,6 +58,19 @@ export const GRAVEYARD_QUERY = `
    LIMIT 500
 `;
 
+/** How many launches meet the graveyard's gate (zero buys, launched at or
+    before the bound time), before the 200-row cap. Bound to
+    nowSeconds - GRAVEYARD_AGE_SECONDS by the caller, the same gate
+    buildGraveyardRows applies in memory. */
+export const GRAVEYARD_TOTAL_QUERY = `
+  SELECT COUNT(*) AS total
+    FROM token_activity a
+    JOIN launch l
+      ON l.token = a.token
+     AND l.block = (SELECT MIN(l2.block) FROM launch l2 WHERE l2.token = a.token)
+   WHERE a.buys = 0 AND l.ts <= ?
+`;
+
 /** The activity index's own scope: how many launches it holds a row for at
     all (any buy count), and the oldest one's own launch timestamp. Read from
     the same two tables the graveyard itself joins, so the caveat can never

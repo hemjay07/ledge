@@ -245,8 +245,8 @@ export function PulseBody({ result }: { result: LiveResult | null }): ReactEleme
       <div className="pulse-reading">
         <span className="pulse-figure mono">{formatCount(takingBuys)}</span>
         <p className="pulse-caption">
-          of <span className="mono">{formatCount(body.count)}</span> tracked curves taking buys
-          right now
+          of the <span className="mono">{formatCount(body.count)}</span> most recently active
+          curves are taking buys right now
         </p>
       </div>
       <div className="pulse-reading">
@@ -600,17 +600,19 @@ export function LiveBoardFull(): ReactElement {
   ];
   const hasBuysOptions = [
     { value: "", label: "All" },
-    { value: "yes", label: "Has taken buys" },
-    { value: "no", label: "Has taken no buys" },
+    { value: "yes", label: "With buys" },
+    { value: "no", label: "No buys" },
   ];
 
   function countLine(body: LiveResponse): string {
     const shown = formatCount(pageRows.length);
     const matched = formatCount(filteredRows.length);
+    const total = body.total ?? body.count;
+    const population = total > body.count ? `, of ${formatCount(total)} with activity` : "";
     if (!filtered) {
-      return `${shown} of ${matched} tokens with activity in this window shown`;
+      return `${shown} of the ${matched} most recently active curves shown${population}`;
     }
-    return `${shown} of ${matched} matching tokens shown (${matched} of ${formatCount(body.count)} total)`;
+    return `${shown} of ${matched} matching curves shown (${matched} of the ${formatCount(body.count)} listed${population})`;
   }
 
   const stale = body !== null && (body.live.stale || pulseAgeSeconds(body) >= numberFile.staleAfterSeconds);
@@ -620,7 +622,12 @@ export function LiveBoardFull(): ReactElement {
       : body === null
         ? "…"
         : `updated ${formatAge(pulseAgeSeconds(body))} ago`;
-  const headerCount = body === null ? null : formatCount(body.count);
+  const headerCount =
+    body === null
+      ? null
+      : (body.total ?? body.count) > body.count
+        ? `${formatCount(body.count)} of ${formatCount(body.total ?? body.count)}`
+        : formatCount(body.count);
 
   const cardsUnscaled = pageRows.some(
     (row) => row.fill !== null && !pairQuantity(row.netQuoteWei, row.pairDecimals, null).scaled,
@@ -728,8 +735,9 @@ export function LiveBoardFull(): ReactElement {
                   in the open, where a reader who wants them looks (CONSTRAINTS
                   3 and 5), not on the line every reader scans. */}
               <caption>
-                Counts since each launch; a row marked &ldquo;partial count&rdquo; launched before the
-                index began. Fill is read from the curve.
+                Buys and sells are counted since each launch. Fill is each curve&rsquo;s own reserve
+                against its own threshold, read from the curve. A row marked &ldquo;partial
+                count&rdquo; launched before the index began.
               </caption>
               <thead>
                 <tr>
@@ -821,7 +829,7 @@ export function LiveBoardFull(): ReactElement {
               {fillLabels(pageRows).map((label) => (
                 <span key={label}>, {label}</span>
               ))}
-              . Every launch has its own threshold; nothing here assumes one.
+              . Every launch has its own threshold.
             </p>
             <p className="note">
               First-block buyers is the number of distinct wallets that bought in the block the

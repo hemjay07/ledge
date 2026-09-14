@@ -47,7 +47,7 @@ describe("the live board's pagination", () => {
     answerWith(PAYLOAD);
     const { container } = render(<LiveBoardFull />);
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(PAGE_SIZE));
-    expect(container.textContent).toContain(`${PAGE_SIZE} of 60 tokens with activity in this window shown`);
+    expect(container.textContent).toContain(`${PAGE_SIZE} of the 60 most recently active curves shown`);
     const pages = totalPagesFor(60);
     expect(container.textContent).toContain(`page 1 of ${pages}`);
 
@@ -94,7 +94,7 @@ describe("the live board's filters", () => {
     const pairSelect = pairSelectIn(container);
     fireEvent.change(pairSelect, { target: { value: "eth" } });
 
-    await waitFor(() => expect(container.textContent).toMatch(/of 20 matching tokens shown \(20 of 60 total\)/));
+    await waitFor(() => expect(container.textContent).toMatch(/of 20 matching curves shown \(20 of the 60 listed\)/));
     expect(container.querySelectorAll("tbody tr").length).toBe(20);
   });
 
@@ -110,7 +110,7 @@ describe("the live board's filters", () => {
     await waitFor(() => expect(summary.textContent).toBe("Filter · 1 active"));
 
     const buysSelect = [...container.querySelectorAll("select")].find((s) =>
-      [...s.querySelectorAll("option")].some((o) => o.textContent === "Has taken no buys"),
+      [...s.querySelectorAll("option")].some((o) => o.textContent === "No buys"),
     ) as HTMLSelectElement;
     fireEvent.change(buysSelect, { target: { value: "no" } });
     await waitFor(() => expect(summary.textContent).toBe("Filter · 2 active"));
@@ -122,12 +122,12 @@ describe("the live board's filters", () => {
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length).toBe(PAGE_SIZE));
 
     const buysSelect = [...container.querySelectorAll("select")].find((s) =>
-      [...s.querySelectorAll("option")].some((o) => o.textContent === "Has taken no buys"),
+      [...s.querySelectorAll("option")].some((o) => o.textContent === "No buys"),
     ) as HTMLSelectElement;
     fireEvent.change(buysSelect, { target: { value: "no" } });
 
     // 60 rows, i % 4 === 0 -> buys 0: 15 rows
-    await waitFor(() => expect(container.textContent).toMatch(/of 15 matching tokens shown \(15 of 60 total\)/));
+    await waitFor(() => expect(container.textContent).toMatch(/of 15 matching curves shown \(15 of the 60 listed\)/));
   });
 
   it("resets every filter and returns to the unfiltered count", async () => {
@@ -137,12 +137,12 @@ describe("the live board's filters", () => {
 
     const pairSelect = pairSelectIn(container);
     fireEvent.change(pairSelect, { target: { value: "eth" } });
-    await waitFor(() => expect(container.textContent).toContain("matching tokens shown"));
+    await waitFor(() => expect(container.textContent).toContain("matching curves shown"));
 
     const reset = container.querySelector(".board-filters-reset") as HTMLAnchorElement;
     fireEvent.click(reset);
     await waitFor(() =>
-      expect(container.textContent).toContain(`${PAGE_SIZE} of 60 tokens with activity in this window shown`),
+      expect(container.textContent).toContain(`${PAGE_SIZE} of the 60 most recently active curves shown`),
     );
   });
 });

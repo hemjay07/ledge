@@ -429,6 +429,10 @@ export const liveResponseSchema = z.object({
      always see the column this board was ordered by. */
   sortedBy: liveSortKeySchema,
   count: z.number().int().nonnegative(),
+  /* The population before the 200-row cap (2026-09-14). Optional so a
+     payload captured before it existed still parses; a renderer without it
+     falls back to count. */
+  total: z.number().int().nonnegative().optional(),
   rows: z.array(liveRowSchema).max(200),
   live: live,
 });
@@ -508,6 +512,7 @@ export const graveyardResponseSchema = z.object({
   lastIndexedBlock: z.number().int().nullable(),
   sortedBy: graveyardSortKeySchema,
   count: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative().optional(),
   rows: z.array(graveyardRowSchema).max(200),
   scope: graveyardScopeSchema,
   live: live,

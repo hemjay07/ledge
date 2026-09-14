@@ -37,7 +37,7 @@ import { useTokenPanel } from "../lib/use-token-panel";
 import { PAIR_BUCKETS, TAX_BUCKETS, taxBucketOf } from "../lib/board-buckets";
 import { clampPage, paginate, totalPagesFor } from "../lib/paginate";
 import { mergeQuery, readQuery, readQueryInt } from "../lib/query-state";
-import { formatAge, formatCount, pairLabel, taxLabel, taxPercent } from "../lib/format";
+import { formatAge, formatCount, pairLabel, taxLabel, taxPercent, formatDurationLong } from "../lib/format";
 import { TokenName } from "./Live";
 
 const REFRESH_MS = 15_000;
@@ -284,9 +284,9 @@ export function GraveyardBoard(): ReactElement {
     const shown = formatCount(pageRows.length);
     const matched = formatCount(filteredRows.length);
     if (!filtered) {
-      return `${shown} of ${matched} launches at zero buys, 72 h or older, shown`;
+      return `${shown} of the ${matched} listed shown`;
     }
-    return `${shown} of ${matched} matching launches shown (${matched} of ${formatCount(body.count)} total)`;
+    return `${shown} of ${matched} matching launches shown (${matched} of the ${formatCount(body.count)} listed)`;
   }
 
   const ageText =
@@ -305,10 +305,13 @@ export function GraveyardBoard(): ReactElement {
 
       {body !== null ? (
         <div className="graveyard-lead">
-          <span className="graveyard-figure mono">{formatCount(body.count)}</span>
+          <span className="graveyard-figure mono">{formatCount(body.total ?? body.count)}</span>
           <p className="note graveyard-lead-caption">
             launches with no buy after 72 hours, of the {formatCount(body.scope.indexedLaunches)}{" "}
             the index has watched since {dateOnly(body.scope.earliestIndexedLaunchAt)}.
+            {(body.total ?? body.count) > body.count
+              ? ` The ${formatCount(body.count)} most recent are listed below.`
+              : ""}
           </p>
         </div>
       ) : null}
@@ -393,8 +396,9 @@ export function GraveyardBoard(): ReactElement {
           >
             <table>
               <caption>
-                Every row: no buy since launch, at least {formatAge(body.scope.ageCutoffSeconds)} ago. A
-                row marked &ldquo;partial count&rdquo; launched before the index began.
+                Every launch here has taken no buy in at least {formatDurationLong(body.scope.ageCutoffSeconds)}{" "}
+                since its launch block. A row marked &ldquo;partial count&rdquo; launched before the
+                index began.
               </caption>
               <thead>
                 <tr>
@@ -478,10 +482,10 @@ export function GraveyardBoard(): ReactElement {
           <details className="board-what-counts">
             <summary>What this can and cannot see</summary>
             <p className="note">
-              A launch is listed after 72 hours with no buy since its launch block. The index only
-              began watching curves recently: a launch that lived and died before then has no row,
-              and its absence means &ldquo;not measured&rdquo;, not &ldquo;took a buy&rdquo;. The
-              count of launches watched, and the oldest, is printed above the table.
+              A launch is listed once 72 hours have passed since its launch block with no buy. The
+              index began watching curves on {dateOnly(body.scope.earliestIndexedLaunchAt)}: a
+              launch that lived and died before then has no row, and its absence means not
+              measured, not that it took a buy.
             </p>
             <p className="note">
               Buys and sells are counted from the curve&rsquo;s own trade events. A launch older
