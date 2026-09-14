@@ -278,6 +278,33 @@ function candidateLine(candidate: GraveyardCandidate): string {
     empty message, and this makes the caller's "was there anything" check the
     same as this function's own return value rather than a second reading of
     the same list. */
+/** Telegram refuses a message over 4,096 characters, silently from the
+    caller's side. The entries are posted in chunks under that, each with
+    its own heading, and each entry links to its own page (2026-09-14). */
+export const TELEGRAM_MAX_CHARS = 4096;
+
+export function graveyardPosts(candidates: GraveyardCandidate[], siteOrigin: string): string[] {
+  if (candidates.length === 0) return [];
+  const heading =
+    candidates.length === 1
+      ? "1 launch newly entered the graveyard: 0 buys recorded in the 72 hours since its own launch block."
+      : `${candidates.length} launches newly entered the graveyard: 0 buys recorded in the 72 hours since each one's own launch block.`;
+  const lines = candidates.map((c) => `${candidateLine(c)}\n${siteOrigin}/t/${c.token}`);
+  const footer = `${siteOrigin}/graveyard`;
+  const posts: string[] = [];
+  let current: string[] = [heading, ""];
+  const length = (parts: string[]) => parts.join("\n").length + 1 + footer.length + 1;
+  for (const line of lines) {
+    if (length([...current, line]) > TELEGRAM_MAX_CHARS && current.length > 2) {
+      posts.push([...current, "", footer].join("\n"));
+      current = [`${heading} (continued)`, ""];
+    }
+    current.push(line);
+  }
+  posts.push([...current, "", footer].join("\n"));
+  return posts;
+}
+
 export function graveyardPostText(
   candidates: GraveyardCandidate[],
   siteOrigin: string,

@@ -46,14 +46,24 @@ export function digestText(file: NumberFile, nowMs: number, siteOrigin: string):
       : `${formatDuration(ttg.p50)} (n=${formatCount(ttg.n)})`;
   const all = file.allTime;
   const allFact = { rate: all.rate, n: all.launches, insufficient: all.insufficient };
-  return [
+  const lines = [
     `Pons, last 24 hours: ${formatCount(h24.launches)} launches; ${formatCount(h24.graduations)} graduated, ${rateText(fact)}.`,
     `Excluding graduations inside ${formatDuration(ef.cutoffSeconds)}: ${formatCount(ef.graduations)} of ${formatCount(h24.launches)}, ${rateText(efFact)}${oneIn}.`,
     `Median time to graduation: ${median}.`,
     `Whole record: ${formatCount(all.graduations)} of ${formatCount(all.launches)} launches graduated, ${rateText(allFact)}.`,
-    `${formatStamp(file.crawledAt)}, ${formatAge(ageSeconds(file.crawledAt, nowMs))} ago.`,
-    `${siteOrigin}/method`,
-  ].join("\n");
+  ];
+  // 2026-09-14: the finding people quote (METHOD.md 2026-09-13), read
+  // from the file's own "all" row; the shares are cumulative and null
+  // below n = 30, in which case the line says so.
+  const fb = file.firstBuy?.cohorts.all[0];
+  if (fb) {
+    const n = { n: fb.n, insufficient: fb.insufficient };
+    lines.push(
+      `First outside buy, launches at least an hour old: within 1 s ${rateText({ rate: fb.within1sShare, ...n })}, within 5 s ${rateText({ rate: fb.within5sShare, ...n })}, none ${rateText({ rate: fb.noneShare, ...n })} (n=${formatCount(fb.n)}).`,
+    );
+  }
+  lines.push(`${formatStamp(file.crawledAt)}, ${formatAge(ageSeconds(file.crawledAt, nowMs))} ago.`, `${siteOrigin}/method`);
+  return lines.join("\n");
 }
 
 /** Runs beside the tick from the scheduled handler. Never throws into the
@@ -69,6 +79,9 @@ export async function announceDigest(env: Env, nowMs: number): Promise<void> {
 
   const chatId = env.TELEGRAM_GRAVEYARD_CHAT_ID;
   if (!(await withinLimits(env.LEDGE_DB, chatId, nowSeconds))) return; // next tick, same hour
-  await sendMessage(env, chatId, digestText(file, nowMs, env.SITE_ORIGIN));
-  await env.LEDGE_KV.put(KV_DIGEST_POSTED, digestDayKey(nowSeconds));
+  // The day is marked only once Telegram accepted the message; a refused
+  // send is tried again on the next tick inside the hour.
+  if (await sendMessage(env, chatId, digestText(file, nowMs, env.SITE_ORIGIN))) {
+    await env.LEDGE_KV.put(KV_DIGEST_POSTED, digestDayKey(nowSeconds));
+  }
 }

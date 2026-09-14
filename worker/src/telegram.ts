@@ -62,12 +62,19 @@ export function classify(message: TgMessage, botName: string): TgIntent {
   return isGroup ? { kind: "silence" } : { kind: "unknown_dm" };
 }
 
+/** The username BotFather issued (2026-09-14). The webhook classifies with
+    it, so "/number@ledgetools_bot" in a group is understood. */
+export const BOT_USERNAME = "ledgetools_bot";
+
+/* Rewritten 2026-09-14: "measures one thing" stopped being true on
+   2026-09-12 (outcomes after a graduation) and 2026-09-13 (first-buy
+   timing). Three things, each with its n; no adjective. */
 export const HELP_TEXT = (siteOrigin: string): string =>
   [
-    "LEDGE measures one thing on Robinhood Chain: how many Pons launches graduate, out of how many, over a stated window. Every figure carries its denominator and the time it was computed.",
+    "LEDGE indexes every pons launch on Robinhood Chain and publishes three things, each with its sample size: how many launches graduated, out of how many; when a launch's first outside buy landed; and where a pool's price went after it graduated.",
     "",
-    "/number — the current reading",
-    "an address — what has happened to launches configured like that one",
+    "/number — the last 24 hours",
+    "an address — that launch's own facts, and what happened to launches like it",
     "",
     `${siteOrigin}/method`,
   ].join("\n");
@@ -101,15 +108,31 @@ export async function withinLimits(
   return true;
 }
 
-export async function sendMessage(env: Env, chatId: number | string, text: string): Promise<void> {
-  if (!env.TELEGRAM_BOT_TOKEN) return;
-  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      disable_web_page_preview: true,
-    }),
-  });
+/** True only when Telegram accepted the message. Until 2026-09-14 the
+    answer was ignored, so a refused or undelivered post was still recorded
+    as posted (graveyard_posted, the digest's KV day) and never retried.
+    Never throws: a Telegram outage is not an indexing failure. */
+export async function sendMessage(
+  env: Env,
+  chatId: number | string,
+  text: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!env.TELEGRAM_BOT_TOKEN) return false;
+  try {
+    const response = await fetchImpl(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        disable_web_page_preview: true,
+      }),
+    });
+    if (!response.ok) console.error(`telegram: sendMessage ${response.status}`);
+    return response.ok;
+  } catch (error) {
+    console.error(`telegram: sendMessage failed: ${String(error).slice(0, 200)}`);
+    return false;
+  }
 }

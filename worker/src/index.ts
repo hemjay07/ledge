@@ -67,6 +67,7 @@ import {
   HELP_TEXT,
   UNKNOWN_DM_TEXT,
   type TgUpdate,
+  BOT_USERNAME,
 } from "./telegram";
 
 const CORS = {
@@ -388,7 +389,7 @@ async function handleTelegram(env: Env, request: Request, secret: string, nowMs:
   const message = update.message ?? update.channel_post;
   if (!message) return new Response("ok");
 
-  const intent = classify(message, "ledgebot");
+  const intent = classify(message, BOT_USERNAME);
   if (intent.kind === "silence") return new Response("ok");
 
   const chatId = String(message.chat.id);
@@ -410,6 +411,7 @@ async function handleTelegram(env: Env, request: Request, secret: string, nowMs:
           file.crawledAt,
           formatAge(ageSeconds(file.crawledAt, nowMs)),
           `${env.SITE_ORIGIN}/method`,
+          { ttg: file.h24.ttg, recordSince: file.firstIndexedAt ?? null },
         )
       : "The published reading is not loadable right now. Nothing is being estimated.";
   } else {

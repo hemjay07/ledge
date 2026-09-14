@@ -173,6 +173,9 @@ export interface NumberFile {
   chainId: number;
   factory: string;
   crawledAt: string;
+  /** The earliest launch in the record (METHOD.md "All-time"); null before
+      anything is indexed. Optional: older files did not carry it. */
+  firstIndexedAt?: string | null;
   stale: boolean;
   staleAfterSeconds: number;
   h24: NumberWindow;

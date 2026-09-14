@@ -42,7 +42,7 @@ import { ZERO_ADDRESS } from "./decimals";
 import {
   GRAVEYARD_QUERY,
   buildGraveyardRows,
-  graveyardPostText,
+  graveyardPosts,
   graveyardRowsToCandidates,
   selectNewGraveyardEntries,
   type GraveyardDbRow,
@@ -427,13 +427,19 @@ async function announceGraveyard(env: Env, db: D1Database, nowSeconds: number, t
   const newEntries = selectNewGraveyardEntries(candidates, new Set(posted.map((p) => p.token)));
   if (newEntries.length === 0) return;
 
-  const text = graveyardPostText(newEntries, env.SITE_ORIGIN);
-  if (text === null) return;
+  const posts = graveyardPosts(newEntries, env.SITE_ORIGIN);
+  if (posts.length === 0) return;
 
   const chatId = env.TELEGRAM_GRAVEYARD_CHAT_ID;
   if (!(await withinLimits(db, chatId, nowSeconds))) return; // retried next tick, never skipped silently
 
-  await sendMessage(env, chatId, text);
+  // Entries are recorded as posted only once Telegram accepted the message
+  // that carries them (2026-09-14); a refused post is retried next tick.
+  let delivered = true;
+  for (const text of posts) {
+    if (!(await sendMessage(env, chatId, text))) { delivered = false; break; }
+  }
+  if (!delivered) return;
   await db.batch(
     newEntries.map((entry) =>
       db

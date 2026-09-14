@@ -4,6 +4,7 @@ import {
   buildGraveyardRows,
   buildGraveyardScope,
   graveyardPostText,
+  graveyardPosts,
   graveyardRowsToCandidates,
   selectNewGraveyardEntries,
   type GraveyardDbRow,
@@ -183,5 +184,34 @@ describe("graveyard rows carry the token's own name/symbol", () => {
     const rows = buildGraveyardRows([row()], CURSOR, NOW, "age", 200, null, null, dbTokenMeta);
     expect(rows[0]!.name).toBeNull();
     expect(rows[0]!.symbol).toBeNull();
+  });
+});
+
+describe("graveyard posts, chunked and linked (2026-09-14)", () => {
+  const candidate = {
+    token: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    pairClass: "eth",
+    creatorTaxBps: 300,
+    ageSeconds: GRAVEYARD_AGE_SECONDS + 3_600,
+    sells: 0,
+    firstBlockBuyers: 0,
+  };
+  const many = Array.from({ length: 120 }, (_, i) => ({
+    ...candidate,
+    token: "0x" + i.toString(16).padStart(40, "0"),
+  }));
+  it("splits a long post so no message exceeds Telegram's 4,096 characters", () => {
+    const posts = graveyardPosts(many, "https://ledge.tools");
+    expect(posts.length).toBeGreaterThan(1);
+    for (const p of posts) expect(p.length).toBeLessThanOrEqual(4096);
+    const joined = posts.join("\n");
+    for (const c of many) expect(joined).toContain(c.token);
+  });
+  it("links every entry to its own page", () => {
+    const [post] = graveyardPosts([candidate], "https://ledge.tools");
+    expect(post).toContain(`https://ledge.tools/t/${candidate.token}`);
+  });
+  it("posts nothing for nothing", () => {
+    expect(graveyardPosts([], "https://ledge.tools")).toEqual([]);
   });
 });

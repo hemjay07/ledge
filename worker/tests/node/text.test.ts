@@ -362,3 +362,15 @@ describe("the first-outside-buy sentence", () => {
     expect(lines.join(" ")).not.toMatch(/\b(will |predict|score|risk|odds|probab)/i);
   });
 });
+
+describe("the /number reply, since 2026-09-14", () => {
+  const file = fixtureNumber();
+  const text = numberText(file.h24, file.crawledAt, "12 min", "https://ledge.tools/method", {
+    ttg: file.h24.ttg,
+    recordSince: "2026-09-05T15:58:32Z",
+  });
+  it("says the median time to graduation with its n, and where the record starts", () => {
+    expect(text).toMatch(/Median time to graduation: .*\(n=[\d,]+\)|Median time to graduation: not enough data/);
+    expect(text).toContain("since 5 Sep 2026");
+  });
+});

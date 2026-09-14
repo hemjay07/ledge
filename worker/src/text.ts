@@ -381,16 +381,30 @@ export function numberText(
   crawledAt: string,
   ageText: string,
   methodUrl: string,
+  /* 2026-09-14: the two lines the digest already carried and /number did
+     not -- the median with its n, and where the record starts, so "the
+     last 24 hours" is read against a stated span. Optional: an older
+     caller prints the reply as before. */
+  extra: { ttg?: { n: number; insufficient: boolean; p50: number | null }; recordSince?: string | null } = {},
 ): string {
   const fact = { rate: h24.rate, n: h24.launches, insufficient: h24.insufficient };
   const ef = { rate: h24.excludingFast.rate, n: h24.launches, insufficient: h24.excludingFast.insufficient };
   const cutoff = formatDuration(h24.excludingFast.cutoffSeconds);
   const oneIn =
     !isInsufficient(ef) && h24.excludingFast.oneIn !== null ? ` (${formatOneIn(h24.excludingFast.oneIn)})` : "";
-  return [
+  const lines = [
     `Pons, last 24 hours: ${formatCount(h24.graduations)} of ${formatCount(h24.launches)} launches graduated, ${rateText(fact)}.`,
     `Excluding launches that graduated inside ${cutoff}: ${formatCount(h24.excludingFast.graduations)} of ${formatCount(h24.launches)}, ${rateText(ef)}${oneIn}.`,
-    `${formatStamp(crawledAt)}, ${ageText} ago.`,
-    methodUrl,
-  ].join("\n");
+  ];
+  if (extra.ttg) {
+    const t = extra.ttg;
+    lines.push(
+      t.insufficient || t.p50 === null
+        ? `Median time to graduation: not enough data (n=${formatCount(t.n)}).`
+        : `Median time to graduation: ${formatDuration(t.p50)} (n=${formatCount(t.n)}).`,
+    );
+  }
+  const since = extra.recordSince ? `Record since ${formatStamp(extra.recordSince).replace(/^Measured /, "").replace(/ · .*$/, "")}. ` : "";
+  lines.push(`${since}${formatStamp(crawledAt)}, ${ageText} ago.`, methodUrl);
+  return lines.join("\n");
 }

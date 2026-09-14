@@ -71,3 +71,28 @@ describe("the cron Cloudflare keeps", () => {
     expect(Number(minute)).toBeLessThan(60);
   });
 });
+
+describe("the digest's first-buy line", () => {
+  it("prints the population's first-outside-buy shares from the file, with n", () => {
+    const file = {
+      ...fixtureNumber(),
+      firstBuy: {
+        indexedFromBlock: 1,
+        population: "launches at least one hour old at crawledAt, launched at or after indexedFromBlock",
+        cohorts: {
+          all: [{ bucket: "all", n: 21293, launchTxBuy: 17008, launchTxBuyShare: 0.79876, outside: { sameBlock: 201, within1s: 8298, within3s: 3311, within5s: 966, after5s: 3283, none: 5234 }, sameBlockShare: 0.009, within1sShare: 0.399145, within3sShare: 0.55, within5sShare: 0.600009, noneShare: 0.245808, insufficient: false }],
+          taxBucket: [],
+          pairClass: [],
+        },
+      },
+    };
+    const t = digestText(file as never, NOW_SECONDS * 1000, "https://ledge.tools");
+    expect(t).toContain("First outside buy");
+    expect(t).toContain("39.91%"); // two decimals above n = 1,000 (format.ts decimalsFor)
+    expect(t).toContain("n=21,293");
+  });
+  it("prints nothing about first buys when the file has no such block", () => {
+    const t = digestText(fixtureNumber(), NOW_SECONDS * 1000, "https://ledge.tools");
+    expect(t).not.toContain("First outside buy");
+  });
+});
