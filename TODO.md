@@ -85,6 +85,12 @@ within 5 s of the launch block; 24.6% had none after an hour). The
 `/t/{address}` surface is not built: the Worker holds no first-buy record
 outside its own window, so it needs either a per-token KV publish from the
 crawl or a lookup file. Decide before building.*
+*2026-09-14 15:00Z: built as Class B readings in the tick (three columns on
+token_activity, migration run by the owner), shown on `/t/{address}` and the
+API beside the tax band's shares from number.json (efa1785). Verified on a
+token launched after the restart: "First outside buy: 1 s after the launch
+block." Fills for launches folded from now on; older tokens show the cohort
+only. A5b DONE.*
 
 **A7. Backfill the record to 14 August.** pons v2's first launch (Bitquery
 archive). "All-time" then means what a reader thinks it means, and every
@@ -117,6 +123,9 @@ Worker still computes no statistic. Zero-buy share waits for a Class A
 figure; the sample on the homepage is a dated measurement, not a window.
 **DONE when:** a graduation posts to the room within a minute of the tick,
 and the digest has posted on two consecutive days.
+*2026-09-14 15:00Z: bot @ledgetools_bot, room @ledgetools; secrets on the
+Worker and the box, webhook set (pending 0, no error). Not yet observed: a
+post in the room, the first digest (12:05 UTC tomorrow).*
 
 **B6. The token's success metric.** Referral visits to ledge.tools from the
 token page and the room in the first week, published on `/t/{our address}`
