@@ -329,3 +329,15 @@ describe("the first-outside-buy card", () => {
     );
   });
 });
+
+describe("the fill card's share beside a reserve too small to round (2026-09-14)", () => {
+  it("says '<0.1%' rather than '0.0%' when the curve holds something", () => {
+    const html = render({
+      pairDecimals: 18,
+      fill: { filledWei: "7", thresholdWei: "369000000000000000000", share: 7 / 369e18, note: null },
+    });
+    expect(html).toContain("under 0.0001 ETH");
+    expect(html).toContain("&lt;0.1% of the threshold"); // escaped in the markup, "<0.1%" on the page
+    expect(html).not.toContain("0.0% of the threshold");
+  });
+});

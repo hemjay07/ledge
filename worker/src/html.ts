@@ -48,6 +48,7 @@ import {
   formatDuration,
   formatStamp,
   rateText,
+  formatShareOfOne,
 } from "./format";
 import { cohortSuppressed, freshnessLine, outcomeWord } from "./text";
 
@@ -242,9 +243,12 @@ function fillCard(body: Body): string {
   /* The share on its own line, smaller: the quantities are the figure and
      the share is read off them. One line of large mono wrapped to three on
      a phone when the share sat inside it. */
+  // A curve holding something never reads as 0.0%: the same rule
+  // format.ts formatShareOfOne applies to the sentence (2026-09-14).
+  const holdsSomething = state.curveFilledWei !== null && state.curveFilledWei !== "0";
   const shareNote = suppressed
     ? ""
-    : `<div class="fig-share mono">${pct.toFixed(1)}% of the threshold</div>`;
+    : `<div class="fig-share mono">${e(formatShareOfOne(state.curveFilledShare, holdsSomething))} of the threshold</div>`;
 
   return `
     <section class="card">
