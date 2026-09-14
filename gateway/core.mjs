@@ -123,7 +123,7 @@ export function createGateway(options) {
     url,
     index: i,
     pacer: new Pacer(options.minIntervalMs ?? 150, options.concurrency ?? 3),
-    stats: { ok: 0, refused: 0, busy: 0, failed: 0 },
+    stats: { ok: 0, refused: 0, busy: 0, failed: 0, missing: 0 },
   }));
   if (upstreams.length === 0) throw new Error("gateway: at least one upstream is required");
   const retryDelays = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
@@ -179,12 +179,40 @@ export function createGateway(options) {
       if (pass > 0) { metrics.retries += 1; await sleep(retryDelays[pass - 1]); }
       for (const up of upstreams) {
         const out = await sendTo(up, items);
-        if (out.answers) return { answers: out.answers };
+        if (out.answers) return { answers: await fillMissingHeaders(items, out.answers, up) };
         lastReason = `${up.url}: ${out.refused}`;
       }
     }
     metrics.exhausted += 1;
     return { refused: lastReason };
+  }
+
+  /** A header answered null is not an error to the endpoint -- it simply
+      has not received that block yet -- so it never failed over, and the
+      tick behind it could not timestamp what it had just read (2026-09-14,
+      eight passes in ten minutes). Each null header is asked of the other
+      upstreams, alone; what none of them has stays null. */
+  async function fillMissingHeaders(items, answers, from) {
+    const missing = [];
+    items.forEach((item, i) => {
+      const a = answers.find((r) => r.id === item.id);
+      if (item.method === "eth_getBlockByNumber" && a && !a.error && a.result === null) missing.push({ i, item });
+    });
+    if (missing.length === 0) return answers;
+    from.stats.missing += missing.length;
+    let filled = answers.map((a) => ({ ...a }));
+    for (const up of upstreams) {
+      if (up === from) continue;
+      const still = missing.filter((m) => filled.find((r) => r.id === m.item.id)?.result === null);
+      if (still.length === 0) break;
+      const out = await sendTo(up, still.map((m) => m.item));
+      if (!out.answers) continue;
+      for (const m of still) {
+        const a = out.answers.find((r) => r.id === m.item.id);
+        if (a && !a.error && a.result !== null) filled = filled.map((r) => (r.id === m.item.id ? { ...a } : r));
+      }
+    }
+    return filled;
   }
 
   function noteHead(items, answers) {

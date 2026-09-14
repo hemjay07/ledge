@@ -184,3 +184,31 @@ test("the cache is bounded by bytes and evicts the oldest entries first", async 
   assert.equal(g.metrics().cache.hits, 0);
   a.close();
 });
+
+test("a header the primary does not have yet is asked of the next upstream", async () => {
+  // 2026-09-14 18:5xZ: the box tick failed eight passes in ten minutes with
+  // "no block header for block N" -- the official endpoint answered null for
+  // a block it had not received yet (a 200, not a refusal), so nothing
+  // failed over, while ordofi already had it.
+  const a = await fakeUpstream((items) => ok(items, (i) => (i.method === "eth_blockNumber" ? "0x" + HEAD.toString(16) : null)));
+  const b = await fakeUpstream((items) => ok(items, (i) => (i.method === "eth_blockNumber" ? "0x" + HEAD.toString(16) : { number: i.params[0], timestamp: "0x1" })));
+  const g = gw(a, b);
+  const recent = "0x" + (HEAD - 3).toString(16);
+  const out = await g.handle([req("eth_getBlockByNumber", [recent, false])]);
+  assert.equal(out.status, 200);
+  assert.equal(out.body[0].result.timestamp, "0x1");
+  assert.equal(g.metrics().upstreams[0].missing, 1);
+  a.close(); b.close();
+});
+
+test("a batch with one missing header sends only that item to the next upstream", async () => {
+  const a = await fakeUpstream((items) => ok(items, (i) => (i.method === "eth_blockNumber" ? "0x" + HEAD.toString(16) : i.params[0] === "0xb" ? null : { timestamp: "0xa" })));
+  const b = await fakeUpstream((items) => ok(items, () => ({ timestamp: "0xb" })));
+  const g = gw(a, b);
+  await g.handle([req("eth_blockNumber", [])]);
+  const out = await g.handle([req("eth_getBlockByNumber", ["0xa", false], 1), req("eth_getBlockByNumber", ["0xb", false], 2)]);
+  assert.equal(out.body[0].result.timestamp, "0xa");
+  assert.equal(out.body[1].result.timestamp, "0xb");
+  assert.equal(b.calls.at(-1).length, 1);
+  a.close(); b.close();
+});

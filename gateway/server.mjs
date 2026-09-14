@@ -82,7 +82,7 @@ export function startServer(env = process.env, listen = true) {
     ticker = setInterval(() => {
       const m = gateway.metrics();
       console.log(`gateway: requests=${m.requests} items=${m.items} cache=${m.cache.hits}/${m.cache.misses} cacheMB=${(m.cacheBytes / 1048576).toFixed(1)} retries=${m.retries} exhausted=${m.exhausted} ` +
-        m.upstreams.map((u) => `${new URL(u.url).host} ok=${u.ok} refused=${u.refused} busy=${u.busy} failed=${u.failed}`).join(" | "));
+        m.upstreams.map((u) => `${new URL(u.url).host} ok=${u.ok} refused=${u.refused} busy=${u.busy} failed=${u.failed} missing=${u.missing}`).join(" | "));
     }, 60_000);
     ticker.unref();
   }
