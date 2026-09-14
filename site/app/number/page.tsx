@@ -119,10 +119,10 @@ export default function NumberCard(): ReactElement {
           <details className="board-what-counts">
             <summary>How this is counted</summary>
             <p className="note note--fine">
-              <span className="mono">stale</span> in <a href="/number.json">number.json</a> is what the
-              generating run knew about itself when it wrote the file; compute the age of the
-              measurement from <span className="mono">crawledAt</span>. The card image carries the age
-              it had at generation. Full data: <a href="/number.json">number.json</a>.
+              The age of a figure is the time since <span className="mono">crawledAt</span> in{" "}
+              <a href="/number.json">number.json</a>; the <span className="mono">stale</span> flag
+              there only says whether the run that wrote the file knew it was behind. The card
+              image carries the age it had when it was drawn.
             </p>
           </details>
         </div>

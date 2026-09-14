@@ -140,7 +140,7 @@ export function formatDayLong(iso) {
    for the card to say something the sheet does not. */
 
 /** The clause the share governs. The figure is never in this string. */
-export const SAMPLE_CLAUSE = "of Pons launches never take a single buy.";
+export const SAMPLE_CLAUSE = "of pons launches never take a single buy.";
 
 /** How the sample was taken, in the length a fine-print line holds. The full
     method stays in the file, under `method`. */

@@ -32,18 +32,18 @@ const ROWS: { what: string; detail: string; status: Status }[] = [
   {
     what: "Its own launch, measured live on the front page",
     detail:
-      "Buyers in its launch block, fill, time to graduation, creator fees — the same readings LEDGE takes of every other token, including the bad ones.",
+      "Buyers in its launch block, fill, time to graduation, creator fees. The same readings LEDGE takes of every other token, including the bad ones.",
     status: "from launch",
   },
   {
     what: "A room that hears every reading first",
     detail:
-      "The bot posts each graduation, each launch that dies, each curve taking real buys, as it happens. What happened, never what to do.",
+      "The bot posts each launch that takes no buys and, once a day, the figures. What happened, never what to do.",
     status: "not yet running",
   },
   {
     what: "A say in what gets measured next",
-    detail: "Another venue, another chain, a cohort nobody has cut. Never a say over a published number.",
+    detail: "Another venue, another chain, a cohort nobody has cut yet. Never a say over a published number.",
     status: "after launch",
   },
 ];
@@ -62,8 +62,8 @@ export default function Token(): ReactElement {
             the others.
           </h1>
           <p className="dek">
-            LEDGE launches on pons like any other token. Everything on this site stays free
-            for everyone; holding buys the three things below.
+            LEDGE launches on pons like any other token. Everything on this site stays free for
+            everyone. Holding gets you the three things below.
           </p>
         </div>
       </section>
@@ -101,23 +101,23 @@ export default function Token(): ReactElement {
         </div>
         <div className="card-body">
           <p className="dek">
-            Creator fees fund the work. If enough comes in, the next thing built is an agent
-            that acts on rules you write against these figures — intent, not a promise.
+            Creator fees pay for the work. If enough comes in, the next thing built is an agent
+            that acts on rules you write against these figures. That is the intent, not a promise.
           </p>
           {/* One line, not a card of three "no"s (2026-09-12). It stays because
               a tool token that hinted at yield would be claiming something it
               cannot pay and should not promise; saying so once is the whole
               cost of never being asked. */}
           <p className="note">
-            It is not a claim on revenue: no yield, buyback or airdrop, and no vote over a
-            published number. The data is free to everyone either way.
+            The token is not a claim on revenue. No yield, no buyback, no airdrop, and no vote
+            over a published number. The data is free to everyone either way.
           </p>
         </div>
       </section>
 
       <p className="note note--fine token-foot">
-        Launch details are public in the repository (<code>LAUNCH.md</code>). When a status
-        above changes, the change is dated on <Link href="/method">the method page</Link>.
+        The launch plan is public in the repository (<code>LAUNCH.md</code>). When a status above
+        changes, the change is dated on <Link href="/method">the method page</Link>.
       </p>
 
       <Footer />

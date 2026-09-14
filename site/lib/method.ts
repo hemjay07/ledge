@@ -20,8 +20,27 @@ function offsetHeadings(): Renderer {
   return renderer;
 }
 
+function render(markdown: string): string {
+  return marked.parse(markdown, { async: false, gfm: true, renderer: offsetHeadings() });
+}
+
+const CHANGELOG_HEADING = "## Changelog of definitions";
+
+/** The definitions, without the dated changelog that follows them. */
 export function methodHtml(): string {
   const source = readFileSync(join(process.cwd(), "..", "METHOD.md"), "utf8");
   const body = source.replace(/^#\s+.*\n/, "");
-  return marked.parse(body, { async: false, gfm: true, renderer: offsetHeadings() });
+  const cut = body.indexOf(CHANGELOG_HEADING);
+  return render(cut === -1 ? body : body.slice(0, cut));
+}
+
+/** The dated changelog alone (2026-09-14): it had grown to most of a
+    12,000-pixel page and pushed the comparison and the record below it. It
+    is the same file, rendered as its own card, folded, after them. */
+export function changelogHtml(): string {
+  const source = readFileSync(join(process.cwd(), "..", "METHOD.md"), "utf8");
+  const cut = source.indexOf(CHANGELOG_HEADING);
+  if (cut === -1) return "";
+  const rest = source.slice(cut + CHANGELOG_HEADING.length);
+  return render(rest);
 }

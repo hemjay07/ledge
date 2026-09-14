@@ -2,25 +2,26 @@ import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { Footer } from "../../components/Footer";
 import { numberFile } from "../../lib/number";
-import { methodHtml } from "../../lib/method";
+import { changelogHtml, methodHtml } from "../../lib/method";
 
 export const metadata: Metadata = {
   title: "Method — LEDGE",
   description:
-    "How the Pons Number is measured: sources, definitions, cohort buckets, freshness, and the command that regenerates every figure from the public data.",
+    "How every number on LEDGE is counted: the source, the definitions, how other pons sites define theirs, and the command that regenerates every figure from the public data.",
 };
 
 const RECOMPUTE = "python pipeline/recompute.py --check";
 
 export default function Method(): ReactElement {
   const html = methodHtml();
+  const changelog = changelogHtml();
 
   return (
     <main className="sheet">
       <div className="evidence-lead">
         <h1 className="kicker">METHOD</h1>
-        <p className="dek">How every number on this site is counted, and how to recompute it.</p>
-        <p className="note">LEDGE does not score, rank, or predict individual tokens.</p>
+        <p className="dek">How every number on this site is counted, and how to check it yourself.</p>
+        <p className="note">LEDGE rates, ranks and predicts nothing. It counts.</p>
       </div>
 
       <div className="card">
@@ -29,16 +30,14 @@ export default function Method(): ReactElement {
           <span className="note note--fine mono">definitions {numberFile.definitionsVersion}</span>
         </div>
         <p className="note" id="h-recompute">
-          Every figure on this site comes from <code>data/number.json</code>, which is regenerated
-          from the raw launch and graduation files with no network access. Clone the repository and
-          run:
+          Every figure on this site is in one file, <code>data/number.json</code>, built from the
+          raw launch and graduation records with no network access. Clone the repository and run:
         </p>
         <pre className="cmd">{RECOMPUTE}</pre>
         <p className="note note--fine">
-          The command exits non-zero if the regenerated file differs from the committed one by a
-          single byte. Continuous integration runs it on every commit, so a rendered number that
-          does not follow from the public data cannot deploy. Schema version{" "}
-          {numberFile.schemaVersion} · chain {numberFile.chainId} · first indexed block{" "}
+          If the file it rebuilds differs from the published one by a single byte, the command
+          fails, and so does the deploy. Schema version {numberFile.schemaVersion}, chain{" "}
+          {numberFile.chainId}, first indexed block{" "}
           {numberFile.firstIndexedBlock.toLocaleString("en-US")}.
         </p>
       </div>
@@ -46,7 +45,7 @@ export default function Method(): ReactElement {
       <div className="card">
         <div className="card-header">
           <h2 className="kicker card-kicker">DEFINITIONS</h2>
-          <span className="note note--fine">binding on the crawler, the site and the tests</span>
+          <span className="note note--fine">binding on the crawl, the site and the tests</span>
         </div>
         <div className="method" id="h-definitions" dangerouslySetInnerHTML={{ __html: html }} />
       </div>
@@ -62,8 +61,8 @@ export default function Method(): ReactElement {
           <span className="note note--fine">as observed on 13 Sep 2026</span>
         </div>
         <p className="note" id="h-compared">
-          Other sites publish figures about pons under different definitions. Where a number here
-          looks unlike one there, this is usually why.
+          Other sites publish pons figures under other definitions. When a number here does not
+          match one there, this table is usually why.
         </p>
         <div className="scroller">
           <table>
@@ -113,8 +112,8 @@ export default function Method(): ReactElement {
           </table>
         </div>
         <p className="note note--fine">
-          Read from each site&rsquo;s own pages on the date above. A site that changes its
-          definitions after that date is not reflected here until this table is re-read.
+          Read from each site&rsquo;s own pages on the date above. If a site changes its
+          definitions later, this table is wrong until it is read again.
         </p>
       </div>
 
@@ -124,13 +123,23 @@ export default function Method(): ReactElement {
           <span className="note note--fine">append-only, dated</span>
         </div>
         <p className="note" id="h-record">
-          Two things on this site never get rewritten. The changelog under DEFINITIONS above
-          carries a dated entry for every change to a definition, with the figures that moved
-          when it changed. And <code>data/number.json</code> is committed on every crawl, so its
-          git history is the sequence of every number this site has ever published, with the raw
-          files each one was computed from beside it. A figure quoted from here on a given day
-          can be checked against what the site published that day.
+          Two things here are never rewritten. The changelog below has a dated entry for every
+          change to a definition, with the figures that moved. And <code>data/number.json</code>{" "}
+          is committed on every crawl, so its git history is every number this site has ever
+          published, next to the raw records it was built from. A figure quoted from here on any
+          day can be checked against what the site said that day.
         </p>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2 className="kicker card-kicker">CHANGELOG</h2>
+          <span className="note note--fine">every change to a definition, dated</span>
+        </div>
+        <details className="board-what-counts">
+          <summary>Open the changelog</summary>
+          <div className="method" id="h-changelog" dangerouslySetInnerHTML={{ __html: changelog }} />
+        </details>
       </div>
 
       <Footer />
