@@ -212,3 +212,24 @@ test("a batch with one missing header sends only that item to the next upstream"
   assert.equal(b.calls.at(-1).length, 1);
   a.close(); b.close();
 });
+
+test("never caches a null header: what no upstream had is asked again next time", async () => {
+  // 2026-09-15 18:03Z: the primary was refusing, the fallback answered null
+  // for ~900 headers it did not hold, and the gateway remembered the nulls
+  // as if they were headers. Every later ask -- the tick's, the crawl's,
+  // their retries -- was served the cached null, for seven hours, while the
+  // primary had the blocks all along.
+  let primaryDown = true;
+  const a = await fakeUpstream((items) => (primaryDown ? 429 : ok(items, (i) => (i.method === "eth_blockNumber" ? "0x" + HEAD.toString(16) : { timestamp: "0x1" }))));
+  const b = await fakeUpstream((items) => ok(items, (i) => (i.method === "eth_blockNumber" ? "0x" + HEAD.toString(16) : null)));
+  const g = gw(a, b);
+  const old = "0x" + (HEAD - 5000).toString(16);
+  const first = await g.handle([req("eth_getBlockByNumber", [old, false])]);
+  assert.equal(first.body[0].result, null);
+  assert.equal(g.metrics().cache.stored, 0);
+  primaryDown = false;
+  const second = await g.handle([req("eth_getBlockByNumber", [old, false])]);
+  assert.equal(second.body[0].result.timestamp, "0x1");
+  assert.equal(g.metrics().cache.stored, 1);
+  a.close(); b.close();
+});

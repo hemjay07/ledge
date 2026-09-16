@@ -17,7 +17,8 @@
 //   - Any other JSON-RPC error is an answer, returned as-is, never cached.
 //   - Only answers that cannot change are cached: a block header for a block
 //     more than `reorgWindow` below the last seen head, and a log range
-//     whose toBlock is below that same line. The head is learnt from
+//     whose toBlock is below that same line. Never a null: an upstream that
+//     lacks a block answers null, and the next upstream may have it. The head is learnt from
 //     eth_blockNumber answers passing through (and refreshed on demand).
 //   - Each upstream is paced: at most `concurrency` in flight and at least
 //     `minIntervalMs` between sends. The official endpoint refused a
@@ -258,7 +259,13 @@ export function createGateway(options) {
       misses.forEach((m, k) => {
         const a = out.answers.find((r) => r.id === k) ?? { jsonrpc: "2.0", id: k, error: { code: -32603, message: "gateway: upstream returned no item" } };
         answers[m.i] = { ...a, id: m.item.id };
-        if (m.key !== null && a.result !== undefined && !a.error) { cache.set(m.key, { jsonrpc: "2.0", result: a.result }); metrics.cache.stored += 1; }
+        // A null result is "not known here", not a fact: an upstream behind
+        // the head, or one that has pruned the block, answers null for a
+        // header it will or does have elsewhere. Remembered, it is served
+        // forever (2026-09-15 18:03Z: 900 nulls from the fallback, cached
+        // while the primary was refusing, stopped the tick and the crawl
+        // for seven hours). Only a real answer is stored.
+        if (m.key !== null && a.result !== undefined && a.result !== null && !a.error) { cache.set(m.key, { jsonrpc: "2.0", result: a.result }); metrics.cache.stored += 1; }
       });
       noteHead(items, answers.filter(Boolean));
     }

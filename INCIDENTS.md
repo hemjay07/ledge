@@ -107,3 +107,4 @@ without the banner — and it has not been met yet.
 | 09-14 | the bot's reply was rewritten; the site's lookup panel walks that text by line order and mis-slotted it for ~1 h | 1 | walker follows the new order; fixtures re-rendered by the Worker's own builder; run the site suite after any text.ts change |
 | 09-14 | one empty header in a 50-block batch failed seven box ticks in a row | 2 | per-block retry in the tick (as the crawl has had since 09-12) |
 | 09-14 | the box runner ignores SIGTERM; every restart waits 90 s for SIGKILL | 2 | open: handle the signal in worker/host/main.ts |
+| 09-15 | gateway cached ~900 null headers from the fallback (taken while the primary refused); tick and crawl failed on the same block for 7 h (18:03Z to 01:2xZ), unnoticed | 2 | null answers never cached (gateway test); open: a stall alert to the owner, since nothing paged anyone |
