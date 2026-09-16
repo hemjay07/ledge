@@ -25,8 +25,14 @@ export async function renderCard(
   body: Omit<TokenResponse, "text">,
   observedMaxSeconds: number | null,
 ): Promise<Uint8Array> {
+  return renderCardSvg(cardSvg(cardTree(body, observedMaxSeconds)));
+}
+
+/** Any card's SVG to PNG, with the same two faces (2026-09-16: the figure
+    cards share this pass with the death card). */
+export async function renderCardSvg(svg: string): Promise<Uint8Array> {
   await ensureWasm();
-  const resvg = new Resvg(cardSvg(cardTree(body, observedMaxSeconds)), {
+  const resvg = new Resvg(svg, {
     fitTo: { mode: "width", value: CARD_WIDTH },
     font: {
       fontBuffers: [new Uint8Array(regular), new Uint8Array(semibold)],

@@ -8,7 +8,9 @@ import { DIGEST_CRON, announceDigest } from "./digest";
 import type { Env } from "./env";
 import { tick } from "./tick";
 import { lookupToken } from "./service";
-import { renderCard } from "./og";
+import { renderCard, renderCardSvg } from "./og";
+import { cardSvg } from "./card";
+import { figureCard, type GraveyardFigure } from "./figures";
 import { tokenShell } from "./html";
 import { headline } from "./text";
 import { numberText } from "./text";
@@ -366,6 +368,28 @@ async function handleShell(env: Env, address: string, nowMs: number): Promise<Re
   );
 }
 
+async function handleFigure(env: Env, name: string, nowMs: number): Promise<Response> {
+  const file = await loadNumber(env, nowMs);
+  if (!file) return new Response("upstream", { status: 503 });
+  let graveyard: GraveyardFigure | null = null;
+  if (name === "graveyard") {
+    const nowSeconds = Math.floor(nowMs / 1000);
+    const [totalResult, scopeResult] = await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(GRAVEYARD_TOTAL_QUERY).bind(nowSeconds - GRAVEYARD_AGE_SECONDS),
+      env.LEDGE_DB.prepare(GRAVEYARD_SCOPE_QUERY),
+    ]);
+    const total = Number((totalResult?.results[0] as { total?: number } | undefined)?.total ?? 0);
+    const scope = buildGraveyardScope((scopeResult?.results[0] as GraveyardScopeDbRow | undefined) ?? null);
+    if (scope.earliestIndexedLaunchAt) graveyard = { total, watched: scope.indexedLaunches, since: scope.earliestIndexedLaunchAt };
+  }
+  const card = figureCard(name, file, graveyard);
+  if (!card) return new Response("not found", { status: 404 });
+  const png = await renderCardSvg(cardSvg(card));
+  return new Response(png as unknown as BodyInit, {
+    headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=300", ...CORS },
+  });
+}
+
 async function handleCard(env: Env, address: string, nowMs: number): Promise<Response> {
   const outcome = await lookupToken(env, address, nowMs);
   if (outcome.kind === "not_a_pons_token") return new Response("not found", { status: 404 });
@@ -488,6 +512,13 @@ export default {
         headers: { Location: `/t/${found[0].toLowerCase()}`, ...CORS },
       });
     }
+
+    // /og/figure/{name}.png: a self-attributing image of a published figure
+    // (worker/src/figures.ts), for a post that would otherwise be a
+    // screenshot. Built from the KV copy of number.json; the graveyard's
+    // figure from the same count the board reports.
+    const figure = path.match(/^\/og\/figure\/([a-z0-9-]+)\.png$/);
+    if (figure) return handleFigure(env, figure[1] as string, nowMs);
 
     // /og/t/{address}.png is the unfurled card; /t/{address}/og.png is the
     // same image under the shell's own path, so a reader guessing either
