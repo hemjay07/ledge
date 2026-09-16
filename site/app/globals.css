@@ -2317,6 +2317,18 @@ footer {
   margin: var(--s-8) 0 0;
 }
 
+/* /method: the five-line brief at the top (2026-09-17). */
+.method-brief {
+  margin: var(--s-4) 0 0;
+  padding-left: 1.4rem;
+  display: grid;
+  gap: var(--s-3);
+  line-height: 1.5;
+}
+.method-brief strong {
+  font-weight: 600;
+}
+
 /* ---- /token: the page a buyer reads ------------------------------------ */
 .token-card {
   margin-top: var(--s-4);

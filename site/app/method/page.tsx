@@ -32,6 +32,41 @@ export default function Method(): ReactElement {
         <p className="note">LEDGE rates, ranks and predicts nothing. It counts.</p>
       </div>
 
+      {/* 2026-09-17: the page was 2,600 words of reference prose with every
+          section open, thirteen phone screens for a reader who wanted one
+          definition. The five things most readers come for are stated here;
+          everything below is folded and is the proof. Each line restates
+          METHOD.md and changes only when it does. */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="kicker card-kicker">WHAT YOU NEED</h2>
+          <span className="note note--fine">the rest of this page is the proof</span>
+        </div>
+        <ol className="method-brief" id="h-brief">
+          <li>
+            <strong>Source.</strong> Every launch and graduation event the pons factory has
+            emitted since block {numberFile.firstIndexedBlock.toLocaleString("en-US")} (5 Sep
+            2026), read from the chain. Nothing is sampled and nothing comes from an API.
+          </li>
+          <li>
+            <strong>A graduation</strong> is one PoolGraduated event from the factory for a
+            launch on record, counted at its block time.
+          </li>
+          <li>
+            <strong>Inside 5 minutes</strong> means the graduation came under 300 seconds after
+            the launch block. It is a descriptive cutoff, not a verdict on any token.
+          </li>
+          <li>
+            <strong>Under 30</strong> in a sample, and the share is withheld: the page prints
+            &ldquo;not enough data (n=&hellip;)&rdquo; and never a percentage.
+          </li>
+          <li>
+            <strong>Freshness.</strong> The crawl runs every 10 minutes. A figure older than 30
+            minutes is marked stale wherever it appears.
+          </li>
+        </ol>
+      </div>
+
       <div className="card">
         <div className="card-header">
           <h2 className="kicker card-kicker">RECOMPUTE</h2>
@@ -55,7 +90,10 @@ export default function Method(): ReactElement {
           <h2 className="kicker card-kicker">DEFINITIONS</h2>
           <span className="note note--fine">binding on the crawl, the site and the tests</span>
         </div>
-        <div className="method" id="h-definitions" dangerouslySetInnerHTML={{ __html: html }} />
+        <details className="board-what-counts">
+          <summary>Open the definitions</summary>
+          <div className="method" id="h-definitions" dangerouslySetInnerHTML={{ __html: html }} />
+        </details>
       </div>
 
       {/* C6 (BRAINSTORM-2026-09-13 §3): a reader who has seen another pons
@@ -72,6 +110,8 @@ export default function Method(): ReactElement {
           Other sites publish pons figures under other definitions. When a number here does not
           match one there, this table is usually why.
         </p>
+        <details className="board-what-counts">
+          <summary>Open the comparison</summary>
         <div className="scroller">
           <table>
             <caption>Definitions, side by side, as read from each site on 13 September 2026.</caption>
@@ -123,6 +163,7 @@ export default function Method(): ReactElement {
           Read from each site&rsquo;s own pages on the date above. If a site changes its
           definitions later, this table is wrong until it is read again.
         </p>
+        </details>
       </div>
 
       {coverage && coverageText ? (
@@ -166,7 +207,8 @@ export default function Method(): ReactElement {
               </>
             ) : (
               "The token has not launched yet."
-            )}
+            )}{" "}
+            The short version is on <a href="/launch">its own page</a>.
           </p>
           <details className="board-what-counts">
             <summary>Open the pre-registration</summary>
@@ -188,6 +230,15 @@ export default function Method(): ReactElement {
           day can be checked against what the site said that day.
         </p>
       </div>
+
+      {/* A link into a folded section must land on it open. Static export,
+          no framework on this page: one line on load and on hash change. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html:
+            "(function(){function o(){var h=location.hash&&document.getElementById(location.hash.slice(1));if(!h)return;var d=h.closest('details');if(d&&!d.open){d.open=true;h.scrollIntoView();}}o();addEventListener('hashchange',o);})();",
+        }}
+      />
 
       <div className="card">
         <div className="card-header">
