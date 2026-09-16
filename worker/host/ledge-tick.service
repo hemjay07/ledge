@@ -15,9 +15,11 @@ ExecStart=/usr/bin/node /home/ledge/ledge/worker/dist/host.mjs
 Restart=always
 RestartSec=5
 # The loop itself already runs forever; a crash restarts clean rather than
-# being treated as an outage that needs manual attention.
+# being treated as an outage that needs manual attention. On SIGTERM the
+# runner finishes the tick in flight and exits; a tick retrying headers can
+# run past a minute, hence the two-minute grace before SIGKILL.
 KillSignal=SIGTERM
-TimeoutStopSec=30
+TimeoutStopSec=120
 
 [Install]
 WantedBy=multi-user.target

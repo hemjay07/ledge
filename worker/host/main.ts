@@ -138,6 +138,10 @@ export interface LoopOptions {
   /** Runs after every tick, success or not (the launch-day ticker). Its
       errors are logged and never stop the loop. */
   afterTick?: () => Promise<void>;
+  /** Resolves when a stop was requested, so the wait between ticks ends at
+      once instead of running out (INCIDENTS 09-14: every restart waited for
+      SIGKILL because the sleep could not be interrupted). */
+  stopped?: Promise<void>;
 }
 
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -170,7 +174,7 @@ export async function runLoop(env: Env, options: LoopOptions): Promise<void> {
     if (shouldStop()) return;
     const elapsed = Date.now() - startedAt;
     const remaining = Math.max(0, options.intervalMs - elapsed);
-    if (remaining > 0) await sleep(remaining);
+    if (remaining > 0) await Promise.race([sleep(remaining), options.stopped ?? new Promise<void>(() => {})]);
   } while (!shouldStop());
 }
 
@@ -202,8 +206,13 @@ async function main(): Promise<void> {
   const env = buildEnv(config);
 
   let stopping = false;
+  let releaseStop = () => {};
+  const stopped = new Promise<void>((resolve) => {
+    releaseStop = resolve;
+  });
   const requestStop = () => {
     stopping = true;
+    releaseStop();
   };
   process.once("SIGTERM", requestStop);
   process.once("SIGINT", requestStop);
@@ -220,6 +229,7 @@ async function main(): Promise<void> {
     tickFn: (e, nowSeconds) =>
       tick(e, nowSeconds, new RpcClient(config.rpcUrl, undefined, config.rpcUrlFallback, undefined, config.rpcBudget)),
     shouldStop: () => stopping,
+    stopped,
     afterTick: tickerHook(env, config),
   });
 

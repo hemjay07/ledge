@@ -128,4 +128,30 @@ describe("the host's KV stub", () => {
     expect(map).toEqual({ "0xabc": { symbol: "USDG", decimals: 6, class: "stable" } });
     await expect(env.LEDGE_KV.get("number:current", "json")).rejects.toThrow(/must not touch KV/);
   });
+
+  it("ends the wait between ticks as soon as a stop is requested", async () => {
+    const tickFn: TickFn = vi.fn(async () => ok());
+    let stopping = false;
+    let release = () => {};
+    const stopped = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = Date.now();
+    setTimeout(() => {
+      stopping = true;
+      release();
+    }, 5);
+    await runLoop(FAKE_ENV, { intervalMs: 60_000, tickFn, shouldStop: () => stopping, stopped });
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(tickFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs afterTick after every tick and survives its errors", async () => {
+    const tickFn: TickFn = vi.fn(async () => ok());
+    const afterTick = vi.fn(async () => {
+      throw new Error("ticker down");
+    });
+    await runLoop(FAKE_ENV, { intervalMs: 1, once: true, tickFn, afterTick, sleep: vi.fn(async () => {}) });
+    expect(afterTick).toHaveBeenCalledTimes(1);
+  });
 });
