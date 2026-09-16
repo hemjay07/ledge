@@ -434,6 +434,8 @@ async function handleTelegram(env: Env, request: Request, secret: string, nowMs:
     reply = HELP_TEXT(env.SITE_ORIGIN);
   } else if (intent.kind === "method") {
     reply = `${env.SITE_ORIGIN}/method`;
+  } else if (intent.kind === "id") {
+    reply = `This chat's id is ${chatId}.`;
   } else if (intent.kind === "unknown_dm") {
     reply = UNKNOWN_DM_TEXT;
   } else if (intent.kind === "number") {

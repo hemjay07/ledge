@@ -36,6 +36,7 @@ export type TgIntent =
   | { kind: "silence" }
   | { kind: "number" }
   | { kind: "help" }
+  | { kind: "id" }
   | { kind: "method" }
   | { kind: "lookup"; address: string }
   | { kind: "unknown_dm" };
@@ -59,6 +60,10 @@ export function classify(message: TgMessage, botName: string): TgIntent {
   if (bare === "/number") return { kind: "number" };
   if (bare === "/start" || bare === "/help") return { kind: "help" };
   if (bare === "/method") return { kind: "method" };
+  // The chat's own id, for TELEGRAM_OWNER_CHAT_ID (ops/README.md, the stall
+  // alert). Answered in a direct message only: a group's id is nobody's
+  // business to print into the group.
+  if (bare === "/id" && !isGroup) return { kind: "id" };
   return isGroup ? { kind: "silence" } : { kind: "unknown_dm" };
 }
 

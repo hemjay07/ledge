@@ -1,0 +1,16 @@
+[Unit]
+Description=LEDGE stall alert to the owner (pipeline/stall_watch.py)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ledge
+Group=ledge
+WorkingDirectory=/home/ledge/ledge
+EnvironmentFile=/etc/ledge/env
+# Reads /api/health, number.json and the gateway's loopback /metrics; sends
+# one Telegram message to TELEGRAM_OWNER_CHAT_ID per stall and one on
+# recovery. Without that key it only prints what it would have sent.
+ExecStart=/usr/bin/python3 /home/ledge/ledge/pipeline/stall_watch.py
+TimeoutStartSec=2min

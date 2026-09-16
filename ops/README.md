@@ -69,3 +69,23 @@ Then on the Worker: `wrangler secret put RPC_PROXY_KEY` with the same key
 it), deploy. Rotate by writing a new key to both places. The journal prints
 one metrics line a minute: `refused`/`busy` rising on an upstream is the
 rate-limit pressure that used to be an outage.
+
+## The stall alert (owner's phone)
+
+`pipeline/stall_watch.py`, run by `ledge-watch.timer` every five minutes.
+It reads the Worker's `/api/health`, the site's `number.json` and the
+gateway's loopback `/metrics`, and sends the owner one Telegram message
+when the live index has not passed in 20 min, is failing 10 passes in a
+row, sits 30,000 blocks behind the head, or the crawl has not published in
+90 min; a reminder every six hours while it lasts; one message on
+recovery. Born of 2026-09-15, seven hours down and nobody told.
+
+Needs `TELEGRAM_OWNER_CHAT_ID` in `/etc/ledge/env`: send `/id` to
+@ledgetools_bot in a direct message and it replies with the number. Until
+the key is set the run prints what it would have sent (`journalctl -u
+ledge-watch`). Install:
+
+```bash
+sudo cp ops/ledge-watch.service ops/ledge-watch.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now ledge-watch.timer
+```

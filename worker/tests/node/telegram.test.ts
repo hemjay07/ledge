@@ -24,6 +24,11 @@ describe("what the bot understands", () => {
     });
   });
 
+  it("tells a direct message its own chat id, and never a group", () => {
+    expect(classify({ ...dm, text: "/id" }, "ledgebot")).toEqual({ kind: "id" });
+    expect(classify({ ...group, text: "/id@ledgebot" }, "ledgebot")).toEqual({ kind: "silence" });
+  });
+
   it("answers /number@ledgebot in a group", () => {
     expect(classify({ ...group, text: "/number@ledgebot" }, "ledgebot")).toEqual({ kind: "number" });
   });
