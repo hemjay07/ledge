@@ -69,7 +69,7 @@ No image; link the /method card.
 
 > LEDGE launches its own token on pons this week. Before it does, the
 > expected outcome and the failure clause are written down and committed:
-> ledge.tools/method#h-preregistration
+> ledge.tools/launch
 >
 > Whatever happens is counted on its own page, by the same rules as every
 > other launch.

@@ -263,7 +263,7 @@ export default function Home(): ReactElement {
                 </p>
               </Link>
             ) : (
-              <Link className="card home-door home-launch" href="/method#h-preregistration">
+              <Link className="card home-door home-launch" href="/launch">
                 <span className="kicker card-kicker">LEDGE&rsquo;s own launch, pre-registered</span>
                 <p className="note">
                   Before the token exists: a 3% creator tax, a creator wallet that never buys its

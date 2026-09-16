@@ -142,7 +142,7 @@ describe("the front door, above the fold", () => {
     const door = container.querySelector(".home-launch");
     expect(door).not.toBeNull();
     expect(door?.textContent).toMatch(/pre-registered|measured by LEDGE/);
-    expect(door?.getAttribute("href")).toMatch(/^\/method#h-preregistration$|^\/t\/0x[0-9a-f]{40}$/);
+    expect(door?.getAttribute("href")).toMatch(/^\/launch$|^\/t\/0x[0-9a-f]{40}$/);
     for (const banned of ["score", "rug", "safe", "risk", "likely", "predict", "odds", "chance"]) {
       expect((door?.textContent ?? "").toLowerCase().includes(banned), banned).toBe(false);
     }
