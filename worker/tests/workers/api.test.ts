@@ -613,9 +613,19 @@ describe("the other endpoints", () => {
     expect(response.status).toBe(400);
     expect(await response.text()).toBe("That is not a 20-byte address.");
 
-    const missing = await get("/t");
-    expect(missing.status).toBe(400);
-    expect(await missing.text()).toBe("That is not a 20-byte address.");
+    const empty = await get("/t?address=");
+    expect(empty.status).toBe(400);
+    expect(await empty.text()).toBe("That is not a 20-byte address.");
+  });
+
+  it("GET /t with no address at all is the lookup page, with the form and the bot", async () => {
+    const response = await get("/t");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+    const html = await response.text();
+    expect(html).toContain('<form class="lookup-form" method="get" action="/t">');
+    expect(html).toContain("@ledgetools_bot");
+    expect(html).toContain("Nothing is rated.");
   });
 
   it("the pair token's zero address prints as ETH, never as hex, on the shell", async () => {

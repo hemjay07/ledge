@@ -11,7 +11,7 @@ import { lookupToken } from "./service";
 import { renderCard, renderCardSvg } from "./og";
 import { cardSvg } from "./card";
 import { figureCard, type GraveyardFigure } from "./figures";
-import { tokenShell } from "./html";
+import { lookupShell, tokenShell } from "./html";
 import { headline } from "./text";
 import { numberText } from "./text";
 import {
@@ -503,6 +503,15 @@ export default {
     if (path === "/t") {
       const raw = url.searchParams.get("address") ?? "";
       const found = raw.match(/0x[0-9a-fA-F]{40}/);
+      // No address at all: the lookup page, not an objection (it is the link
+      // the X bio carries, 2026-09-16). A wrong address still gets the
+      // objection, so a form that posted garbage hears so.
+      if (!url.searchParams.has("address")) {
+        return new Response(lookupShell(env.SITE_ORIGIN), {
+          status: 200,
+          headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600", ...CORS },
+        });
+      }
       if (!found) {
         return new Response("That is not a 20-byte address.", {
           status: 400,

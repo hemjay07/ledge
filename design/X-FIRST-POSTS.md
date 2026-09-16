@@ -1,6 +1,6 @@
 # X: profile fields and the first posts
 
-Written 2026-09-16 after the profile image and banner went up. Every rate
+Written 2026-09-16 after the profile image and banner went up; bio and name revised the same day after the profile brainstorm (a number in the bio goes stale; the Telegram handle is not an X handle). Every rate
 below carries its n as CONSTRAINTS.md requires; refresh the figures from
 number.json on the day of posting (the cards refresh themselves).
 
@@ -8,8 +8,8 @@ number.json on the day of posting (the cards refresh themselves).
 
 | Field | Value |
 | --- | --- |
-| Name | LEDGE |
-| Bio (159 chars) | Counts every pons launch on Robinhood Chain: how many graduate, how fast, what happens after. Every figure with its n. Independent; not affiliated with pons. |
+| Name | ledge.tools |
+| Bio (139 chars) | Counts every pons launch on Robinhood Chain. Every rate with its n. No calls, no ratings. Independent of pons. Any address: ledge.tools/t |
 | Location | Robinhood Chain |
 | Website | https://ledge.tools |
 | Pinned | post 1 below, once it is up |

@@ -509,42 +509,9 @@ function topBar(siteOrigin: string): string {
   </header>`;
 }
 
-export function tokenShell(
-  body: Body,
-  text: string,
-  title: string,
-  siteOrigin: string,
-  observedMaxSeconds: number | null = null,
-): string {
-  const address = body.address;
-  const ogImage = `${siteOrigin}/og/t/${address}.png`;
-  const canonical = `${siteOrigin}/t/${address}`;
-  const facts = text.split("\n").map((line) => `<p>${escapeHtml(line)}</p>`).join("\n        ");
-  /* SYMBOL prepended to the title text.ts's headline() builds, never inside
-     it -- text.ts is not touched by this change. The address stays in the
-     meta line below regardless; a symbol is a label on the title, not a
-     replacement for the identity the page is about. */
-  const displayTitle = body.config.symbol === null ? title : `${body.config.symbol} · ${title}`;
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(displayTitle)} — LEDGE</title>
-<link rel="canonical" href="${canonical}">
-<meta name="description" content="${escapeHtml(displayTitle)}">
-<meta property="og:type" content="article">
-<meta property="og:title" content="${escapeHtml(displayTitle)}">
-<meta property="og:description" content="${escapeHtml(text.split("\n")[3] ?? title)}">
-<meta property="og:image" content="${ogImage}">
-<meta property="og:url" content="${canonical}">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="${ogImage}">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
-<style>
+/** The shell's stylesheet, shared by the token page and the bare /t
+    lookup page so the two cannot drift. */
+const SHELL_CSS = `
   :root {
     --ground: #EFEAE0;
     --ground-alt: #E5DFD1;
@@ -642,6 +609,16 @@ export function tokenShell(
     padding: 0.4rem 0.55rem;
   }
   .topbar-input::placeholder { color: var(--ink-3); }
+  /* The bare /t page (lookupShell). */
+  .lookup-main { max-width: 40rem; margin: 0 auto; padding: 3rem 1rem 4rem; }
+  .lookup-title { font-family: var(--font-display); font-size: clamp(2rem, 6vw, 3.25rem); line-height: 1.05; margin: 0 0 1rem; letter-spacing: 0.01em; }
+  .lookup-lede { font-size: 1.05rem; line-height: 1.5; margin: 0 0 1.75rem; color: var(--ink-2); }
+  .lookup-form { display: flex; align-items: stretch; border: 1px solid var(--rule-mid); background: var(--ground-alt); margin: 0 0 1rem; }
+  .lookup-form .topbar-go { padding: 0 1rem; }
+  .lookup-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .lookup-input { font-size: 1rem; padding: 0.7rem 0.75rem; }
+  .lookup-note { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-muted); line-height: 1.5; }
+  .lookup-note a { color: var(--ink); }
   .topbar-input:focus-visible { outline: 2px solid var(--fill); outline-offset: -2px; }
   .topbar-go {
     flex: none;
@@ -840,7 +817,44 @@ export function tokenShell(
 
   footer { color: var(--ink-muted); font-size: 0.8125rem; word-break: break-all; padding: 0 0 1rem; }
   footer p { margin: 0 0 0.4rem; }
-</style>
+`;
+
+export function tokenShell(
+  body: Body,
+  text: string,
+  title: string,
+  siteOrigin: string,
+  observedMaxSeconds: number | null = null,
+): string {
+  const address = body.address;
+  const ogImage = `${siteOrigin}/og/t/${address}.png`;
+  const canonical = `${siteOrigin}/t/${address}`;
+  const facts = text.split("\n").map((line) => `<p>${escapeHtml(line)}</p>`).join("\n        ");
+  /* SYMBOL prepended to the title text.ts's headline() builds, never inside
+     it -- text.ts is not touched by this change. The address stays in the
+     meta line below regardless; a symbol is a label on the title, not a
+     replacement for the identity the page is about. */
+  const displayTitle = body.config.symbol === null ? title : `${body.config.symbol} · ${title}`;
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(displayTitle)} — LEDGE</title>
+<link rel="canonical" href="${canonical}">
+<meta name="description" content="${escapeHtml(displayTitle)}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="${escapeHtml(displayTitle)}">
+<meta property="og:description" content="${escapeHtml(text.split("\n")[3] ?? title)}">
+<meta property="og:image" content="${ogImage}">
+<meta property="og:url" content="${canonical}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${ogImage}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
+<style>${SHELL_CSS}</style>
 </head>
 <body>
   ${topBar(siteOrigin)}
@@ -869,6 +883,40 @@ export function tokenShell(
     </footer>
   </main>
   <script type="application/json" id="ledge-data">${JSON.stringify(body).replace(/</g, "\\u003c")}</script>
+</body>
+</html>`;
+}
+
+/** The page at bare /t: the one thing a reader can do, and nothing else.
+    Until 2026-09-16 a visit with no address got a 400 in plain text, which
+    is the wrong answer for the link a profile bio carries. Same top bar,
+    same form, same stylesheet as the token page. */
+export function lookupShell(siteOrigin: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Look up a token — LEDGE</title>
+<meta name="description" content="Paste a pons token address. LEDGE shows what happened on its curve, counted from the chain.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
+<style>${SHELL_CSS}</style>
+</head>
+<body>
+${topBar(siteOrigin)}
+  <main class="lookup-main">
+    <h1 class="lookup-title">Any pons token, counted.</h1>
+    <p class="lookup-lede">Paste a token address, or the launch URL from ponsfamily.com. The page shows the curve's buys and sells, the first outside buy, how launches like it did, and how old the figures are. Nothing is rated.</p>
+    <form class="lookup-form" method="get" action="/t">
+      <label class="lookup-label" for="lookup-address">Token address</label>
+      <input id="lookup-address" name="address" class="topbar-input mono lookup-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…" autofocus>
+      <button class="topbar-go" type="submit">Look up</button>
+    </form>
+    <p class="lookup-note">Also on Telegram: send any address to @ledgetools_bot. <a href="${siteOrigin}/method">How the figures are counted.</a></p>
+  </main>
 </body>
 </html>`;
 }
