@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { collectText } from "../../src/card";
-import { FIGURE_NAMES, figureCard } from "../../src/figures";
+import { FIGURE_NAMES, MAX_LINE_CHARS, figureCard } from "../../src/figures";
 import { fixtureNumber } from "./helpers";
 
 /* 2026-09-16: a self-attributing image for every figure a post might carry,
@@ -58,5 +58,15 @@ describe("figure cards", () => {
     const card = figureCard("graveyard", fixtureNumber(), { total: 576, watched: 55532, since: "2026-09-07T01:13:15Z" })!;
     expect(collectText(card)).toContain("576");
     expect(collectText(card)).toContain("55,532");
+  });
+
+  it("no body line is wider than the card", () => {
+    const file = fixtureNumber();
+    for (const name of FIGURE_NAMES) {
+      const card = figureCard(name, file, { total: 576, watched: 55385, since: "2026-09-05T00:00:00Z" });
+      for (const t of card?.texts ?? []) {
+        if (t.size >= 28 && t.size <= 30) expect(t.text.length, `${name}: ${t.text}`).toBeLessThanOrEqual(MAX_LINE_CHARS);
+      }
+    }
   });
 });

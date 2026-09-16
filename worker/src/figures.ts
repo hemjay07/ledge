@@ -19,6 +19,10 @@ const GROUND = "#EFEAE0";
 const INK = "#16130F";
 const INK_MUTED = "#57503F";
 const PAD = 64;
+/** The widest a line of the mono face fits between the pads at 28-30 px.
+    A longer line runs off the card (2026-09-16: the graduation card's
+    third line clipped at "Half the graduations took"). */
+export const MAX_LINE_CHARS = 64;
 
 export const FIGURE_NAMES = ["firstbuy", "graduation", "graveyard"] as const;
 
@@ -95,7 +99,8 @@ export function figureCard(name: string, file: NumberFile, graveyard: GraveyardF
       [
         text(rateText(fact), PAD, 330, 150, 600),
         text(`of ${formatCount(w.launches)} launches graduated (${formatCount(w.graduations)}).`, PAD, 392, 30),
-        text(`${rateText(ef)} leaving out graduations under ${formatDuration(w.excludingFast.cutoffSeconds)}. ${median}`, PAD, 470, 28),
+        text(`${rateText(ef)} leaving out graduations under ${formatDuration(w.excludingFast.cutoffSeconds)}.`, PAD, 458, 28),
+        text(median, PAD, 500, 28),
       ],
       stamp,
     );
