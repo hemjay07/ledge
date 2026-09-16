@@ -24,15 +24,34 @@ Security) before the first post. Leave "professional account" off.
 
 ## Post 1, the introduction (pin it)
 
-Image: `https://ledge.tools/og/figure/graduation.png` (save it, then attach).
+Post between 14:00 and 18:00 UTC (15:00 to 19:00 in Abuja). Open
+`https://ledge.tools/og/figure/graduation.png` at post time, save it, and
+copy its three numbers into the text: they drift daily and the card is
+stamped, so the text must match the card. No link in the body; the link
+goes in the first reply.
 
-> LEDGE counts every pons launch on Robinhood Chain.
+> 264,710 pons launches. 4,124 graduated. 1.56%.
 >
-> Since the record began: 264,710 launches, 4,124 graduated (1.56%).
-> Leaving out graduations under 5 minutes: 0.67%.
-> Half the graduations took under 3 minutes (n=4,124).
+> leave out the ones that graduated inside 5 minutes and it's 0.67%.
 >
-> Every figure with its n. Method and data: ledge.tools/method
+> every figure with its n. counted, not rated.
+>
+> n or it didn't happen.
+
+First reply, from the same account, straight after:
+
+> method, data, live index: ledge.tools/method
+> ledge check any address: ledge.tools/t
+
+Then pin the post.
+
+## The three phrases (2026-09-17)
+
+Used the same way every time: "n or it didn't happen." closes posts that
+carry a figure; "ledge check" captions every reply that pastes the bot's
+answer for an address; "Counted." signs off anything else. Memes are about
+the instrument, never about a token; "off the ledge" about a named token is
+a verdict (CONSTRAINTS clause 1) and is not used.
 
 ## Post 2, the first outside buy (next day)
 
