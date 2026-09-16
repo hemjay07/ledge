@@ -173,19 +173,34 @@ export function createGateway(options) {
     }
   }
 
-  /** One batch to the upstreams in order, with the retry passes. */
+  const isNullHeader = (item, a) => item.method === "eth_getBlockByNumber" && a && !a.error && a.result === null;
+
+  /** One batch to the upstreams in order, with the retry passes. A header
+      still null after the fill is retried like a refusal, with the same
+      backoff (2026-09-16 01:1xZ: the primary refused the tick's batch, the
+      fallback held none of the range, the single fill attempt was refused
+      too, and the tick got nulls on every pass). What is still null when
+      the passes run out is returned null, never cached, for the caller to
+      retry. */
   async function forward(items) {
     let lastReason = "no upstream";
+    let answers = null;
+    let pending = items;
     for (let pass = 0; pass <= retryDelays.length; pass++) {
       if (pass > 0) { metrics.retries += 1; await sleep(retryDelays[pass - 1]); }
       for (const up of upstreams) {
-        const out = await sendTo(up, items);
-        if (out.answers) return { answers: await fillMissingHeaders(items, out.answers, up) };
-        lastReason = `${up.url}: ${out.refused}`;
+        const out = await sendTo(up, pending);
+        if (!out.answers) { lastReason = `${up.url}: ${out.refused}`; continue; }
+        const filled = await fillMissingHeaders(pending, out.answers, up);
+        answers = answers === null ? filled : answers.map((a) => filled.find((f) => f.id === a.id) ?? a);
+        pending = pending.filter((item) => isNullHeader(item, answers.find((a) => a.id === item.id)));
+        if (pending.length === 0) return { answers };
+        lastReason = `${up.url}: ${pending.length} headers not held`;
+        break; // the fill already asked the other upstreams for these; back off before asking again
       }
     }
     metrics.exhausted += 1;
-    return { refused: lastReason };
+    return answers === null ? { refused: lastReason } : { answers };
   }
 
   /** A header answered null is not an error to the endpoint -- it simply

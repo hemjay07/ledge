@@ -233,3 +233,24 @@ test("never caches a null header: what no upstream had is asked again next time"
   assert.equal(g.metrics().cache.stored, 1);
   a.close(); b.close();
 });
+
+test("a header no upstream returned on the first pass is asked again after the backoff", async () => {
+  // 2026-09-16 01:1xZ, after the null-cache fix: the primary refused the
+  // tick's header batch, the fallback answered null for the whole range it
+  // did not hold, the one fill attempt at the primary was refused too, and
+  // the tick was handed nulls. One backoff later the primary answered.
+  let primaryCalls = 0;
+  const a = await fakeUpstream((items) => {
+    primaryCalls += 1;
+    return primaryCalls <= 3 ? 429 : ok(items, (i) => (i.method === "eth_blockNumber" ? "0x" + HEAD.toString(16) : { timestamp: "0x1" }));
+  });
+  const b = await fakeUpstream((items) => ok(items, (i) => (i.method === "eth_blockNumber" ? "0x" + HEAD.toString(16) : null)));
+  const g = gw(a, b);
+  const old = "0x" + (HEAD - 5000).toString(16);
+  const out = await g.handle([req("eth_getBlockByNumber", [old, false], 7)]);
+  assert.equal(out.status, 200);
+  assert.equal(out.body[0].id, 7);
+  assert.equal(out.body[0].result.timestamp, "0x1");
+  assert.ok(g.metrics().retries >= 1);
+  a.close(); b.close();
+});
