@@ -36,13 +36,13 @@
             "cutoffSeconds": 300,
             "graduations": 185,
             "insufficient": false,
-            "oneIn": 180,
-            "rate": 0.005556
+            "oneIn": 181,
+            "rate": 0.005539
           },
           "graduations": 410,
           "insufficient": false,
-          "launches": 33298,
-          "rate": 0.012313
+          "launches": 33399,
+          "rate": 0.012276
         },
         {
           "bucket": "Thu",
@@ -360,13 +360,13 @@
             "cutoffSeconds": 300,
             "graduations": 124,
             "insufficient": false,
-            "oneIn": 126,
-            "rate": 0.007912
+            "oneIn": 127,
+            "rate": 0.007861
           },
           "graduations": 305,
           "insufficient": false,
-          "launches": 15673,
-          "rate": 0.01946
+          "launches": 15774,
+          "rate": 0.019336
         },
         {
           "bucket": "19",
@@ -447,12 +447,12 @@
             "graduations": 1049,
             "insufficient": false,
             "oneIn": 145,
-            "rate": 0.006903
+            "rate": 0.0069
           },
           "graduations": 1989,
           "insufficient": false,
-          "launches": 151962,
-          "rate": 0.013089
+          "launches": 152037,
+          "rate": 0.013082
         },
         {
           "bucket": "stable",
@@ -461,12 +461,12 @@
             "graduations": 260,
             "insufficient": false,
             "oneIn": 121,
-            "rate": 0.008262
+            "rate": 0.00826
           },
           "graduations": 838,
           "insufficient": false,
-          "launches": 31468,
-          "rate": 0.02663
+          "launches": 31478,
+          "rate": 0.026622
         },
         {
           "bucket": "stock",
@@ -475,12 +475,12 @@
             "graduations": 462,
             "insufficient": false,
             "oneIn": 183,
-            "rate": 0.005463
+            "rate": 0.005462
           },
           "graduations": 1280,
           "insufficient": false,
-          "launches": 84573,
-          "rate": 0.015135
+          "launches": 84589,
+          "rate": 0.015132
         },
         {
           "bucket": "other",
@@ -504,14 +504,14 @@
             "cutoffSeconds": 300,
             "graduations": 241,
             "insufficient": false,
-            "oneIn": 238,
-            "rate": 0.004194
+            "oneIn": 239,
+            "rate": 0.00419
           },
           "graduations": 508,
           "insufficient": false,
-          "launches": 57459,
+          "launches": 57522,
           "pairClass": "eth",
-          "rate": 0.008841,
+          "rate": 0.008831,
           "taxBucket": "0%"
         },
         {
@@ -521,13 +521,13 @@
             "graduations": 196,
             "insufficient": false,
             "oneIn": 140,
-            "rate": 0.007126
+            "rate": 0.007124
           },
           "graduations": 407,
           "insufficient": false,
-          "launches": 27505,
+          "launches": 27512,
           "pairClass": "eth",
-          "rate": 0.014797,
+          "rate": 0.014794,
           "taxBucket": "1%"
         },
         {
@@ -537,13 +537,13 @@
             "graduations": 514,
             "insufficient": false,
             "oneIn": 104,
-            "rate": 0.009649
+            "rate": 0.009648
           },
           "graduations": 901,
           "insufficient": false,
-          "launches": 53272,
+          "launches": 53277,
           "pairClass": "eth",
-          "rate": 0.016913,
+          "rate": 0.016912,
           "taxBucket": "2-3%"
         },
         {
@@ -585,13 +585,13 @@
             "graduations": 150,
             "insufficient": false,
             "oneIn": 146,
-            "rate": 0.006859
+            "rate": 0.006856
           },
           "graduations": 615,
           "insufficient": false,
-          "launches": 21869,
+          "launches": 21879,
           "pairClass": "stable",
-          "rate": 0.028122,
+          "rate": 0.028109,
           "taxBucket": "0%"
         },
         {
@@ -665,13 +665,13 @@
             "graduations": 250,
             "insufficient": false,
             "oneIn": 171,
-            "rate": 0.005858
+            "rate": 0.005855
           },
           "graduations": 868,
           "insufficient": false,
-          "launches": 42680,
+          "launches": 42696,
           "pairClass": "stock",
-          "rate": 0.020337,
+          "rate": 0.02033,
           "taxBucket": "0%"
         },
         {
@@ -827,12 +827,12 @@
             "graduations": 654,
             "insufficient": false,
             "oneIn": 189,
-            "rate": 0.005295
+            "rate": 0.005291
           },
           "graduations": 2030,
           "insufficient": false,
-          "launches": 123511,
-          "rate": 0.016436
+          "launches": 123600,
+          "rate": 0.016424
         },
         {
           "bucket": "1%",
@@ -841,12 +841,12 @@
             "graduations": 365,
             "insufficient": false,
             "oneIn": 116,
-            "rate": 0.00865
+            "rate": 0.008649
           },
           "graduations": 733,
           "insufficient": false,
-          "launches": 42195,
-          "rate": 0.017372
+          "launches": 42202,
+          "rate": 0.017369
         },
         {
           "bucket": "2-3%",
@@ -855,12 +855,12 @@
             "graduations": 647,
             "insufficient": false,
             "oneIn": 104,
-            "rate": 0.009599
+            "rate": 0.009598
           },
           "graduations": 1158,
           "insufficient": false,
-          "launches": 67404,
-          "rate": 0.01718
+          "launches": 67409,
+          "rate": 0.017179
         },
         {
           "bucket": "4-5%",
@@ -900,16 +900,16 @@
       "tax": 1
     },
     "deployers": {
-      "distinct": 175641,
-      "from10plusShare": 0.206492,
+      "distinct": 175690,
+      "from10plusShare": 0.206577,
       "histogram": [
         {
           "bucket": "1",
-          "deployers": 153319
+          "deployers": 153362
         },
         {
           "bucket": "2-4",
-          "deployers": 18287
+          "deployers": 18292
         },
         {
           "bucket": "5-9",
@@ -917,7 +917,7 @@
         },
         {
           "bucket": "10-49",
-          "deployers": 1141
+          "deployers": 1142
         },
         {
           "bucket": "50+",
@@ -925,14 +925,14 @@
         }
       ],
       "insufficient": false,
-      "launched2plusShare": 0.127089
+      "launched2plusShare": 0.127087
     },
     "excludingFast": {
       "cutoffSeconds": 300,
       "graduations": 1793,
       "insufficient": false,
       "oneIn": 151,
-      "rate": 0.006634
+      "rate": 0.006631
     },
     "fastShares": {
       "insufficient": false,
@@ -942,10 +942,10 @@
     },
     "graduations": 4162,
     "insufficient": false,
-    "launches": 270287,
+    "launches": 270388,
     "lowerBound": false,
     "orphans": 44,
-    "rate": 0.015398,
+    "rate": 0.015393,
     "since": null,
     "ttg": {
       "histogram": [
@@ -1101,10 +1101,10 @@
       "p90": 5454,
       "p95": 20422
     },
-    "until": 1789583828
+    "until": 1789584461
   },
   "chainId": 4663,
-  "crawledAt": "2026-09-16T18:37:08Z",
+  "crawledAt": "2026-09-16T18:47:41Z",
   "definitionsVersion": "2026-09-06",
   "factory": "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e",
   "firstBuy": {
@@ -1113,84 +1113,84 @@
         {
           "bucket": "all",
           "insufficient": false,
-          "launchTxBuy": 55093,
-          "launchTxBuyShare": 0.622358,
-          "n": 88523,
-          "noneShare": 0.363905,
+          "launchTxBuy": 55193,
+          "launchTxBuyShare": 0.622552,
+          "n": 88656,
+          "noneShare": 0.363732,
           "outside": {
-            "after5s": 16734,
-            "none": 32214,
+            "after5s": 16747,
+            "none": 32247,
             "sameBlock": 508,
-            "within1s": 26235,
-            "within3s": 10258,
-            "within5s": 2574
+            "within1s": 26279,
+            "within3s": 10277,
+            "within5s": 2598
           },
-          "sameBlockShare": 0.005739,
-          "within1sShare": 0.302102,
-          "within3sShare": 0.417982,
-          "within5sShare": 0.447059
+          "sameBlockShare": 0.00573,
+          "within1sShare": 0.302145,
+          "within3sShare": 0.418065,
+          "within5sShare": 0.44737
         }
       ],
       "pairClass": [
         {
           "bucket": "eth",
           "insufficient": false,
-          "launchTxBuy": 36963,
-          "launchTxBuyShare": 0.601005,
-          "n": 61502,
-          "noneShare": 0.383028,
+          "launchTxBuy": 37019,
+          "launchTxBuyShare": 0.601133,
+          "n": 61582,
+          "noneShare": 0.382904,
           "outside": {
-            "after5s": 10794,
-            "none": 23557,
+            "after5s": 10803,
+            "none": 23580,
             "sameBlock": 292,
-            "within1s": 18447,
-            "within3s": 7343,
+            "within1s": 18481,
+            "within3s": 7357,
             "within5s": 1069
           },
-          "sameBlockShare": 0.004748,
-          "within1sShare": 0.304689,
-          "within3sShare": 0.424084,
-          "within5sShare": 0.441465
+          "sameBlockShare": 0.004742,
+          "within1sShare": 0.304846,
+          "within3sShare": 0.424312,
+          "within5sShare": 0.441671
         },
         {
           "bucket": "stable",
           "insufficient": false,
-          "launchTxBuy": 7924,
-          "launchTxBuyShare": 0.806268,
-          "n": 9828,
-          "noneShare": 0.264347,
+          "launchTxBuy": 7932,
+          "launchTxBuyShare": 0.806343,
+          "n": 9837,
+          "noneShare": 0.264512,
           "outside": {
             "after5s": 2017,
-            "none": 2598,
+            "none": 2602,
             "sameBlock": 148,
-            "within1s": 3227,
+            "within1s": 3228,
             "within3s": 1175,
-            "within5s": 663
+            "within5s": 667
           },
-          "sameBlockShare": 0.015059,
-          "within1sShare": 0.343407,
-          "within3sShare": 0.462963,
-          "within5sShare": 0.530423
+          "sameBlockShare": 0.015045,
+          "within1sShare": 0.343194,
+          "within3sShare": 0.462641,
+          "within5sShare": 0.530446
         },
         {
           "bucket": "stock",
           "insufficient": false,
-          "launchTxBuy": 9810,
-          "launchTxBuyShare": 0.593431,
-          "n": 16531,
-          "noneShare": 0.352005,
+          "launchTxBuy": 9846,
+          "launchTxBuyShare": 0.594027,
+          "n": 16575,
+          "noneShare": 0.351433,
           "outside": {
-            "after5s": 3775,
-            "none": 5819,
+            "after5s": 3779,
+            "none": 5825,
             "sameBlock": 68,
-            "within1s": 4397,
-            "within3s": 1667,
-            "within5s": 805
+            "within1s": 4406,
+            "within3s": 1672,
+            "within5s": 825
           },
-          "sameBlockShare": 0.004113,
-          "within1sShare": 0.270099,
-          "within3sShare": 0.370939,
-          "within5sShare": 0.419636
+          "sameBlockShare": 0.004103,
+          "within1sShare": 0.269925,
+          "within3sShare": 0.370799,
+          "within5sShare": 0.420573
         },
         {
           "bucket": "other",
@@ -1217,72 +1217,72 @@
         {
           "bucket": "0%",
           "insufficient": false,
-          "launchTxBuy": 27865,
-          "launchTxBuyShare": 0.699388,
-          "n": 39842,
-          "noneShare": 0.283645,
+          "launchTxBuy": 27956,
+          "launchTxBuyShare": 0.69953,
+          "n": 39964,
+          "noneShare": 0.283505,
           "outside": {
-            "after5s": 7869,
-            "none": 11301,
+            "after5s": 7881,
+            "none": 11330,
             "sameBlock": 338,
-            "within1s": 13319,
-            "within3s": 5372,
-            "within5s": 1643
+            "within1s": 13357,
+            "within3s": 5391,
+            "within5s": 1667
           },
-          "sameBlockShare": 0.008484,
-          "within1sShare": 0.342779,
-          "within3sShare": 0.477612,
-          "within5sShare": 0.518849
+          "sameBlockShare": 0.008458,
+          "within1sShare": 0.342683,
+          "within3sShare": 0.47758,
+          "within5sShare": 0.519292
         },
         {
           "bucket": "1%",
           "insufficient": false,
-          "launchTxBuy": 9951,
-          "launchTxBuyShare": 0.81666,
-          "n": 12185,
-          "noneShare": 0.294378,
+          "launchTxBuy": 9952,
+          "launchTxBuyShare": 0.816608,
+          "n": 12187,
+          "noneShare": 0.294412,
           "outside": {
             "after5s": 1938,
-            "none": 3587,
+            "none": 3588,
             "sameBlock": 23,
-            "within1s": 3692,
+            "within1s": 3693,
             "within3s": 2508,
             "within5s": 437
           },
-          "sameBlockShare": 0.001888,
-          "within1sShare": 0.304883,
-          "within3sShare": 0.51071,
-          "within5sShare": 0.546574
+          "sameBlockShare": 0.001887,
+          "within1sShare": 0.304915,
+          "within3sShare": 0.510708,
+          "within5sShare": 0.546566
         },
         {
           "bucket": "2-3%",
           "insufficient": false,
-          "launchTxBuy": 15681,
-          "launchTxBuyShare": 0.500878,
-          "n": 31307,
-          "noneShare": 0.45945,
+          "launchTxBuy": 15688,
+          "launchTxBuyShare": 0.500974,
+          "n": 31315,
+          "noneShare": 0.459428,
           "outside": {
             "after5s": 5978,
-            "none": 14384,
+            "none": 14387,
             "sameBlock": 147,
-            "within1s": 8172,
+            "within1s": 8177,
             "within3s": 2180,
             "within5s": 446
           },
-          "sameBlockShare": 0.004695,
-          "within1sShare": 0.265723,
-          "within3sShare": 0.335356,
-          "within5sShare": 0.349602
+          "sameBlockShare": 0.004694,
+          "within1sShare": 0.265815,
+          "within3sShare": 0.33543,
+          "within5sShare": 0.349673
         },
         {
           "bucket": "4-5%",
           "insufficient": false,
-          "launchTxBuy": 1142,
-          "launchTxBuyShare": 0.424378,
-          "n": 2691,
-          "noneShare": 0.527685,
+          "launchTxBuy": 1143,
+          "launchTxBuyShare": 0.424591,
+          "n": 2692,
+          "noneShare": 0.527489,
           "outside": {
-            "after5s": 619,
+            "after5s": 620,
             "none": 1420,
             "sameBlock": 0,
             "within1s": 474,
@@ -1290,9 +1290,9 @@
             "within5s": 36
           },
           "sameBlockShare": 0.0,
-          "within1sShare": 0.176143,
-          "within3sShare": 0.228911,
-          "within5sShare": 0.242289
+          "within1sShare": 0.176077,
+          "within3sShare": 0.228826,
+          "within5sShare": 0.242199
         },
         {
           "bucket": "6-10%",
@@ -1342,15 +1342,15 @@
           "bucket": "Tue",
           "excludingFast": {
             "cutoffSeconds": 300,
-            "graduations": 20,
+            "graduations": 17,
             "insufficient": false,
-            "oneIn": 300,
-            "rate": 0.003338
+            "oneIn": 334,
+            "rate": 0.002997
           },
-          "graduations": 42,
+          "graduations": 39,
           "insufficient": false,
-          "launches": 5991,
-          "rate": 0.007011
+          "launches": 5673,
+          "rate": 0.006875
         },
         {
           "bucket": "Wed",
@@ -1358,13 +1358,13 @@
             "cutoffSeconds": 300,
             "graduations": 31,
             "insufficient": false,
-            "oneIn": 261,
-            "rate": 0.003825
+            "oneIn": 265,
+            "rate": 0.003778
           },
           "graduations": 53,
           "insufficient": false,
-          "launches": 8105,
-          "rate": 0.006539
+          "launches": 8206,
+          "rate": 0.006459
         },
         {
           "bucket": "Thu",
@@ -1680,15 +1680,15 @@
           "bucket": "18",
           "excludingFast": {
             "cutoffSeconds": 300,
-            "graduations": 7,
+            "graduations": 4,
             "insufficient": false,
-            "oneIn": 124,
-            "rate": 0.008074
+            "oneIn": 162,
+            "rate": 0.006154
           },
-          "graduations": 10,
+          "graduations": 7,
           "insufficient": false,
-          "launches": 867,
-          "rate": 0.011534
+          "launches": 650,
+          "rate": 0.010769
         },
         {
           "bucket": "19",
@@ -1766,15 +1766,15 @@
           "bucket": "eth",
           "excludingFast": {
             "cutoffSeconds": 300,
-            "graduations": 40,
+            "graduations": 37,
             "insufficient": false,
-            "oneIn": 247,
-            "rate": 0.004042
+            "oneIn": 265,
+            "rate": 0.003776
           },
-          "graduations": 64,
+          "graduations": 61,
           "insufficient": false,
-          "launches": 9897,
-          "rate": 0.006467
+          "launches": 9798,
+          "rate": 0.006226
         },
         {
           "bucket": "stable",
@@ -1782,13 +1782,13 @@
             "cutoffSeconds": 300,
             "graduations": 3,
             "insufficient": false,
-            "oneIn": 386,
-            "rate": 0.002588
+            "oneIn": 379,
+            "rate": 0.002641
           },
           "graduations": 7,
           "insufficient": false,
-          "launches": 1159,
-          "rate": 0.00604
+          "launches": 1136,
+          "rate": 0.006162
         },
         {
           "bucket": "stock",
@@ -1796,13 +1796,13 @@
             "cutoffSeconds": 300,
             "graduations": 8,
             "insufficient": false,
-            "oneIn": 364,
-            "rate": 0.002745
+            "oneIn": 353,
+            "rate": 0.002834
           },
           "graduations": 22,
           "insufficient": false,
-          "launches": 2914,
-          "rate": 0.00755
+          "launches": 2823,
+          "rate": 0.007793
         },
         {
           "bucket": "other",
@@ -1815,8 +1815,8 @@
           },
           "graduations": 2,
           "insufficient": false,
-          "launches": 126,
-          "rate": 0.015873
+          "launches": 122,
+          "rate": 0.016393
         }
       ],
       "pairTax": [
@@ -1824,16 +1824,16 @@
           "bucket": "eth/0%",
           "excludingFast": {
             "cutoffSeconds": 300,
-            "graduations": 39,
+            "graduations": 36,
             "insufficient": false,
-            "oneIn": 239,
-            "rate": 0.00418
+            "oneIn": 256,
+            "rate": 0.003905
           },
-          "graduations": 61,
+          "graduations": 58,
           "insufficient": false,
-          "launches": 9331,
+          "launches": 9220,
           "pairClass": "eth",
-          "rate": 0.006537,
+          "rate": 0.006291,
           "taxBucket": "0%"
         },
         {
@@ -1847,9 +1847,9 @@
           },
           "graduations": 1,
           "insufficient": false,
-          "launches": 104,
+          "launches": 111,
           "pairClass": "eth",
-          "rate": 0.009615,
+          "rate": 0.009009,
           "taxBucket": "1%"
         },
         {
@@ -1858,14 +1858,14 @@
             "cutoffSeconds": 300,
             "graduations": 1,
             "insufficient": false,
-            "oneIn": 417,
-            "rate": 0.002398
+            "oneIn": 422,
+            "rate": 0.00237
           },
           "graduations": 2,
           "insufficient": false,
-          "launches": 417,
+          "launches": 422,
           "pairClass": "eth",
-          "rate": 0.004796,
+          "rate": 0.004739,
           "taxBucket": "2-3%"
         },
         {
@@ -1906,14 +1906,14 @@
             "cutoffSeconds": 300,
             "graduations": 3,
             "insufficient": false,
-            "oneIn": 375,
-            "rate": 0.002664
+            "oneIn": 368,
+            "rate": 0.00272
           },
           "graduations": 7,
           "insufficient": false,
-          "launches": 1126,
+          "launches": 1103,
           "pairClass": "stable",
-          "rate": 0.006217,
+          "rate": 0.006346,
           "taxBucket": "0%"
         },
         {
@@ -1986,14 +1986,14 @@
             "cutoffSeconds": 300,
             "graduations": 7,
             "insufficient": false,
-            "oneIn": 398,
-            "rate": 0.002511
+            "oneIn": 385,
+            "rate": 0.002595
           },
           "graduations": 20,
           "insufficient": false,
-          "launches": 2788,
+          "launches": 2698,
           "pairClass": "stock",
-          "rate": 0.007174,
+          "rate": 0.007413,
           "taxBucket": "0%"
         },
         {
@@ -2007,7 +2007,7 @@
           },
           "graduations": 0,
           "insufficient": false,
-          "launches": 38,
+          "launches": 37,
           "pairClass": "stock",
           "rate": 0.0,
           "taxBucket": "1%"
@@ -2071,9 +2071,9 @@
           },
           "graduations": 2,
           "insufficient": false,
-          "launches": 125,
+          "launches": 121,
           "pairClass": "other",
-          "rate": 0.016,
+          "rate": 0.016529,
           "taxBucket": "0%"
         },
         {
@@ -2146,15 +2146,15 @@
           "bucket": "0%",
           "excludingFast": {
             "cutoffSeconds": 300,
-            "graduations": 49,
+            "graduations": 46,
             "insufficient": false,
-            "oneIn": 273,
-            "rate": 0.003665
+            "oneIn": 286,
+            "rate": 0.0035
           },
-          "graduations": 90,
+          "graduations": 87,
           "insufficient": false,
-          "launches": 13370,
-          "rate": 0.006731
+          "launches": 13142,
+          "rate": 0.00662
         },
         {
           "bucket": "1%",
@@ -2167,8 +2167,8 @@
           },
           "graduations": 1,
           "insufficient": false,
-          "launches": 151,
-          "rate": 0.006623
+          "launches": 157,
+          "rate": 0.006369
         },
         {
           "bucket": "2-3%",
@@ -2176,13 +2176,13 @@
             "cutoffSeconds": 300,
             "graduations": 2,
             "insufficient": false,
-            "oneIn": 251,
-            "rate": 0.003992
+            "oneIn": 253,
+            "rate": 0.003953
           },
           "graduations": 4,
           "insufficient": false,
-          "launches": 501,
-          "rate": 0.007984
+          "launches": 506,
+          "rate": 0.007905
         },
         {
           "bucket": "4-5%",
@@ -2222,24 +2222,24 @@
       "tax": 0
     },
     "deployers": {
-      "distinct": 10403,
-      "from10plusShare": 0.138905,
+      "distinct": 10242,
+      "from10plusShare": 0.139347,
       "histogram": [
         {
           "bucket": "1",
-          "deployers": 9284
+          "deployers": 9140
         },
         {
           "bucket": "2-4",
-          "deployers": 952
+          "deployers": 936
         },
         {
           "bucket": "5-9",
-          "deployers": 103
+          "deployers": 101
         },
         {
           "bucket": "10-49",
-          "deployers": 53
+          "deployers": 54
         },
         {
           "bucket": "50+",
@@ -2247,34 +2247,34 @@
         }
       ],
       "insufficient": false,
-      "launched2plusShare": 0.107565
+      "launched2plusShare": 0.107596
     },
     "excludingFast": {
       "cutoffSeconds": 300,
-      "graduations": 51,
+      "graduations": 48,
       "insufficient": false,
-      "oneIn": 276,
-      "rate": 0.003618
+      "oneIn": 289,
+      "rate": 0.003458
     },
     "fastShares": {
       "insufficient": false,
-      "n": 95,
-      "under300Share": 0.463158,
-      "under60Share": 0.284211
+      "n": 92,
+      "under300Share": 0.478261,
+      "under60Share": 0.293478
     },
-    "graduations": 95,
+    "graduations": 92,
     "insufficient": false,
-    "launches": 14096,
+    "launches": 13879,
     "lowerBound": true,
     "orphans": 44,
-    "rate": 0.00674,
-    "since": 1789497428,
+    "rate": 0.006629,
+    "since": 1789498061,
     "ttg": {
       "histogram": [
         {
           "fromSeconds": 0,
           "graduations": 13,
-          "share": 0.136842,
+          "share": 0.141304,
           "toSeconds": 2
         },
         {
@@ -2286,73 +2286,73 @@
         {
           "fromSeconds": 5,
           "graduations": 1,
-          "share": 0.010526,
+          "share": 0.01087,
           "toSeconds": 10
         },
         {
           "fromSeconds": 10,
           "graduations": 7,
-          "share": 0.073684,
+          "share": 0.076087,
           "toSeconds": 20
         },
         {
           "fromSeconds": 20,
           "graduations": 5,
-          "share": 0.052632,
+          "share": 0.054348,
           "toSeconds": 40
         },
         {
           "fromSeconds": 40,
           "graduations": 4,
-          "share": 0.042105,
+          "share": 0.043478,
           "toSeconds": 80
         },
         {
           "fromSeconds": 80,
           "graduations": 4,
-          "share": 0.042105,
+          "share": 0.043478,
           "toSeconds": 160
         },
         {
           "fromSeconds": 160,
           "graduations": 12,
-          "share": 0.126316,
+          "share": 0.130435,
           "toSeconds": 320
         },
         {
           "fromSeconds": 320,
-          "graduations": 14,
-          "share": 0.147368,
+          "graduations": 13,
+          "share": 0.141304,
           "toSeconds": 640
         },
         {
           "fromSeconds": 640,
           "graduations": 11,
-          "share": 0.115789,
+          "share": 0.119565,
           "toSeconds": 1280
         },
         {
           "fromSeconds": 1280,
           "graduations": 11,
-          "share": 0.115789,
+          "share": 0.119565,
           "toSeconds": 2560
         },
         {
           "fromSeconds": 2560,
-          "graduations": 6,
-          "share": 0.063158,
+          "graduations": 5,
+          "share": 0.054348,
           "toSeconds": 5120
         },
         {
           "fromSeconds": 5120,
           "graduations": 2,
-          "share": 0.021053,
+          "share": 0.021739,
           "toSeconds": 10240
         },
         {
           "fromSeconds": 10240,
-          "graduations": 5,
-          "share": 0.052632,
+          "graduations": 4,
+          "share": 0.043478,
           "toSeconds": null
         }
       ],
@@ -2361,71 +2361,71 @@
         {
           "atSeconds": 30,
           "cumulative": 25,
-          "cumulativeShare": 0.263158
+          "cumulativeShare": 0.271739
         },
         {
           "atSeconds": 60,
           "cumulative": 27,
-          "cumulativeShare": 0.284211
+          "cumulativeShare": 0.293478
         },
         {
           "atSeconds": 120,
           "cumulative": 34,
-          "cumulativeShare": 0.357895
+          "cumulativeShare": 0.369565
         },
         {
           "atSeconds": 300,
           "cumulative": 44,
-          "cumulativeShare": 0.463158
+          "cumulativeShare": 0.478261
         },
         {
           "atSeconds": 600,
-          "cumulative": 59,
-          "cumulativeShare": 0.621053
+          "cumulative": 58,
+          "cumulativeShare": 0.630435
         },
         {
           "atSeconds": 900,
-          "cumulative": 68,
-          "cumulativeShare": 0.715789
+          "cumulative": 67,
+          "cumulativeShare": 0.728261
         },
         {
           "atSeconds": 1800,
-          "cumulative": 77,
-          "cumulativeShare": 0.810526
+          "cumulative": 76,
+          "cumulativeShare": 0.826087
         },
         {
           "atSeconds": 3600,
-          "cumulative": 85,
-          "cumulativeShare": 0.894737
+          "cumulative": 83,
+          "cumulativeShare": 0.902174
         },
         {
           "atSeconds": 7200,
-          "cumulative": 90,
-          "cumulativeShare": 0.947368
+          "cumulative": 88,
+          "cumulativeShare": 0.956522
         },
         {
           "atSeconds": 14400,
-          "cumulative": 91,
-          "cumulativeShare": 0.957895
+          "cumulative": 88,
+          "cumulativeShare": 0.956522
         },
         {
           "atSeconds": 21600,
-          "cumulative": 92,
-          "cumulativeShare": 0.968421
+          "cumulative": 89,
+          "cumulativeShare": 0.967391
         }
       ],
       "max": 50277,
-      "n": 95,
+      "n": 92,
       "p10": 1,
-      "p25": 25,
-      "p50": 332,
-      "p75": 1354,
-      "p90": 4322,
-      "p95": 10411
+      "p25": 24,
+      "p50": 319,
+      "p75": 1056,
+      "p90": 3524,
+      "p95": 5829
     },
-    "until": 1789583828
+    "until": 1789584461
   },
-  "headBlock": 64728250,
+  "headBlock": 64734525,
   "outcomes": {
     "cohorts": {
       "pair": [
@@ -2447,9 +2447,9 @@
               "fromProbe": 121,
               "insufficient": false,
               "median": -0.889593,
-              "n": 545,
-              "noTrade": 490,
-              "noTradeShare": 0.899083,
+              "n": 546,
+              "noTrade": 491,
+              "noTradeShare": 0.899267,
               "p25": -0.932127,
               "p75": -0.487126
             },
@@ -2597,9 +2597,9 @@
               "fromProbe": 21,
               "insufficient": false,
               "median": -0.937616,
-              "n": 125,
-              "noTrade": 117,
-              "noTradeShare": 0.936,
+              "n": 126,
+              "noTrade": 118,
+              "noTradeShare": 0.936508,
               "p25": -0.942263,
               "p75": -0.931478
             },
@@ -2858,9 +2858,9 @@
               "fromProbe": 69,
               "insufficient": false,
               "median": -0.872325,
-              "n": 313,
-              "noTrade": 287,
-              "noTradeShare": 0.916933,
+              "n": 314,
+              "noTrade": 288,
+              "noTradeShare": 0.917197,
               "p25": -0.927244,
               "p75": -0.638372
             },
