@@ -6,6 +6,11 @@ number.json on the day of posting (the cards refresh themselves).
 
 ## Profile
 
+Images, regenerated 2026-09-16 (`design/logo/social.mjs`): upload
+`design/logo/finals/social/x-profile-400.png` and `x-header-1500x500.png`
+again. The mark is larger and the banner carries only the mark and the
+wordmark, so nothing on it can go stale.
+
 | Field | Value |
 | --- | --- |
 | Name | ledge.tools |
