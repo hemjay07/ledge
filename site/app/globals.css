@@ -2275,7 +2275,8 @@ footer {
       "table table table table table table table callout callout callout callout callout"
       "finding finding finding finding finding finding finding finding finding finding finding finding"
       "now now now now now now now now now now now now"
-      "d1 d1 d1 d1 d2 d2 d2 d2 d3 d3 d3 d3";
+      "d1 d1 d1 d1 d2 d2 d2 d2 d3 d3 d3 d3"
+      "launch launch launch launch launch launch launch launch launch launch launch launch";
     align-items: start;
   }
   .home-hook {
@@ -2304,6 +2305,11 @@ footer {
   }
   .home-door-3 {
     grid-area: d3;
+  }
+  /* The launch door (2026-09-16) had no area and fell into a one-column
+     leftover under the three doors: a 160 px-wide card, thirty lines tall. */
+  .home-launch {
+    grid-area: launch;
   }
 }
 
