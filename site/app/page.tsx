@@ -6,6 +6,7 @@ import { Shape } from "../components/Shape";
 import { StaleBanner } from "../components/StaleBanner";
 import { Stat } from "../components/Stat";
 import { allTime, numberFile } from "../lib/number";
+import { readLaunch } from "../lib/launch";
 import {
   formatCount,
   formatDayLong,
@@ -74,6 +75,8 @@ function TableRow({
     </tr>
   );
 }
+
+const launch = readLaunch();
 
 export default function Home(): ReactElement {
   const r30 = ladderRung(30);
@@ -247,7 +250,29 @@ export default function Home(): ReactElement {
             <p className="note">Every launch that took no buys in its first 72 hours.</p>
           </Link>
 
-          {/* LEDGE's own launch: pre-registration, then /t/{address} — REVAMP.md 2026-09-12 */}
+          {/* LEDGE's own launch (REVAMP.md 2026-09-12, TODO C3): the
+              pre-registration before the token exists; the token's own page,
+              under the same rules as every other token, after. */}
+          {launch ? (
+            launch.address ? (
+              <Link className="card home-door home-launch" href={`/t/${launch.address}`}>
+                <span className="kicker card-kicker">LEDGE, measured by LEDGE</span>
+                <p className="note">
+                  Our own token, on its own page, with the same readings as every other launch:
+                  buyers in the launch block, first outside buy, fill, and what launches like it did.
+                </p>
+              </Link>
+            ) : (
+              <Link className="card home-door home-launch" href="/method#h-preregistration">
+                <span className="kicker card-kicker">LEDGE&rsquo;s own launch, pre-registered</span>
+                <p className="note">
+                  Before the token exists: a 3% creator tax, a creator wallet that never buys its
+                  own curve, no arranged buys, and every reading published under the same rules as
+                  every other launch. Committed as <span className="mono">{launch.preregistrationCommit}</span>.
+                </p>
+              </Link>
+            )
+          ) : null}
           </HomeLiveProvider>
         </div>
 

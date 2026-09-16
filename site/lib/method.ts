@@ -44,3 +44,12 @@ export function changelogHtml(): string {
   const rest = source.slice(cut + CHANGELOG_HEADING.length);
   return render(rest);
 }
+
+/** PREREGISTRATION.md, rendered the same way (2026-09-16). The file is
+    committed before the launch and its hash is printed beside it, so a
+    reader can check that nothing above its "Outcome" heading changed. */
+export function preregistrationHtml(): string {
+  const source = readFileSync(join(process.cwd(), "..", "PREREGISTRATION.md"), "utf8");
+  const body = source.replace(/^#\s+.*\n/, "");
+  return render(body);
+}

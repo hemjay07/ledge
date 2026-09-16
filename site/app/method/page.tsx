@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { Footer } from "../../components/Footer";
 import { numberFile } from "../../lib/number";
-import { changelogHtml, methodHtml } from "../../lib/method";
+import { changelogHtml, methodHtml, preregistrationHtml } from "../../lib/method";
+import { readLaunch } from "../../lib/launch";
 import { readCoverage } from "../../lib/coverage";
 import { coverageCardText } from "../../lib/coverage-text";
 import { formatDayLong } from "../../lib/format";
@@ -20,6 +21,8 @@ export default function Method(): ReactElement {
   const changelog = changelogHtml();
   const coverage = readCoverage();
   const coverageText = coverage ? coverageCardText(coverage) : null;
+  const launch = readLaunch();
+  const preregistration = preregistrationHtml();
 
   return (
     <main className="sheet">
@@ -139,6 +142,36 @@ export default function Method(): ReactElement {
           <p className="note">{coverageText.coverage}</p>
           <p className="note">{coverageText.launchBlock}</p>
           <p className="note note--fine">{coverageText.freshness}</p>
+        </div>
+      ) : null}
+
+      {launch ? (
+        /* PREREGISTRATION.md, committed before LEDGE's own launch and never
+           edited above its Outcome heading; the hash is how anyone checks. */
+        <div className="card">
+          <div className="card-header">
+            <h2 className="kicker card-kicker">PRE-REGISTRATION</h2>
+            <span className="note note--fine mono">
+              commit {launch.preregistrationCommit} · {formatDayLong(`${launch.preregistrationCommittedOn}T00:00:00Z`)}
+            </span>
+          </div>
+          <p className="note" id="h-preregistration">
+            LEDGE launches its own token on pons. What it expects and what it commits to were
+            written down first, committed to the public repository as{" "}
+            <code>{launch.preregistrationCommit}</code>, and are not edited above the Outcome
+            heading. {launch.address ? (
+              <>
+                The token is live: <a href={`/t/${launch.address}`}>its own page</a> is the record,
+                under the same definitions as every other token.
+              </>
+            ) : (
+              "The token has not launched yet."
+            )}
+          </p>
+          <details className="board-what-counts">
+            <summary>Open the pre-registration</summary>
+            <div className="method" id="h-preregistration-text" dangerouslySetInnerHTML={{ __html: preregistration }} />
+          </details>
         </div>
       ) : null}
 

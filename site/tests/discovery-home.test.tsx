@@ -134,11 +134,18 @@ describe("the front door, above the fold", () => {
     expect(container.querySelectorAll(".entry[data-folio]").length).toBe(0);
   });
 
-  /* Added 2026-09-12: the reserved slot for LEDGE's own launch renders no
-     text -- only the comment REVAMP.md's dated entry names. */
-  it("renders the reserved slot for LEDGE's own launch as nothing", () => {
+  /* 2026-09-16: the reserved slot now carries the pre-registration until
+     the token exists (data/launch.json address null), and the token's own
+     page after. Either way it states facts and links; no verdict word. */
+  it("renders the reserved slot for LEDGE's own launch as the pre-registration door", () => {
     const { container } = render(<Home />);
-    expect(container.textContent ?? "").not.toMatch(/pre-registration/i);
+    const door = container.querySelector(".home-launch");
+    expect(door).not.toBeNull();
+    expect(door?.textContent).toMatch(/pre-registered|measured by LEDGE/);
+    expect(door?.getAttribute("href")).toMatch(/^\/method#h-preregistration$|^\/t\/0x[0-9a-f]{40}$/);
+    for (const banned of ["score", "rug", "safe", "risk", "likely", "predict", "odds", "chance"]) {
+      expect((door?.textContent ?? "").toLowerCase().includes(banned), banned).toBe(false);
+    }
   });
 });
 
@@ -216,10 +223,9 @@ describe("the table, the NOW card and the LIVE card's stale state", () => {
     expect(link?.textContent).toContain(formatCount(manyRows.length));
   });
 
-  it("renders the reserved slot for LEDGE's own launch as nothing", () => {
+  it("carries the pre-registration's commit hash in the launch slot before launch", () => {
     const { container } = render(<Home />);
-    // the slot is a JSX comment only -- nothing it could render is on the page
-    expect(container.textContent ?? "").not.toMatch(/pre-registration/i);
+    expect(container.querySelector(".home-launch")?.textContent).toMatch(/[0-9a-f]{7}|measured by LEDGE/);
   });
 
   it("takes is-stale on the LIVE card's header when the fixture says the live index is stale", async () => {
