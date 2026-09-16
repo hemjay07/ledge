@@ -52,6 +52,25 @@ Cloudflare D1 database over its HTTP API, in a loop. See `INDEXER.md` section
    RPC_BUDGET=400
    ```
 
+   Launch-day ticker (optional; `worker/host/ticker.ts`). Set either key
+   and the runner posts one message to the room and edits it in place
+   after every tick, at most once per `TICKER_INTERVAL_MS`:
+
+   ```
+   LEDGE_LAUNCH_AT=2026-09-19T16:00:00Z   # before the launch: a countdown
+   LEDGE_TOKEN_ADDRESS=0x...              # after: the live reading
+   TELEGRAM_TICKER_CHAT_ID=               # defaults to TELEGRAM_GRAVEYARD_CHAT_ID
+   TICKER_INTERVAL_MS=60000
+   TICKER_HOURS=24                        # then one final edit, never touched again
+   TICKER_STATE_PATH=/home/ledge/ticker-state.json
+   ```
+
+   The message id lives in `TICKER_STATE_PATH`, so restarting the unit
+   (`systemctl restart ledge-tick`) after setting the address keeps editing
+   the countdown message rather than posting a second one. Delete the file
+   to start a fresh message. The text is the /t page's own sentences
+   (`worker/src/ticker.ts`); an unreadable chain leaves the message as it is.
+
    ```bash
    sudo mkdir -p /etc/ledge
    sudo touch /etc/ledge/env

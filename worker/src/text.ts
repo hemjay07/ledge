@@ -401,7 +401,7 @@ export function lookupText(
     One sentence a reader can act on. "Died" keeps the
     meaning outcomeWord gives it: older than the slowest graduation on
     record with no PoolGraduated seen -- a settled fact, not a forecast. */
-function stateSentence(body: Omit<TokenResponse, "text">, observedMaxSeconds: number | null): string {
+export function stateSentence(body: Omit<TokenResponse, "text">, observedMaxSeconds: number | null): string {
   const elapsed = body.state.elapsedSeconds;
   const ago = elapsed === null ? null : `${formatAgeLong(elapsed)} ago`;
   const word = outcomeWord(body, observedMaxSeconds);

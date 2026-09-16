@@ -139,6 +139,22 @@ and the digest has posted on two consecutive days.
 Worker and the box, webhook set (pending 0, no error). Not yet observed: a
 post in the room, the first digest (12:05 UTC tomorrow).*
 
+**B7. Launch day, in order** (2026-09-16, the four builds from the launch
+brainstorm; 1, 2 and 3 are built and tested, 4 is wired and waits for the
+address). *Owner's steps in italics.*
+1. *Fill the launch window in `PREREGISTRATION.md`, commit.* The hash
+   beside PRE-REGISTRATION on `/method` is the commit that froze it.
+2. *On the box, add `LEDGE_LAUNCH_AT=<ISO>` to `/etc/ledge/env` and
+   `systemctl restart ledge-tick`.* The countdown message appears in the
+   room within a minute. Post the failure clause on X the day before.
+3. *Launch on pons. Put the address in `LEDGE_TOKEN_ADDRESS` on the box,
+   restart the unit.* The countdown message becomes the live ticker.
+4. *Set `data/launch.json` `address` and `launchAt`, push.* The homepage
+   slot flips to `/t/{address}` on the next Vercel build.
+5. Three hours after: post "LEDGE launched, here is what happened" with
+   `/og/figure/firstbuy.png` or the `/t` card, and the page link.
+Figure cards for posts: `https://ledge.tools/og/figure/{firstbuy,graduation,graveyard}.png`.
+
 **B6. The token's success metric.** Referral visits to ledge.tools from the
 token page and the room in the first week, published on `/t/{our address}`
 — not fees (BRAINSTORM-2026-09-13, "What to adjust"). Goes into `LAUNCH.md`

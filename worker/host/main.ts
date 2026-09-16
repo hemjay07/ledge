@@ -11,7 +11,10 @@ import { readFile } from "node:fs/promises";
 import type { Env } from "../src/env";
 import { RpcClient } from "../src/rpc";
 import { tick, type TickResult } from "../src/tick";
+import { lookupToken } from "../src/service";
+import { editMessage, postMessage, withinLimits } from "../src/telegram";
 import { D1HttpClient } from "./d1-http";
+import { runTicker, tickerConfigFromEnv, tickerDepsFor } from "./ticker";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -132,6 +135,9 @@ export interface LoopOptions {
   /** Resolves once SIGTERM/SIGINT has asked the loop to stop after the
       in-flight tick. Injectable so tests never touch real signal handlers. */
   shouldStop?: () => boolean;
+  /** Runs after every tick, success or not (the launch-day ticker). Its
+      errors are logged and never stop the loop. */
+  afterTick?: () => Promise<void>;
 }
 
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -153,12 +159,41 @@ export async function runLoop(env: Env, options: LoopOptions): Promise<void> {
     } catch (error) {
       console.error("tick threw", error instanceof Error ? error.stack ?? error.message : String(error));
     }
+    if (options.afterTick) {
+      try {
+        await options.afterTick();
+      } catch (error) {
+        console.error("afterTick threw", error instanceof Error ? error.message : String(error));
+      }
+    }
     if (options.once) return;
     if (shouldStop()) return;
     const elapsed = Date.now() - startedAt;
     const remaining = Math.max(0, options.intervalMs - elapsed);
     if (remaining > 0) await sleep(remaining);
   } while (!shouldStop());
+}
+
+/** The launch-day ticker (worker/host/ticker.ts), throttled to its own
+    interval inside the tick loop so it never needs a second process. */
+function tickerHook(env: Env, config: HostConfig): (() => Promise<void>) | undefined {
+  const tickerConfig = tickerConfigFromEnv(process.env, config.siteOrigin);
+  if (!tickerConfig) return undefined;
+  const intervalMs = Number(process.env.TICKER_INTERVAL_MS ?? 60_000);
+  const statePath = process.env.TICKER_STATE_PATH ?? "/home/ledge/ticker-state.json";
+  const deps = tickerDepsFor(env, statePath, {
+    lookup: (address, nowMs) => lookupToken(env, address, nowMs),
+    post: postMessage,
+    edit: editMessage,
+    allowed: (e, chatId) => withinLimits(e.LEDGE_DB, chatId, Math.floor(Date.now() / 1000)),
+  });
+  let lastRun = 0;
+  return async () => {
+    if (Date.now() - lastRun < intervalMs) return;
+    lastRun = Date.now();
+    const result = await runTicker(tickerConfig, deps);
+    console.log(`ticker ${result}`);
+  };
 }
 
 async function main(): Promise<void> {
@@ -185,6 +220,7 @@ async function main(): Promise<void> {
     tickFn: (e, nowSeconds) =>
       tick(e, nowSeconds, new RpcClient(config.rpcUrl, undefined, config.rpcUrlFallback, undefined, config.rpcBudget)),
     shouldStop: () => stopping,
+    afterTick: tickerHook(env, config),
   });
 
   process.exit(0);

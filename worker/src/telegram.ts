@@ -137,3 +137,59 @@ export async function sendMessage(
     return false;
   }
 }
+
+/** A message post that returns Telegram's message_id, for a message the
+    sender means to edit later (the launch-day ticker, worker/src/ticker.ts).
+    Null when Telegram refused or the token is unset. Never throws. */
+export async function postMessage(
+  env: Env,
+  chatId: number | string,
+  text: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<number | null> {
+  if (!env.TELEGRAM_BOT_TOKEN) return null;
+  try {
+    const response = await fetchImpl(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+    });
+    if (!response.ok) {
+      console.error(`telegram: sendMessage ${response.status}`);
+      return null;
+    }
+    const body = (await response.json()) as { result?: { message_id?: number } };
+    return typeof body.result?.message_id === "number" ? body.result.message_id : null;
+  } catch (error) {
+    console.error(`telegram: sendMessage failed: ${String(error).slice(0, 200)}`);
+    return null;
+  }
+}
+
+/** Edits a message in place. Telegram answers 400 "message is not modified"
+    when the text is unchanged; that is treated as success, since the message
+    already says what it should. Never throws. */
+export async function editMessage(
+  env: Env,
+  chatId: number | string,
+  messageId: number,
+  text: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!env.TELEGRAM_BOT_TOKEN) return false;
+  try {
+    const response = await fetchImpl(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, disable_web_page_preview: true }),
+    });
+    if (response.ok) return true;
+    const detail = await response.text().catch(() => "");
+    if (response.status === 400 && detail.includes("message is not modified")) return true;
+    console.error(`telegram: editMessageText ${response.status}`);
+    return false;
+  } catch (error) {
+    console.error(`telegram: editMessageText failed: ${String(error).slice(0, 200)}`);
+    return false;
+  }
+}
