@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DIGEST_CRON, DIGEST_HOUR_UTC, digestDayKey, digestText, shouldPostDigest } from "../../src/digest";
 import { fixtureNumber, NOW_SECONDS } from "./helpers";
 
-/* BRAINSTORM-2026-09-13 §2: the room is the first push channel, and the
+/* the 13 Sep brainstorm (internal notes) §2: the room is the first push channel, and the
    digest is one message a day from number.json. The Worker formats what
    stats.py published; it computes nothing (gate 2). */
 describe("the daily digest text", () => {

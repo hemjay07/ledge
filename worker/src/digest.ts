@@ -1,6 +1,6 @@
 /* The daily digest: one message a day to the room, from number.json.
 
-   BRAINSTORM-2026-09-13 §2: every pons account that gets quoted posts; a
+   the 13 Sep brainstorm (internal notes) §2: every pons account that gets quoted posts; a
    correct page at a URL waits. So the room carries, besides graduations as
    they land, one message a day with the published 24-hour figures, each
    with its n. Everything here is read from the file stats.py wrote and

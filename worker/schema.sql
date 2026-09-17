@@ -109,7 +109,7 @@ CREATE INDEX IF NOT EXISTS graduation_ts_idx    ON graduation (ts DESC);
 -- covering the whole board population, never a per-curve RPC call.
 --
 -- launch_tx_buy / first_outside_buy_block / first_outside_buy_ts
--- (2026-09-14, design/FIRSTBUY-TOKEN-BRIEF.md). MOAT.md #3's per-token
+-- (2026-09-14, design/FIRSTBUY-TOKEN-BRIEF.md). the moat note (internal) #3's per-token
 -- surface: the launch's own opening buy, kept apart from the first buy from
 -- anyone else, exactly as design/FIRSTBUY-BRIEF.md's pipeline-side crawl
 -- keeps `inLaunchTx` apart from the first outside buy in `data/firstbuys/`.
