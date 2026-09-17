@@ -16,6 +16,7 @@ describe("/launch", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("2.52% graduated (588 of 23,353)");
     expect(text).toContain("record as of 12 Sep 2026");
+    expect(text).toContain("launches 19 Sep 2026, 16:00 UTC");
   });
 
   it("carries the three commitments and the commit hash from data/launch.json", () => {

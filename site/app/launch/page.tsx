@@ -24,6 +24,15 @@ export const metadata: Metadata = {
     "LEDGE launches a token on pons. What it expects and what it commits to were written down and committed before the launch, and are counted afterwards by the same rules as every other launch.",
 };
 
+/** "19 Sep 2026, 16:00 UTC" from the ISO stamp in data/launch.json. */
+function launchLabel(iso: string): string {
+  const d = new Date(iso);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${hh}:${mm} UTC`;
+}
+
 const COMMITMENTS = [
   {
     what: "The creator wallet does not buy on the curve.",
@@ -51,7 +60,7 @@ export default function LaunchPage(): ReactElement {
         <div className="card-header">
           <span className="kicker card-kicker">LEDGE&rsquo;s own launch</span>
           <span className="mono token-status">
-            {launch?.address ? "live" : launch?.launchAt ? `launches ${launch.launchAt}` : "not launched yet"}
+            {launch?.address ? "live" : launch?.launchAt ? `launches ${launchLabel(launch.launchAt)}` : "not launched yet"}
           </span>
         </div>
         <div className="card-body">
@@ -79,8 +88,10 @@ export default function LaunchPage(): ReactElement {
         <div className="card-body">
           <p className="note">
             LEDGE, on pons, Robinhood Chain. Paired with ETH, graduation threshold 4.2 ETH, creator
-            tax 3%. The launch day and hour are the last thing set; the document is frozen the
-            moment they are.
+            tax 3%.{" "}
+            {launch?.launchAt
+              ? `Launch: ${launchLabel(launch.launchAt)}, chosen for when most of the venue is awake, not from the hour-of-day rates.`
+              : "The launch day and hour are the last thing set; the document is frozen the moment they are."}
           </p>
         </div>
       </section>
