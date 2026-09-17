@@ -1,16 +1,22 @@
 # Pre-registration: LEDGE's own launch
 
-**DRAFT — not published, not signed off.** Written 2026-09-12 from
-`data/number.json` as of crawl 2026-09-12T06:06Z. `REVAMP.md` 1.5 says this
-must exist, dated and immutable, before the token does, or it is worthless.
-When the owner signs off it is committed, the commit hash goes in the
-homepage slot and on `/method`, and nothing above the "Outcome" heading is
-edited again.
+**Frozen 2026-09-17.** Written 2026-09-12 from `data/number.json` as of
+crawl 2026-09-12T06:06Z. `REVAMP.md` 1.5 says this must exist, dated and
+immutable, before the token does, or it is worthless. The commit that
+carries this line is the hash shown in the homepage slot, on `/launch` and
+on `/method`; nothing above the "Outcome" heading is edited after it.
 
 **Owner decisions, 2026-09-12.** Creator tax **3%**. Both commitments below
-confirmed **as written**. The launch is intended **within the next few
-days**; the exact day and hour UTC is the one blank left, and this file is
-frozen the moment it is filled in.
+confirmed **as written**.
+
+**Launch window, decided 2026-09-17: Friday 19 September 2026, 16:00 UTC.**
+Chosen for when most of the venue is awake: 58% of all pons launches on
+record are made between 14:00 and 24:00 UTC (n = 273,991), and 16:00 is the
+middle of that band. It was not chosen from the hour-of-day graduation
+rates, which this document says below it does not use. Friday happens to be
+the day with the highest rate excluding fast graduations on the record as of
+this date (0.95% of 17,566); that is noted so nobody can later say it was
+hidden, and it played no part in the choice.
 
 ## What this is and is not
 
@@ -112,6 +118,6 @@ document does not claim the data supports that choice.
 graduation share in the record, 2.52%; 4–5% halves it to 0.77%), and
 commitments 1 and 2 confirmed as written.
 
-**Still blank:** the launch window — day and hour UTC. It is the last thing
-this file needs, and it is deliberately the last thing decided, because the
-data layer has to be solid before the launch post points at it.
+**Filled 2026-09-17:** the launch window, above. It was the last thing
+decided, deliberately, because the data layer had to be solid before the
+launch post pointed at it.
