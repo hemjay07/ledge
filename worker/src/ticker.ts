@@ -35,7 +35,7 @@ export function countdownText(launchAt: string | null, siteOrigin: string): stri
   return [
     `LEDGE on pons: ${when}.`,
     "Once the curve exists this message becomes the live ticker: fill, buys, sells, the first outside buy. Edited every minute.",
-    `Pre-registration: ${siteOrigin}/method#h-preregistration`,
+    `Pre-registration: ${siteOrigin}/launch`,
   ].join("\n");
 }
 

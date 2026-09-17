@@ -22,7 +22,7 @@ describe("ticker text", () => {
   it("counts down before the address exists", () => {
     const text = countdownText("2026-09-17T16:00:00Z", SITE);
     expect(text).toContain("launches 17 Sep, 16:00 UTC");
-    expect(text).toContain(`${SITE}/method#h-preregistration`);
+    expect(text).toContain(`${SITE}/launch`);
   });
 
   it("prints the live reading with the same sentences as the /t page, and no rate without its n", () => {
