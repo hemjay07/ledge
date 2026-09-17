@@ -168,7 +168,7 @@ describe("the live board's own row model", () => {
     const row = live.rows[0]!;
     const pct = fillPercent(row.fill!.reserveWei, row.fill!.graduationThresholdWei);
     expect(pct).not.toBeNull();
-    expect(container.textContent).toContain(`${(pct as number).toFixed(1)}%`);
+    expect(container.textContent).toContain(`${(pct as number).toFixed(1)}% filled`);
   });
 
   /* The window sentence moved from a per-row cell into the table's own

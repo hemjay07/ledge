@@ -335,7 +335,10 @@ export function FillBody({ row, compact = false }: { row: Row; compact?: boolean
           {figures}
           {pct === null ? null : " · "}
         </span>
-        {pct === null ? null : <>{pct.toFixed(1)}%</>}
+        {/* "filled", not a bare percentage: on a phone the quantities are
+            hidden and the figure stood alone with nothing saying what it was
+            (2026-09-17). */}
+        {pct === null ? null : <>{pct.toFixed(1)}% filled</>}
       </p>
       {compact || threshold.scaled ? null : (
         <p className="note note--fine">

@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { LedgerEntry } from "./LedgerEntry";
+import { Scroller } from "./Scroller";
 
 export interface RegisterCell {
   text?: string;
@@ -58,7 +59,7 @@ export function Register(props: RegisterProps): ReactElement {
   }
 
   const table = (
-    <div className="scroller" tabIndex={0} role="group" aria-label={ariaLabel}>
+    <Scroller ariaLabel={ariaLabel}>
       <table>
         <caption>{caption}</caption>
         <thead>
@@ -99,7 +100,7 @@ export function Register(props: RegisterProps): ReactElement {
           </tfoot>
         ) : null}
       </table>
-    </div>
+    </Scroller>
   );
 
   if (folio === undefined || heading === undefined || headingId === undefined) {

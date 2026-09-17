@@ -583,12 +583,11 @@ a:focus-visible,
   .entry {
     padding-left: 0;
   }
+  /* On a phone the folio has no margin to sit in; printed above the heading
+     it was a lone "02" with nothing beside it (2026-09-17). The heading
+     carries the entry; the number is a desktop margin mark. */
   .entry::before {
-    position: static;
-    display: block;
-    width: auto;
-    text-align: left;
-    margin-bottom: var(--s-2);
+    display: none;
   }
   /* The gutter rule goes with the gutter. It marks the edge of a column that
      no longer exists at this width, so left where it was it simply runs down
@@ -2315,6 +2314,10 @@ footer {
 
 .home-rest {
   margin: var(--s-8) 0 0;
+}
+
+.scroller-hint {
+  margin-top: var(--s-2);
 }
 
 /* /method: the five-line brief at the top (2026-09-17). */
