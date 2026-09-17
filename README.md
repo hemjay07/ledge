@@ -54,10 +54,12 @@ gateway/    The RPC gateway the crawl and the indexer read through: pacing, fail
 site/       Next.js static export on Vercel. Reads number.json at build; /api and /t go to the Worker.
 contracts/  LedgeOracle: the headline reading mirrored on Robinhood Chain, rates with their counts.
 ops/        systemd units for the box; the stall alert.
+docs/       Architecture, the indexer, deployment, incidents, the pons contracts.
 ```
 
-`ARCHITECTURE.md` and `INDEXER.md` explain the two layers, `DEPLOY.md` how to
-stand them up, `INCIDENTS.md` what has gone wrong and what guards it now.
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/INDEXER.md`](docs/INDEXER.md)
+explain the two layers, [`docs/DEPLOY.md`](docs/DEPLOY.md) how to stand them up,
+[`docs/INCIDENTS.md`](docs/INCIDENTS.md) what has gone wrong and what guards it now.
 
 ## Tests
 
@@ -75,3 +77,8 @@ bash scripts/lint-copy.sh           # no banned copy on any public surface
 A change to any window, cutoff or bucket is a dated entry in `METHOD.md`
 and on the site's changelog, with the figures that moved. Nothing is
 renamed quietly and no ugly number is taken down.
+
+## License
+
+Code under [MIT](LICENSE). The record in `data/` under
+[CC BY 4.0](data/LICENSE): use it freely, say it came from LEDGE.

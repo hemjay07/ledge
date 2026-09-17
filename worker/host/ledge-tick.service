@@ -1,6 +1,6 @@
 [Unit]
 Description=LEDGE live indexer (worker/src/tick.ts under Node, worker/host/main.ts)
-Documentation=https://github.com/hemjay07/ledge/blob/main/INDEXER.md
+Documentation=https://github.com/hemjay07/ledge/blob/main/docs/INDEXER.md
 After=network-online.target ledge-gateway.service
 Wants=network-online.target
 
