@@ -32,7 +32,7 @@ matters on a launch day and not before, and the migration is still available
 later — nothing here forecloses it.
 
 **Then tell me it resolves**, and I will make the two edits that are mine: the
-links in `OUTREACH.md` and `LAUNCH.md` move from the Vercel alias to
+links in the outreach note (internal) and `LAUNCH.md` move from the Vercel alias to
 `ledge.tools`. Do not send anything with a `ledge.tools` link before that,
 because a dead link in the first line of a pitch ends the pitch.
 
@@ -66,7 +66,7 @@ site down rather than moving it.
    are set the Worker answers by fetching the file over HTTP from the site,
    which is the coupling KV exists to remove. On launch day that coupling means
    one slow site makes the API slow too.
-7. **Update the links in `OUTREACH.md` and `LAUNCH.md`** from the Vercel alias
+7. **Update the links in the outreach note (internal) and `LAUNCH.md`** from the Vercel alias
    back to `ledge.tools`.
 
 Steps 1, 2, 3, 5 and 6 are yours: they need dashboard access and credentials
@@ -142,7 +142,7 @@ curl "https://api.telegram.org/bot$TOKEN/setWebhook" \
 
 ## 4. Oracle (Robinhood Chain)
 
-Follow `README.md` → "On-chain oracle" → "One-time setup". Summary: two keys (owner offline, writer in CI), fund the writer with ~0.003 ETH for a month at the 6-hourly cadence (0.012 ETH if you set `LEDGE_ORACLE_EVERY_RUN=1`), deploy with `forge script`, then set the repo secret `LEDGE_ORACLE_KEY` and the variable `LEDGE_ORACLE_ADDRESS`. The crawl workflow's `oracle` job starts publishing at 00/06/12/18 UTC.
+Full detail in the "On-chain oracle" appendix at the end of this file. Summary: two keys (owner offline, writer in CI), fund the writer with ~0.003 ETH for a month at the 6-hourly cadence (0.012 ETH if you set `LEDGE_ORACLE_EVERY_RUN=1`), deploy with `forge script`, then set the repo secret `LEDGE_ORACLE_KEY` and the variable `LEDGE_ORACLE_ADDRESS`. The crawl workflow's `oracle` job starts publishing at 00/06/12/18 UTC.
 
 ## 5. Weekly dispatch (optional)
 
@@ -186,3 +186,160 @@ Worker is deployed from your machine with `wrangler`, never from CI.
 - Paste a live token into the lookup: it answers within ~2 s.
 - `api.ledge.tools/api/live` returns rows with no `0x` in them.
 - The oracle's `latest()` on Blockscout matches `number.json` after the next 6-hour mark.
+
+---
+
+# Appendix: the oracle and the dispatch in full (moved from README.md, 2026-09-17)
+
+## On-chain oracle
+
+The same reading `data/number.json` carries is mirrored on Robinhood Chain by
+`contracts/src/LedgeOracle.sol`, so a contract can read the Pons Number without
+trusting a web server. One packed storage slot holds both rates in basis points
+**and both counts**, so a reader never has a rate without its denominator. The
+contract has no proxy, no upgrade path, no pause, and no way to change a stored
+reading except by publishing a newer one: `crawledAt` must strictly increase, so
+a stalled publisher shows up on-chain as a reading that stopped advancing.
+
+`pipeline/publish_oracle.py` reads `data/number.json`, refuses to send when the
+24h window is flagged insufficient, signs an EIP-1559 transaction (stdlib only:
+`pipeline/secp256k1.py`, no web3 and no Foundry at run time), then reads the
+contract back and diffs all six fields against the file, exiting non-zero on a
+mismatch. It runs as a separate `continue-on-error` job in `crawl.yml`, after
+the data commit, so a failed publish can never block or dirty the dataset.
+
+```
+forge test                                  # in contracts/
+python pipeline/publish_oracle.py --dry-run # derive the reading, send nothing
+```
+
+### Cost
+
+Measured with `forge test --gas-report` (optimizer on, 200 runs): 589,740 gas to
+deploy, 55,760 gas for the first publish (cold slot), **38,660 gas for every
+publish after it**. `eth_estimateGas` on Robinhood Chain returns no L1 data
+surcharge for this call and receipts report `gasUsedForL1: 0x0`, so the L2
+number is the whole cost.
+
+At the 0.3696 gwei base fee read from the chain (`eth_gasPrice`, priority fee 0):
+
+| | gas | ETH |
+|---|---|---|
+| deploy, once | 589,740 | 0.000218 |
+| first publish | 55,760 | 0.0000206 |
+| each hourly publish | 38,660 | 0.0000143 |
+| one month, 720 publishes | 27,835,200 | 0.0103 |
+
+Fund the writer one month at a time and no further — 0.012 ETH covers a month
+with headroom. The gas price is read fresh on every run and printed in the job
+log; if it moves, the log moves with it.
+
+### One-time setup
+
+Run once, by hand. Nothing below is automated, and no key in this repo.
+
+1. **Generate two keys offline.** The owner key never touches CI; its only job
+   is `setWriter` if the writer key is ever exposed.
+   ```
+   cast wallet new        # owner  — write the key down offline, do not export it
+   cast wallet new        # writer — this one becomes a GitHub secret
+   ```
+
+2. **Fund the writer** with about 0.012 ETH on Robinhood Chain (a month of
+   publishes at the rate in the table above) and the owner with enough for the
+   deploy plus a rotation, about 0.001 ETH.
+
+3. **Deploy**, with the owner key. `--interactives 1` prompts for the key
+   instead of putting it in the shell history.
+   ```
+   cd contracts
+   export ETH_RPC_URL=https://rpc.mainnet.chain.robinhood.com
+   export LEDGE_ORACLE_WRITER=0x<the writer address from step 1>
+   forge script script/Deploy.s.sol:Deploy --rpc-url "$ETH_RPC_URL" \
+     --broadcast --interactives 1
+   ```
+   The deployer becomes `owner` and the address in `LEDGE_ORACLE_WRITER` becomes
+   `writer`; the run prints the contract address.
+
+4. **Check what was deployed** before trusting it.
+   ```
+   cast call <address> "owner()(address)"  --rpc-url "$ETH_RPC_URL"
+   cast call <address> "writer()(address)" --rpc-url "$ETH_RPC_URL"
+   ```
+   `setWriter` rotates the writer later without a redeploy — one transaction from
+   the owner key, no new address anywhere:
+   ```
+   cast send <address> "setWriter(address)" 0x<next> --rpc-url "$ETH_RPC_URL" --interactive
+   ```
+
+5. **Verify the source on Blockscout**, so the NatSpec is readable next to the
+   numbers.
+   ```
+   forge verify-contract <address> src/LedgeOracle.sol:LedgeOracle \
+     --chain 4663 \
+     --constructor-args $(cast abi-encode "constructor(address)" "$LEDGE_ORACLE_WRITER") \
+     --verifier blockscout \
+     --verifier-url https://robinhoodchain.blockscout.com/api
+   ```
+   That host answers non-browser clients with a bot challenge (HTTP 403/500 to
+   curl and to Foundry's user agent, checked 2026-09-06), so the command may
+   fail without ever reaching the verifier. If it does, produce the standard
+   JSON input and paste it into the explorer's own verify form:
+   ```
+   forge verify-contract <address> src/LedgeOracle.sol:LedgeOracle \
+     --show-standard-json-input > LedgeOracle.verify.json
+   ```
+   Verification is cosmetic — it changes nothing about what the contract does —
+   so a blocked verifier is not a reason to delay the deploy.
+
+6. **Tell the workflow**, in the repo's Settings:
+   - secret `LEDGE_ORACLE_KEY` — the writer's private key from step 1
+   - variable `LEDGE_ORACLE_ADDRESS` — the contract address from step 3
+
+   The oracle job is skipped entirely while either is absent.
+
+7. **Watch the first run.** The next hourly crawl that commits data runs the
+   oracle job; its log prints the reading, the gas, the cost, and the read-back
+   diff. To trigger one by hand, run the crawl workflow from the Actions tab.
+
+### Rotating a leaked writer key
+
+`cast send <address> "setWriter(address)" 0x<new writer>` from the owner key,
+then replace the `LEDGE_ORACLE_KEY` secret. The old key can do nothing from the
+next block onward. The writer holds gas and nothing else: it can call `publish`
+and no other function, and `publish` can only move `crawledAt` forward.
+
+
+## Weekly dispatch
+
+`pipeline/dispatch.py` composes one email a week from the committed record:
+the trailing 7-day figure and the excluding-fast figure as "1 in N", the two
+furthest-apart rows of the pair-token and creator-tax cohorts, the p50 and p90
+time to graduation, and one fact drawn from the published ladder. Every figure
+is a count or a rate that came out of `pipeline/stats.py`, with its n and its
+window; the module formats and selects, and computes nothing.
+
+The 7-day window is deliberately **not** a key in `data/number.json`. It could
+be — `stats.window` takes any interval and the site's Zod schema is not
+`.strict()` — but that file is covered byte-for-byte by `recompute.py --check`
+and frozen again in `tests/vectors/`, and the dispatch is not reason enough to
+move a file other consumers are pinned to. If a second consumer ever needs the
+window it belongs in `number.json`, with a dated `/method` entry.
+
+```bash
+python pipeline/dispatch.py --dry-run   # writes dispatch/preview.{txt,html}, opens no socket
+python pipeline/dispatch.py             # sends, given RESEND_API_KEY and RESEND_AUDIENCE_ID
+```
+
+`.github/workflows/dispatch.yml` runs it on Monday at 09:00 UTC, uploads the
+preview as an artifact on every path, and sends only when both secrets exist.
+
+### Mailing list
+
+There is no sign-up form on the site, and there will not be one until it can be
+built without breaking CONSTRAINTS §8 — nothing on `ledge.tools` may require an
+email to see a number. A sign-up endpoint in the Worker is a follow-up and is
+not implemented. Until it lands, Resend's own hosted sign-up page against the
+same audience is the whole mechanism: the list lives in Resend, this repo never
+holds an address, and `dispatch.py` addresses the audience by id and never
+enumerates it. Every message carries Resend's per-recipient opt-out link.
