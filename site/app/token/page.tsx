@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { social } from "../../lib/social";
 import type { ReactElement } from "react";
 import Link from "next/link";
 import { Footer } from "../../components/Footer";
@@ -21,10 +22,7 @@ import { Footer } from "../../components/Footer";
    3. The agent gets one sentence, as what the fees would build (PLAN.md
       Phase 2): intent, never owed, dated or nearly done. */
 
-export const metadata: Metadata = {
-  title: "The token — LEDGE",
-  description: "What the LEDGE token on pons is, what holding it gets you, and what it does not.",
-};
+export const metadata: Metadata = social("/token", "The token", "What the LEDGE token on pons is, what holding it gets you, and what it does not.");
 
 type Status = "from launch" | "after launch" | "not yet running" | "running";
 

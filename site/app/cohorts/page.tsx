@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { social } from "../../lib/social";
 import type { ReactElement } from "react";
 import { Age } from "../../components/Age";
 import { Footer } from "../../components/Footer";
@@ -56,11 +57,7 @@ const firstBuyAll = firstBuy?.cohorts.all[0] ?? {
   insufficient: true,
 };
 
-export const metadata: Metadata = {
-  title: "Cohorts — LEDGE",
-  description:
-    "How pons launches graduate, by pair token, creator tax, hour and day; when the first outside buy landed; and where the price went after graduation. Every figure with its sample size.",
-};
+export const metadata: Metadata = social("/cohorts", "Cohorts", "How pons launches graduate, by pair token, creator tax, hour and day; when the first outside buy landed; and where the price went after graduation. Every figure with its sample size.", "firstbuy");
 
 /* While the all-time window holds exactly the launches the 24-hour window
    holds, every table below would be printed twice, cell for cell. One

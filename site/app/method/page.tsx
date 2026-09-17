@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { social } from "../../lib/social";
 import type { ReactElement } from "react";
 import { Footer } from "../../components/Footer";
 import { numberFile } from "../../lib/number";
@@ -8,11 +9,7 @@ import { readCoverage } from "../../lib/coverage";
 import { coverageCardText } from "../../lib/coverage-text";
 import { formatDayLong } from "../../lib/format";
 
-export const metadata: Metadata = {
-  title: "Method — LEDGE",
-  description:
-    "How every number on LEDGE is counted: the source, the definitions, how other pons sites define theirs, and the command that regenerates every figure from the public data.",
-};
+export const metadata: Metadata = social("/method", "Method", "How every number on LEDGE is counted: the source, the definitions, how other pons sites define theirs, and the command that regenerates every figure from the public data.");
 
 const RECOMPUTE = "python pipeline/recompute.py --check";
 
@@ -96,7 +93,7 @@ export default function Method(): ReactElement {
         </details>
       </div>
 
-      {/* C6 (BRAINSTORM-2026-09-13 §3): a reader who has seen another pons
+      {/* C6 (the 13 Sep brainstorm (internal notes) §3): a reader who has seen another pons
           site's survival or safety figure will compare it with ours and, if
           the definitions differ silently, assume ours is wrong. The table
           states the definitions side by side, from their public pages, with

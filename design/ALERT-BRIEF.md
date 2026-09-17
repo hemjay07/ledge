@@ -1,6 +1,6 @@
 # The first-outside-buy alert — design, 2026-09-14
 
-MOAT.md §3, second item: the one thing a trader *acts* on rather than reads.
+the moat note (internal), §3, second item: the one thing a trader *acts* on rather than reads.
 Not built; this is the design to build from, with the parts that are already
 in place named, so the build is a week and not a month.
 

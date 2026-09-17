@@ -59,8 +59,23 @@ const banner = `<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500
 <rect x="0" y="497" width="1500" height="3" fill="${INK}"/>
 </svg>`;
 
+// The link preview, 1200 x 630 (site/public/og/ledge.png and the logo
+// finals): the same wordmark, centred, with the rule along the bottom.
+const OG_FONT = 210;
+const OG_CAP = Math.round(OG_FONT * 0.863);
+const OG_MARK = OG_CAP / 0.7728;
+const OG_BASE = 400;
+const OG_LEFT = 600 - 355;
+const og = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<style>@font-face{font-family:Anton;src:url(data:font/ttf;base64,${anton})}</style>
+<rect width="1200" height="630" fill="${GROUND}"/>
+<g transform="translate(${OG_LEFT - OG_MARK * 0.04} ${OG_BASE - OG_MARK * 0.8128})">${mark(OG_MARK)}</g>
+<text x="${OG_LEFT + OG_MARK * 0.96 + GAP}" y="${OG_BASE}" font-family="Anton" font-size="${OG_FONT}" letter-spacing="28" fill="${INK}">EDGE</text>
+<rect x="0" y="626" width="1200" height="4" fill="${INK}"/>
+</svg>`;
+
 const browser = await chromium.launch();
-for (const [name, svg, w, h] of [["x-profile-400.png", profile, 400, 400], ["x-header-1500x500.png", banner, 1500, 500]]) {
+for (const [name, svg, w, h] of [["x-profile-400.png", profile, 400, 400], ["x-header-1500x500.png", banner, 1500, 500], ["../og-1200x630.png", og, 1200, 630]]) {
   const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
   await page.setContent(`<!doctype html><body style="margin:0;background:${GROUND}">${svg}</body>`);
   await page.evaluate(() => document.fonts.ready);

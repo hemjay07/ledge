@@ -1,6 +1,6 @@
 # The per-token first-buy line on /t/{address} — brief, 2026-09-14
 
-MOAT.md §3: the one thing that turns the first-buy finding into a product.
+the moat note (internal), §3: the one thing that turns the first-buy finding into a product.
 A launcher pastes their address and reads, on their own token's page, when
 its first outside buy landed and how launches like it fared. Read first:
 design/FIRSTBUY-BRIEF.md (the definitions; they are binding here),

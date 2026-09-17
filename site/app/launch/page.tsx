@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { social } from "../../lib/social";
 import type { ReactElement } from "react";
 import Link from "next/link";
 import { Footer } from "../../components/Footer";
@@ -18,11 +19,7 @@ import { formatDayLong } from "../../lib/format";
    heading once committed, so these figures do not track the live record;
    the live figures are one link away, on their own pages. */
 
-export const metadata: Metadata = {
-  title: "LEDGE's own launch — LEDGE",
-  description:
-    "LEDGE launches a token on pons. What it expects and what it commits to were written down and committed before the launch, and are counted afterwards by the same rules as every other launch.",
-};
+export const metadata: Metadata = social("/launch", "LEDGE's own launch", "LEDGE launches a token on pons. What it expects and what it commits to were written down and committed before the launch, and are counted afterwards by the same rules as every other launch.");
 
 /** "19 Sep 2026, 16:00 UTC" from the ISO stamp in data/launch.json. */
 function launchLabel(iso: string): string {

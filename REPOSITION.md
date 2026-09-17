@@ -142,7 +142,7 @@ a rate without its n; no page renders a score.
 calculator. Decide whether DEX volume comes from DexScreener — labelled external per
 #12 — or is skipped until we index the pools ourselves.
 
-**D. Outreach.** Rewrite `OUTREACH.md` to lead with the broken analytics tab rather
+**D. Outreach.** Rewrite the outreach note (internal) to lead with the broken analytics tab rather
 than the exposé, in that order: pons first, then the chain's data accounts, then the
 journalists. Add the email field.
 

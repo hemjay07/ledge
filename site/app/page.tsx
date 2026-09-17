@@ -124,7 +124,7 @@ export default function Home(): ReactElement {
               LEDGE counts every pons launch and times every graduation. Every number here says how
               many it was counted from.
             </p>
-            {/* C5 (BRAINSTORM-2026-09-13): the one line of difference. Four pons
+            {/* C5 (the 13 Sep brainstorm, internal notes): the one line of difference. Four pons
                 sites score or publish the tape; a visitor arriving from one needs
                 to know why this page looks different, in one line, before the
                 table. It is a separate line, not part of the dek, because the dek

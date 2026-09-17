@@ -26,11 +26,29 @@ const body = Newsreader({
   variable: "--ledge-font-body",
 });
 
+const HOME_DESCRIPTION =
+  "Counts every pons launch on Robinhood Chain: how many graduate, how fast, what happens after. Every figure with the number it was counted from.";
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://ledge.tools"),
   title: "LEDGE — The Pons Number",
-  description:
-    "The Pons Number: the share of Pons launches that graduate, measured hourly from the factory contract, published with its denominator.",
+  description: HOME_DESCRIPTION,
+  /* The homepage's preview is the live graduation card from the Worker,
+     stamped with its measurement time; pages set their own in lib/social.ts. */
+  openGraph: {
+    type: "website",
+    url: "https://ledge.tools/",
+    siteName: "LEDGE",
+    title: "LEDGE — The Pons Number",
+    description: HOME_DESCRIPTION,
+    images: [{ url: "/og/figure/graduation.png", width: 1200, height: 630, alt: "The share of pons launches that graduated, with its n and measurement time." }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LEDGE — The Pons Number",
+    description: HOME_DESCRIPTION,
+    images: ["/og/figure/graduation.png"],
+  },
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },

@@ -900,6 +900,14 @@ export function lookupShell(siteOrigin: string): string {
 <title>Look up a token — LEDGE</title>
 <meta name="description" content="Paste a pons token address. LEDGE shows what happened on its curve, counted from the chain.">
 <meta name="robots" content="noindex">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="LEDGE">
+<meta property="og:title" content="Look up a token — LEDGE">
+<meta property="og:description" content="Paste a pons token address. LEDGE shows what happened on its curve, counted from the chain.">
+<meta property="og:image" content="${siteOrigin}/ledge-og.png">
+<meta property="og:url" content="${siteOrigin}/t">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${siteOrigin}/ledge-og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">

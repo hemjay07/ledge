@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { social } from "../../lib/social";
 import type { ReactElement } from "react";
 import { Footer } from "../../components/Footer";
 import { GraduatedBoard } from "../../components/Graduated";
@@ -9,11 +10,7 @@ import { PAGE_SIZE } from "../../lib/paginate";
 
 const { crawledAt, staleAfterSeconds } = numberFile;
 
-export const metadata: Metadata = {
-  title: "Graduated — LEDGE",
-  description:
-    "Every Pons graduation, ranked by how long it took to graduate. No score, no grade, no verdict — the duration is the finding.",
-};
+export const metadata: Metadata = social("/graduated", "Graduated", "Every pons graduation, ranked by how long it took to graduate. No score, no grade, no verdict — the duration is the finding.", "graduation");
 
 /* Only the first page ships in the HTML (REVAMP.md pagination).
    graduatedFile.rows is generated fastest-first by
