@@ -67,7 +67,7 @@ Image: `https://ledge.tools/og/figure/firstbuy.png`.
 
 No image; link the /method card.
 
-> LEDGE launches its own token on pons this week. Before it does, the
+> LEDGE launches its own token on pons Friday, 16:00 UTC. Before it does, the
 > expected outcome and the failure clause are written down and committed:
 > ledge.tools/launch
 >
