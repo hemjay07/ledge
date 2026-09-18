@@ -31,6 +31,10 @@
     {
       "source": "/og/figure/:path*",
       "destination": "https://ledge-api.ledge-worker.workers.dev/og/figure/:path*"
+    },
+    {
+      "source": "/og/token/:path*",
+      "destination": "https://ledge-api.ledge-worker.workers.dev/og/token/:path*"
     }
   ],
   "headers": [

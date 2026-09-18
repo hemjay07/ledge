@@ -11,9 +11,11 @@
    no card rather than a stale one. */
 
 import { CARD_HEIGHT, CARD_WIDTH, type Card, type CardText } from "./card";
-import { formatCount, formatDuration, formatStamp, rateText } from "./format";
+import { formatAge, formatAmount, formatCount, formatDuration, formatShareOfOne, formatStamp, rateText, shortAddress } from "./format";
 import type { FirstBuyCohortRow, NumberFile } from "./numberFile";
-import { taxLabel } from "./buckets";
+import { pairLabel, taxLabel } from "./buckets";
+import type { TokenResponse } from "./schema";
+import { isInsufficient } from "./format";
 
 const GROUND = "#EFEAE0";
 const INK = "#16130F";
@@ -23,6 +25,17 @@ const PAD = 64;
     A longer line runs off the card (2026-09-16: the graduation card's
     third line clipped at "Half the graduations took"). */
 export const MAX_LINE_CHARS = 64;
+const MAX_LINE = 64;
+
+/** Cuts a line to the card's width at a word boundary, with an ellipsis. */
+function clip(line: string): string {
+  return clipTo(line, MAX_LINE);
+}
+function clipTo(line: string, max: number): string {
+  if (line.length <= max) return line;
+  const cut = line.slice(0, max - 1);
+  return `${cut.slice(0, cut.lastIndexOf(" "))}…`;
+}
 
 export const FIGURE_NAMES = ["firstbuy", "graduation", "graveyard"] as const;
 
@@ -120,4 +133,64 @@ export function figureCard(name: string, file: NumberFile, graveyard: GraveyardF
   }
 
   return null;
+}
+
+
+/* The token card (2026-09-18): one token's own facts, for a post about that
+   token. The share card (/og/t) leads with the cohort rate and a minute
+   count; a quote-post needs the token first. Fill is the big number; the
+   counts, the launch block and the first outside buy follow; the cohort
+   sits last with its n. Nothing here is computed: every figure is read off
+   the lookup body, and every sentence is the wording the /t page prints. */
+export function tokenCard(body: Omit<TokenResponse, "text">, nowSeconds: number): Card {
+  const s = body.state;
+  const c = body.config;
+  const a = body.activity;
+  const sym = c.symbol ? c.symbol.toUpperCase() : shortAddress(body.address);
+  const age = s.elapsedSeconds === null ? "age not indexed" : `${formatAge(s.elapsedSeconds)} old`;
+  const state = s.graduated
+    ? s.timeToGraduationSeconds === null ? "graduated" : `graduated in ${formatDuration(s.timeToGraduationSeconds)}`
+    : "on the curve";
+  // The kicker is wide-tracked (4 px at 22 px): about 58 characters fit.
+  const kicker = clipTo(`PONS · ${sym} · ${age} · ${state}`.toUpperCase(), 58);
+
+  const lines: CardText[] = [];
+  const holds = s.curveFilledWei !== null && s.curveFilledWei !== "0";
+  if (s.curveFilledShare !== null) {
+    lines.push(text(formatShareOfOne(s.curveFilledShare, holds), PAD, 290, 150, 600));
+    const filled = c.pairDecimals === null ? null : formatAmount(s.curveFilledWei ?? "0", c.pairDecimals, c.pairSymbol);
+    const threshold = c.pairDecimals === null ? null : formatAmount(s.graduationThresholdWei ?? "0", c.pairDecimals, c.pairSymbol);
+    lines.push(text(clip(filled && threshold ? `of the curve filled: ${filled} of ${threshold}.` : "of the curve filled."), PAD, 344, 30));
+  } else {
+    lines.push(text("fill not read", PAD, 290, 96, 600));
+    lines.push(text(clip(`Curve fill: ${s.fillNote ?? "not available"}.`), PAD, 344, 30));
+  }
+
+  if (a) {
+    const buyers = a.firstBlock === null ? "launch block not indexed" : `${formatCount(a.firstBlock.distinctBuyers)} ${a.firstBlock.distinctBuyers === 1 ? "buyer" : "buyers"} in the launch block`;
+    lines.push(text(clip(`${formatCount(a.buys)} ${a.buys === 1 ? "buy" : "buys"} · ${formatCount(a.sells)} ${a.sells === 1 ? "sell" : "sells"} · ${buyers}.`), PAD, 402, 28));
+    const fob = a.firstOutsideBuy;
+    const first = fob === null
+      ? a.launchTxBuy === null ? "First outside buy: not recorded." : "First outside buy: none yet."
+      : fob.inLaunchBlock ? "First outside buy: in the launch block itself."
+      : fob.delaySeconds === null ? "First outside buy: none yet."
+      : `First outside buy: ${formatDuration(fob.delaySeconds)} after the launch block.`;
+    lines.push(text(clip(first), PAD, 440, 28));
+  } else {
+    lines.push(text("Curve activity: not indexed for this launch.", PAD, 402, 28));
+  }
+
+  const w = body.cohort?.allTime ?? null;
+  if (w) {
+    const fact = { rate: w.rate, n: w.launches, insufficient: w.insufficient };
+    const ef = { rate: w.excludingFast.rate, n: w.launches, insufficient: w.excludingFast.insufficient };
+    const who = `${pairLabel(c.pairClass)} · ${c.taxBucket === null ? "tax not read" : `${taxLabel(c.taxBucket)} tax`}`;
+    lines.push(text(clip(`Launches like this (${who}), n=${formatCount(w.launches)}:`), PAD, 490, 26, 400, INK_MUTED));
+    const line = isInsufficient(fact)
+      ? rateText(fact)
+      : `${rateText(fact)} graduated · ${rateText(ef)} leaving out under ${formatDuration(w.excludingFast.cutoffSeconds)}.`;
+    lines.push(text(clip(line), PAD, 522, 26, 400, INK_MUTED));
+  }
+
+  return frame(kicker, lines, `Read ${formatStamp(new Date(nowSeconds * 1000).toISOString()).replace(/^Measured /, "")}`);
 }

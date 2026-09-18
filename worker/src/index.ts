@@ -10,7 +10,7 @@ import { tick } from "./tick";
 import { lookupToken } from "./service";
 import { renderCard, renderCardSvg } from "./og";
 import { cardSvg } from "./card";
-import { figureCard, type GraveyardFigure } from "./figures";
+import { figureCard, tokenCard, type GraveyardFigure } from "./figures";
 import { lookupShell, tokenShell } from "./html";
 import { headline } from "./text";
 import { numberText } from "./text";
@@ -390,6 +390,18 @@ async function handleFigure(env: Env, name: string, nowMs: number): Promise<Resp
   });
 }
 
+/* /og/token/{address}.png: the token card (worker/src/figures.ts tokenCard),
+   the token's own facts first, for a post about that token. */
+async function handleTokenCard(env: Env, address: string, nowMs: number): Promise<Response> {
+  const outcome = await lookupToken(env, address, nowMs);
+  if (outcome.kind === "not_a_pons_token") return new Response("not found", { status: 404 });
+  if (outcome.kind === "rpc_down") return new Response("upstream", { status: 503 });
+  const png = await renderCardSvg(cardSvg(tokenCard(outcome.body, Math.floor(nowMs / 1000))));
+  return new Response(png as unknown as BodyInit, {
+    headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=60", ...CORS },
+  });
+}
+
 async function handleCard(env: Env, address: string, nowMs: number): Promise<Response> {
   const outcome = await lookupToken(env, address, nowMs);
   if (outcome.kind === "not_a_pons_token") return new Response("not found", { status: 404 });
@@ -530,6 +542,8 @@ export default {
     // figure from the same count the board reports.
     const figure = path.match(/^\/og\/figure\/([a-z0-9-]+)\.png$/);
     if (figure) return handleFigure(env, figure[1] as string, nowMs);
+    const tokenPng = path.match(/^\/og\/token\/(0x[0-9a-fA-F]{40})\.png$/);
+    if (tokenPng) return handleTokenCard(env, (tokenPng[1] as string).toLowerCase(), nowMs);
 
     // /og/t/{address}.png is the unfurled card; /t/{address}/og.png is the
     // same image under the shell's own path, so a reader guessing either

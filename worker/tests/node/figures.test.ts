@@ -70,3 +70,22 @@ describe("figure cards", () => {
     }
   });
 });
+
+describe("the token card", () => {
+  it("leads with the token's own fill, counts and first outside buy, then the cohort with its n", async () => {
+    const { tokenCard } = await import("../../src/figures");
+    const { makeBody, ACTIVITY } = await import("./helpers");
+    const body = makeBody({ activity: ACTIVITY, fill: { filledWei: "1892200000000000000", thresholdWei: "4200000000000000000", share: 0.4505, note: null } });
+    const card = tokenCard(body, 1_762_536_735);
+    const lines = card.texts.map((t) => t.text);
+    expect(lines[0]).toMatch(/^PONS · .* · ON THE CURVE$/);
+    expect(lines[1]).toBe("45.1%");
+    expect(lines[2]).toContain("of the curve filled: 1.8922 ETH of 4.2 ETH");
+    expect(lines[3]).toMatch(/buys · .* sells · .* in the launch block\./);
+    expect(lines[4]).toContain("First outside buy:");
+    expect(lines[5]).toMatch(/^Launches like this \(.*\), n=[0-9,]+:$/);
+    expect(lines[6]).toMatch(/graduated · .* leaving out under 5 min\.$/);
+    for (const t of card.texts) if (t.size >= 26 && t.size <= 30) expect(t.text.length).toBeLessThanOrEqual(64);
+    expect(lines.some((l) => l.startsWith("Read "))).toBe(true);
+  });
+});
