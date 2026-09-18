@@ -15,6 +15,7 @@ import { formatAge, formatAmount, formatCount, formatDuration, formatShareOfOne,
 import type { FirstBuyCohortRow, NumberFile } from "./numberFile";
 import { pairLabel, taxLabel } from "./buckets";
 import type { TokenResponse } from "./schema";
+import { placementText } from "./text";
 import { isInsufficient } from "./format";
 
 const GROUND = "#EFEAE0";
@@ -25,11 +26,12 @@ const PAD = 64;
     A longer line runs off the card (2026-09-16: the graduation card's
     third line clipped at "Half the graduations took"). */
 export const MAX_LINE_CHARS = 64;
-const MAX_LINE = 64;
 
-/** Cuts a line to the card's width at a word boundary, with an ellipsis. */
-function clip(line: string): string {
-  return clipTo(line, MAX_LINE);
+/** Cuts a line to the card's width at a word boundary, with an ellipsis.
+    Plex Mono advances 0.6 em, so the width in characters follows the size:
+    64 at 28 px, 68 at 26 px, 74 at 24 px. */
+function clip(line: string, size = 28): string {
+  return clipTo(line, Math.floor((CARD_WIDTH - 2 * PAD) / (size * 0.6)));
 }
 function clipTo(line: string, max: number): string {
   if (line.length <= max) return line;
@@ -146,50 +148,63 @@ export function tokenCard(body: Omit<TokenResponse, "text">, nowSeconds: number)
   const s = body.state;
   const c = body.config;
   const a = body.activity;
+  // The symbol as the headline; the short address, unclipped, when there is none.
   const sym = c.symbol ? c.symbol.toUpperCase() : shortAddress(body.address);
+  const headline = c.symbol ? clipTo(sym, 16) : sym;
   const age = s.elapsedSeconds === null ? "age not indexed" : `${formatAge(s.elapsedSeconds)} old`;
   const state = s.graduated
     ? s.timeToGraduationSeconds === null ? "graduated" : `graduated in ${formatDuration(s.timeToGraduationSeconds)}`
     : "on the curve";
   // The kicker is wide-tracked (4 px at 22 px): about 58 characters fit.
-  const kicker = clipTo(`PONS · ${sym} · ${age} · ${state}`.toUpperCase(), 58);
+  const kicker = clipTo(`PONS · ${state} · ${age}`.toUpperCase(), 58);
 
   const lines: CardText[] = [];
+  // The name is the headline (2026-09-18): a quote-post is about this token.
+  // Anton caps at 118 px fit about 16 characters across the card.
+  lines.push(text(headline, PAD, 250, headline.length > 10 ? 96 : 118, 600));
+
   const holds = s.curveFilledWei !== null && s.curveFilledWei !== "0";
   if (s.curveFilledShare !== null) {
-    lines.push(text(formatShareOfOne(s.curveFilledShare, holds), PAD, 290, 150, 600));
     const filled = c.pairDecimals === null ? null : formatAmount(s.curveFilledWei ?? "0", c.pairDecimals, c.pairSymbol);
     const threshold = c.pairDecimals === null ? null : formatAmount(s.graduationThresholdWei ?? "0", c.pairDecimals, c.pairSymbol);
-    lines.push(text(clip(filled && threshold ? `of the curve filled: ${filled} of ${threshold}.` : "of the curve filled."), PAD, 344, 30));
+    const share = formatShareOfOne(s.curveFilledShare, holds);
+    lines.push(text(clip(filled && threshold ? `${share} of the curve filled: ${filled} of ${threshold}.` : `${share} of the curve filled.`), PAD, 312, 32, 600));
   } else {
-    lines.push(text("fill not read", PAD, 290, 96, 600));
-    lines.push(text(clip(`Curve fill: ${s.fillNote ?? "not available"}.`), PAD, 344, 30));
+    lines.push(text(clip(`Curve fill: ${s.fillNote ?? "not available"}.`), PAD, 318, 32, 600));
   }
 
   if (a) {
     const buyers = a.firstBlock === null ? "launch block not indexed" : `${formatCount(a.firstBlock.distinctBuyers)} ${a.firstBlock.distinctBuyers === 1 ? "buyer" : "buyers"} in the launch block`;
-    lines.push(text(clip(`${formatCount(a.buys)} ${a.buys === 1 ? "buy" : "buys"} · ${formatCount(a.sells)} ${a.sells === 1 ? "sell" : "sells"} · ${buyers}.`), PAD, 402, 28));
+    lines.push(text(clip(`${formatCount(a.buys)} ${a.buys === 1 ? "buy" : "buys"} · ${formatCount(a.sells)} ${a.sells === 1 ? "sell" : "sells"} · ${buyers}.`), PAD, 366, 28));
     const fob = a.firstOutsideBuy;
     const first = fob === null
       ? a.launchTxBuy === null ? "First outside buy: not recorded." : "First outside buy: none yet."
       : fob.inLaunchBlock ? "First outside buy: in the launch block itself."
       : fob.delaySeconds === null ? "First outside buy: none yet."
       : `First outside buy: ${formatDuration(fob.delaySeconds)} after the launch block.`;
-    lines.push(text(clip(first), PAD, 440, 28));
+    lines.push(text(clip(first), PAD, 404, 28));
   } else {
-    lines.push(text("Curve activity: not indexed for this launch.", PAD, 402, 28));
+    lines.push(text("Curve activity: not indexed for this launch.", PAD, 366, 28));
   }
+
+  /* Where this launch sits on the published table of graduation times
+     (text.ts placementText, the wording the vector gate pins). Stated the
+     same way whether it flatters the token or not: "56% of graduations were
+     done within 5 min (n=4,376); this launch was not." */
+  const placed = placementText(body.placement, s.graduated);
+  // 24 px: 74 characters fit, and the pinned sentence is 73.
+  if (placed && !placed.startsWith("The table")) lines.push(text(clip(placed, 24), PAD, 448, 24));
 
   const w = body.cohort?.allTime ?? null;
   if (w) {
     const fact = { rate: w.rate, n: w.launches, insufficient: w.insufficient };
     const ef = { rate: w.excludingFast.rate, n: w.launches, insufficient: w.excludingFast.insufficient };
     const who = `${pairLabel(c.pairClass)} · ${c.taxBucket === null ? "tax not read" : `${taxLabel(c.taxBucket)} tax`}`;
-    lines.push(text(clip(`Launches like this (${who}), n=${formatCount(w.launches)}:`), PAD, 490, 26, 400, INK_MUTED));
+    lines.push(text(clip(`Launches like this (${who}), n=${formatCount(w.launches)}:`, 24), PAD, 484, 24, 400, INK_MUTED));
     const line = isInsufficient(fact)
       ? rateText(fact)
-      : `${rateText(fact)} graduated · ${rateText(ef)} leaving out under ${formatDuration(w.excludingFast.cutoffSeconds)}.`;
-    lines.push(text(clip(line), PAD, 522, 26, 400, INK_MUTED));
+      : `${rateText(fact)} graduated · ${rateText(ef)} leaving out graduations under ${formatDuration(w.excludingFast.cutoffSeconds)}.`;
+    lines.push(text(clip(line, 24), PAD, 514, 24, 400, INK_MUTED));
   }
 
   return frame(kicker, lines, `Read ${formatStamp(new Date(nowSeconds * 1000).toISOString()).replace(/^Measured /, "")}`);

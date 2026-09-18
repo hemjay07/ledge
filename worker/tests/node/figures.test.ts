@@ -78,13 +78,14 @@ describe("the token card", () => {
     const body = makeBody({ activity: ACTIVITY, fill: { filledWei: "1892200000000000000", thresholdWei: "4200000000000000000", share: 0.4505, note: null } });
     const card = tokenCard(body, 1_762_536_735);
     const lines = card.texts.map((t) => t.text);
-    expect(lines[0]).toMatch(/^PONS · .* · ON THE CURVE$/);
-    expect(lines[1]).toBe("45.1%");
-    expect(lines[2]).toContain("of the curve filled: 1.8922 ETH of 4.2 ETH");
+    expect(lines[0]).toMatch(/^PONS · ON THE CURVE · .* OLD$/);
+    expect(lines[1]).toBe("0x23fe54b3…f98fe2"); // the name is the headline; the address when there is none
+    expect(lines[2]).toBe("45.1% of the curve filled: 1.8922 ETH of 4.2 ETH.");
     expect(lines[3]).toMatch(/buys · .* sells · .* in the launch block\./);
     expect(lines[4]).toContain("First outside buy:");
-    expect(lines[5]).toMatch(/^Launches like this \(.*\), n=[0-9,]+:$/);
-    expect(lines[6]).toMatch(/graduated · .* leaving out under 5 min\.$/);
+    expect(lines[5]).toMatch(/of graduations were done within .* \(n=[0-9,]+\); this launch was not\.$/);
+    expect(lines[6]).toMatch(/^Launches like this \(.*\), n=[0-9,]+:$/);
+    expect(lines[7]).toMatch(/graduated · .* leaving out graduations under 5 min\.$/);
     for (const t of card.texts) if (t.size >= 26 && t.size <= 30) expect(t.text.length).toBeLessThanOrEqual(64);
     expect(lines.some((l) => l.startsWith("Read "))).toBe(true);
   });

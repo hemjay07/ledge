@@ -276,7 +276,7 @@ describe("the tick", () => {
     expect(cursor.last_error).toBeNull();
   });
 
-  it("prunes rows past the retention window and keeps the rest", async () => {
+  it("keeps launch rows past the retention window (2026-09-18: the record is kept whole)", async () => {
     await seedCursor(500_000, NOW);
     await env.LEDGE_DB.prepare(
       `INSERT INTO launch VALUES ('0xold', '0xc', '0x0', 'eth', 0, NULL, 1, ?, '0xt', 0)`,
@@ -291,7 +291,7 @@ describe("the tick", () => {
     const { client } = fakeChain({ head: 500_100, launches: [], graduations: [] });
     await tick(env, NOW, client);
     const rows = await env.LEDGE_DB.prepare("SELECT token FROM launch ORDER BY token").all();
-    expect(rows.results.map((r: any) => r.token)).toEqual(["0xkeep"]);
+    expect(rows.results.map((r: any) => r.token)).toEqual(["0xkeep", "0xold"]);
   });
 
   it("bounds the catch-up after an outage rather than blowing the budget", async () => {
@@ -538,16 +538,22 @@ describe("retention keeps a launch as long as its graduation", () => {
     expect(rows.results.map((r: any) => r.token)).toEqual(["0xslow"]);
   });
 
-  it("still evicts a launch past the cutoff that never graduated", async () => {
+  it("keeps a launch past the cutoff that never graduated, and prunes only its activity", async () => {
     await seedCursor(500_000, NOW);
-    await env.LEDGE_DB.prepare(
-      `INSERT INTO launch VALUES ('0xgone', '0xc', '0x0', 'eth', 0, NULL, 10, ?, '0xt1', 0)`,
-    )
-      .bind(NOW - RETENTION_SECONDS - 3600)
-      .run();
+    await env.LEDGE_DB.batch([
+      env.LEDGE_DB.prepare(
+        `INSERT INTO launch VALUES ('0xgone', '0xc', '0x0', 'eth', 0, NULL, 10, ?, '0xt1', 0)`,
+      ).bind(NOW - RETENTION_SECONDS - 3600),
+      env.LEDGE_DB.prepare(
+        `INSERT INTO token_activity (token, from_block, buys, sells, quote_in, quote_out, first_buy_ts, last_activity_ts)
+         VALUES ('0xgone', 10, 3, 0, '1', '0', ?, ?)`,
+      ).bind(NOW - RETENTION_SECONDS - 3500, NOW - RETENTION_SECONDS - 3500),
+    ]);
     await tick(env, NOW, fakeChain({ head: 500_100, launches: [], graduations: [] }).client);
-    const rows = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM launch").first<any>();
-    expect(rows.n).toBe(0);
+    const launches = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM launch").first<any>();
+    const activity = await env.LEDGE_DB.prepare("SELECT count(*) AS n FROM token_activity").first<any>();
+    expect(launches.n).toBe(1);
+    expect(activity.n).toBe(0);
   });
 });
 

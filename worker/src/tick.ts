@@ -845,31 +845,18 @@ export async function tick(
        lookup that reported the token unindexed while still holding its
        graduation. Graduations are pruned first, and a launch is kept as long
        as any surviving graduation still references it. */
-    statements.push(
-      db.prepare("DELETE FROM graduation WHERE ts < ?").bind(nowSeconds - RETENTION_SECONDS),
-    );
-    /* Activity is pruned on its own last event, under the same graduation
-       hold, and BEFORE the launch that carries it -- a launch is what maps a
-       curve to a token, so evicting one whose curve is still trading would
-       turn every later trade on it into an unattributed reading. An activity
-       row never predates its launch, so the two always age out together and
-       the window an activity row names is never wider than what was read. */
+    /* 2026-09-18: launch and graduation rows are kept for good. They are
+       small (a launch row is ~200 bytes; 26,000 a day is 5 MB a day), and
+       evicting them cost every token older than a week its launch time,
+       its age, its cohort and its time to graduation on its own page, while
+       the canonical record held all of it. Only the activity rows, the heavy
+       ones, age out; a graduated token's activity is kept with it. */
     statements.push(
       db
         .prepare(
           `DELETE FROM token_activity
              WHERE last_activity_ts < ?
                AND token NOT IN (SELECT token FROM graduation)`,
-        )
-        .bind(nowSeconds - RETENTION_SECONDS),
-    );
-    statements.push(
-      db
-        .prepare(
-          `DELETE FROM launch
-             WHERE ts < ?
-               AND token NOT IN (SELECT token FROM graduation)
-               AND token NOT IN (SELECT token FROM token_activity)`,
         )
         .bind(nowSeconds - RETENTION_SECONDS),
     );
