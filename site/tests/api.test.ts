@@ -140,7 +140,7 @@ describe("the sentences, taken back apart", () => {
 
   it("keeps the notice in its own slot when the launch is not indexed", () => {
     const lines = splitLookupText(body(notIndexed));
-    expect(lines.notice).toContain("Launched more than 7 days ago");
+    expect(lines.notice).toContain("Launched before 5 September 2026");
     expect(lines.config).toBe("ETH pair, 2–3% creator tax. Still on the curve.");
     expect(lines.placement).toBe(
       "The launch time is not indexed, so this launch is not placed on the table of graduation times.",

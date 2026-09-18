@@ -136,7 +136,7 @@ describe("the lookup text", () => {
 
   it("says plainly when a launch is outside the retention window", () => {
     const t = lookupText(makeBody({ launch: null }), MAX);
-    expect(t).toContain("Launched more than 7 days ago");
+    expect(t).toContain("Launched before 5 September 2026");
     expect(t).toContain("not placed on the table of graduation times");
   });
 

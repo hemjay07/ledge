@@ -446,7 +446,7 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
     },
     notice: indexed
       ? null
-      : "Launched more than 7 days ago, or LEDGE has not reached this block yet. The launch time is not known, so the elapsed time and the placement are absent; everything else is read from the chain now.",
+      : "Launched before 5 September 2026, when the record began, or LEDGE has not reached this block yet. The launch time is not known, so the elapsed time and the placement are absent; everything else is read from the chain now.",
     links: {
       method: `${input.siteOrigin}/method`,
       numberJson: `${input.siteOrigin}/number.json`,

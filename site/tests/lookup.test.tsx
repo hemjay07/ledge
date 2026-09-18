@@ -129,7 +129,7 @@ describe("a full lookup", () => {
 describe("a partial", () => {
   it("prints the objection and the four facts that survived it", async () => {
     const container = await lookUp(notIndexed);
-    await waitFor(() => expect(container.textContent).toContain("Launched more than 7 days ago"));
+    await waitFor(() => expect(container.textContent).toContain("Launched before 5 September 2026"));
     const text = container.textContent ?? "";
     expect(text).toContain(notIndexed.message);
     expect(text).toContain("ETH pair, 2–3% creator tax");

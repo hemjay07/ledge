@@ -139,7 +139,7 @@ async function handleToken(env: Env, address: string, nowMs: number): Promise<Re
         schemaVersion: SCHEMA_VERSION,
         error: "not_indexed",
         message:
-          "Launched more than 7 days ago, or LEDGE has not reached this block yet.",
+          "Launched before 5 September 2026, when the record began, or LEDGE has not reached this block yet.",
         lastIndexedBlock: outcome.lastIndexedBlock,
         partial: payload,
       },

@@ -193,7 +193,7 @@ write("token-stale", response({ cursorRow: cursor(3980) }));
 write("token-not-indexed", {
   schemaVersion: 1,
   error: "not_indexed",
-  message: "Launched more than 7 days ago, or LEDGE has not reached this block yet.",
+  message: "Launched before 5 September 2026, when the record began, or LEDGE has not reached this block yet.",
   lastIndexedBlock: LAST_INDEXED_BLOCK,
   /* No launch row means no curve mapping, and retention keeps the two
      together: a token LEDGE cannot place has no activity row either. */

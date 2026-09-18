@@ -262,7 +262,7 @@ Binding response rules, enforced by a Zod schema shared by the Worker, the site,
 { "schemaVersion": 1, "error": "bad_address",  "message": "Not a 20-byte hex address." }              // 400
 { "schemaVersion": 1, "error": "not_pons",     "message": "This address was not launched by the Pons factory 0x7eD5…EC7e.",
   "factory": "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e" }                                          // 404
-{ "schemaVersion": 1, "error": "not_indexed",  "message": "Launched more than 7 days ago, or LEDGE has not reached this block yet.",
+{ "schemaVersion": 1, "error": "not_indexed",  "message": "Launched before 5 September 2026, when the record began, or LEDGE has not reached this block yet.",
   "lastIndexedBlock": 56172588, "partial": { "config": {…}, "state": {…}, "cohort": {…} } }           // 200
 { "schemaVersion": 1, "error": "upstream_unavailable", "message": "The chain RPC did not answer. Nothing is being estimated.",
   "retryAfterSeconds": 30 }                                                                          // 503
