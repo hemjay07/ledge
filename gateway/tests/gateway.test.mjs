@@ -254,3 +254,25 @@ test("a header no upstream returned on the first pass is asked again after the b
   assert.ok(g.metrics().retries >= 1);
   a.close(); b.close();
 });
+
+test("an endpoint's own upstream timeout (-32000, context deadline exceeded) fails over like a refusal", async () => {
+  const a = await fakeUpstream((items) => items.map((i) => ({ jsonrpc: "2.0", id: i.id, error: { code: -32000, message: 'Post "http://10.31.11.37:8547/rpc": context deadline exceeded' } })));
+  const b = await fakeUpstream((items) => ok(items, () => [{ blockNumber: "0x1" }]));
+  const g = gw(a, b);
+  const out = await g.handle([req("eth_getLogs", [{ fromBlock: "0x1", toBlock: "0x2" }])]);
+  assert.equal(out.status, 200);
+  assert.deepEqual(out.body[0].result, [{ blockNumber: "0x1" }]);
+  // Two: the head refresh that precedes a log read met the same timeout.
+  assert.ok(g.metrics().upstreams[0].busy >= 1);
+  a.close(); b.close();
+});
+
+test("any other -32000 is an answer, passed through and never cached", async () => {
+  const a = await fakeUpstream((items) => items.map((i) => ({ jsonrpc: "2.0", id: i.id, error: { code: -32000, message: "block range too large" } })));
+  const b = await fakeUpstream((items) => ok(items, () => "unexpected"));
+  const g = gw(a, b);
+  const out = await g.handle([req("eth_getLogs", [{ fromBlock: "0x1", toBlock: "0x2" }])]);
+  assert.equal(out.body[0].error.message, "block range too large");
+  assert.equal(b.calls.length, 0);
+  a.close(); b.close();
+});

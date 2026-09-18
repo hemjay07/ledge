@@ -29,6 +29,13 @@
 
 const USER_AGENT = "ledge/1.0 (+https://ledge.tools)";
 const BUSY_CODES = new Set([-32005]);
+/* A -32000 whose message is the endpoint's own upstream timing out ("Post
+   http://10.x.x.x:8547/rpc: context deadline exceeded", 2026-09-18, 275
+   tick passes lost in twelve hours) is a refusal in everything but its
+   code: the endpoint did not answer the question. Any other -32000 (a
+   range too large, an unknown block) is an answer and is passed through. */
+const TRANSIENT_MESSAGE = /context deadline exceeded|timeout|timed out|deadline/i;
+const isTransient = (e) => !!e && (BUSY_CODES.has(e.code) || (e.code === -32000 && TRANSIENT_MESSAGE.test(String(e.message ?? ""))));
 const DEFAULT_RETRY_DELAYS_MS = [500, 1500, 4000];
 const HEAD_TTL_MS = 1000;
 const UPSTREAM_TIMEOUT_MS = 20_000;
@@ -158,7 +165,7 @@ export function createGateway(options) {
       }
       const body = await response.json();
       const list = Array.isArray(body) ? body : [body];
-      if (list.some((r) => r?.error && BUSY_CODES.has(r.error.code))) {
+      if (list.some((r) => r?.error && isTransient(r.error))) {
         up.stats.busy += 1;
         return { refused: "busy" };
       }
