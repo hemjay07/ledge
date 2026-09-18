@@ -118,6 +118,15 @@ document does not claim the data supports that choice.
 graduation share in the record, 2.52%; 4–5% halves it to 0.77%), and
 commitments 1 and 2 confirmed as written.
 
+**Erratum, 2026-09-18.** The launch window above says "Friday 19 September
+2026". 19 September 2026 is a Saturday. The date and hour stand: 19
+September 2026, 16:00 UTC. The weekday was wrong, and the sentence about
+Friday's graduation rate therefore describes a different day from the one
+chosen. On the record as of this date Saturday's rate excluding fast
+graduations is 0.81% of 33,623 launches. As the document already says, the
+day played no part in the choice. Nothing above the Outcome heading is
+edited; this note is the correction.
+
 **Filled 2026-09-17:** the launch window, above. It was the last thing
 decided, deliberately, because the data layer had to be solid before the
 launch post pointed at it.
