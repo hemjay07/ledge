@@ -381,10 +381,17 @@ export function buildTokenBody(input: BuildInput): Omit<TokenResponse, "text"> {
     firstBuy = firstBuyFor(numberFile, taxBucket);
     /* No launch time, no placement. An unindexed token is not placed at
        "minute 0": it is not placed at all. */
+    /* A launch is placed by the figure the ladder is a table of: its time
+       to graduation once it has one, its age while it has not. Placing a
+       graduated token by its age (2026-09-19) drifted with the clock, so a
+       token that graduated in 25 minutes read "86% of graduations were done
+       within 1 h" an hour later, and "99% within 24 h" the next day: true
+       sentences about a mark the token had nothing to do with. */
+    const placeAt = timeToGraduationSeconds ?? elapsedSeconds;
     placement =
-      elapsedSeconds === null
+      placeAt === null
         ? null
-        : placeOnLadder(numberFile.allTime, "allTime", numberFile.crawledAt, elapsedSeconds);
+        : placeOnLadder(numberFile.allTime, "allTime", numberFile.crawledAt, placeAt);
   }
 
   return {

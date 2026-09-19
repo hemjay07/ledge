@@ -274,3 +274,22 @@ describe("the first-outside-buy activity reading", () => {
     expect(unknown.activity?.launchTxBuy).toBeNull();
   });
 });
+
+describe("where a launch sits on the table of graduation times", () => {
+  it("places a graduated token by its time to graduation, not by its age", () => {
+    // The fixture launch is 811 s old. A graduation 120 s after it puts the
+    // token on the 120 s mark, never on the mark its 811 s of age reaches.
+    const body = makeBody({
+      graduation: { token: ADDRESS, block: 56172100, ts: LAUNCH.ts + 120 },
+    });
+    expect(body.state.timeToGraduationSeconds).toBe(120);
+    expect(body.placement?.elapsedSeconds).toBe(120);
+    expect(body.placement?.rung?.atSeconds).toBe(120);
+  });
+
+  it("places a launch still on the curve by its age", () => {
+    const body = makeBody();
+    expect(body.state.graduated).toBe(false);
+    expect(body.placement?.elapsedSeconds).toBe(body.state.elapsedSeconds);
+  });
+});
