@@ -16,7 +16,11 @@ describe("/launch", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("2.52% graduated (588 of 23,353)");
     expect(text).toContain("record as of 12 Sep 2026");
-    expect(text).toContain("launches 19 Sep 2026, 16:00 UTC");
+    /* Live since 2026-09-19 16:25 UTC: the header reads "live" and the
+       launch line carries the actual launch time from data/launch.json. */
+    expect(text).toContain("live");
+    expect(text).toContain("The token is live.");
+    expect(text).toContain("19 Sep 2026, 16:25 UTC");
   });
 
   it("carries the three commitments and the commit hash from data/launch.json", () => {
