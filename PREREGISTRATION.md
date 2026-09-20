@@ -110,7 +110,44 @@ document does not claim the data supports that choice.
 
 ## Outcome
 
-*(empty until after launch)*
+**Token:** LEDGE, `0xdf6f7daf68990e5e9ce25fc71579e29b44132295`. Launched
+2026-09-19 16:25:25 UTC in block 67223550 from `0xBCc4d6E6B0e748770F9733AB42C0231E97F7333F`,
+25 minutes after the window above. The launch transaction carried no buy.
+
+**Readings, from `/t/0xdf6f…2295`, with their measurement times:**
+
+| read at (UTC) | elapsed | buys | sells | curve fill | buyers in launch block |
+|---|---|---|---|---|---|
+| 2026-09-19 16:29 | 4 min | 0 | 0 | 0.00 of 4.2 ETH | 0 |
+| 2026-09-19 18:10 | 1 h 45 min | 0 | 0 | 0.00 of 4.2 ETH | 0 |
+| 2026-09-19 21:34 | 5 h 9 min | 0 | 0 | 0.00 of 4.2 ETH | 0 |
+| 2026-09-20 21:59 | 29 h 34 min | 0 | 0 | 0.00 of 4.2 ETH | 0 |
+| +7 d | *(due 2026-09-26)* | | | | |
+
+The activity index counts every buy and sell on the curve from the launch
+block onward, so the +1 h reading is the 18:10 row: nothing traded between
+the two.
+
+**Expectations, matched or not:**
+
+- Creator wallet does not buy on the curve: **matched.** 0 buyers in the
+  launch block, no buy in the launch transaction, 0 buys since.
+- No arranged buys: **matched.** 0 buys.
+- Every reading published as it happens: **matched.** The token page from
+  the launch block; front pages No. 2, 3 and 4 on X at 4 min, 5 h and 29 h.
+- No fill inside five minutes: **matched.**
+- Graduation: **not graduated at 29 h.** The base-rate outcome, as the
+  document says above. If it graduates, slow: **not applicable** so far.
+- Published in the same place with the same prominence: **matched.** This
+  section, on `/method`, and the homepage slot.
+
+**Reference, from the record as of the 29 h reading:** 44.2% of launches
+in this cohort (ETH pair, 2–3% tax) took no outside buy in their first hour
+(n = 52,197). 94.3% of all graduations were done within 6 hours (n = 4,717).
+In a sample of 200 matured launches read on 2026-09-08, 93.5% had raised
+nothing on their curve.
+
+*+7 d reading and the closing line to follow on 2026-09-26.*
 
 ---
 
